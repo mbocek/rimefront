@@ -13,7 +13,7 @@ use crate::economy::Economies;
 use crate::engineers::{EngineerJob, EngineerTask};
 use crate::fog::FogOfWar;
 use crate::intel::Intel;
-use crate::levels::Difficulty;
+use crate::levels::{Difficulty, Personality};
 use crate::map::{
     CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, in_far_half,
     mirror_centre, opposite_cell, opposite_origin, world_to_cell,
@@ -76,6 +76,8 @@ pub struct AiCommander {
     pub team: Team,
     pub base: IVec2,
     pub difficulty: Difficulty,
+    #[serde(default)]
+    pub personality: Personality,
     think_timer: f32,
     wave_size: usize,
     #[serde(default)]
@@ -96,6 +98,7 @@ impl AiCommander {
             team,
             base,
             difficulty,
+            personality: Personality::Balanced,
             think_timer: difficulty.think_interval_secs(),
             wave_size: difficulty.first_wave_size(),
             secs_since_enemy_army_seen: 0.0,
@@ -104,6 +107,165 @@ impl AiCommander {
             planned_vehicle: None,
         }
     }
+
+    pub fn with_personality(mut self, personality: Personality) -> Self {
+        self.personality = personality;
+        self.wave_size = self
+            .difficulty
+            .first_wave_size()
+            .saturating_add_signed(first_wave_change(personality))
+            .max(MIN_FIRST_WAVE);
+        self
+    }
+}
+
+const MIN_FIRST_WAVE: usize = 3;
+
+/// The fastest way to an army and its first strike, with defences left for later.
+const RUSHER_PLAN: [BuildingKind; 16] = [
+    BuildingKind::PowerPlant,
+    BuildingKind::Barracks,
+    BuildingKind::Refinery,
+    BuildingKind::Factory,
+    BuildingKind::PowerPlant,
+    BuildingKind::Refinery,
+    BuildingKind::PowerPlant,
+    BuildingKind::TechCenter,
+    BuildingKind::RepairBay,
+    BuildingKind::PowerPlant,
+    BuildingKind::GunTurret,
+    BuildingKind::Helipad,
+    BuildingKind::Refinery,
+    BuildingKind::FlakCannon,
+    BuildingKind::PowerPlant,
+    BuildingKind::GunTurret,
+];
+
+/// Guns around the base before anything else, then artillery behind them.
+const FORTRESS_PLAN: [BuildingKind; 20] = [
+    BuildingKind::PowerPlant,
+    BuildingKind::Barracks,
+    BuildingKind::Refinery,
+    BuildingKind::GunTurret,
+    BuildingKind::PowerPlant,
+    BuildingKind::Factory,
+    BuildingKind::GunTurret,
+    BuildingKind::RocketBunker,
+    BuildingKind::PowerPlant,
+    BuildingKind::GunTurret,
+    BuildingKind::Refinery,
+    BuildingKind::FlakCannon,
+    BuildingKind::PowerPlant,
+    BuildingKind::TechCenter,
+    BuildingKind::GunTurret,
+    BuildingKind::RepairBay,
+    BuildingKind::FlakCannon,
+    BuildingKind::PowerPlant,
+    BuildingKind::GunTurret,
+    BuildingKind::Refinery,
+];
+
+/// Straight to the Tech Center and a Repair Bay for the heavy tanks.
+const ARMOURED_PLAN: [BuildingKind; 17] = [
+    BuildingKind::PowerPlant,
+    BuildingKind::Barracks,
+    BuildingKind::Refinery,
+    BuildingKind::PowerPlant,
+    BuildingKind::Factory,
+    BuildingKind::GunTurret,
+    BuildingKind::PowerPlant,
+    BuildingKind::Refinery,
+    BuildingKind::TechCenter,
+    BuildingKind::RepairBay,
+    BuildingKind::GunTurret,
+    BuildingKind::PowerPlant,
+    BuildingKind::Refinery,
+    BuildingKind::Helipad,
+    BuildingKind::FlakCannon,
+    BuildingKind::PowerPlant,
+    BuildingKind::GunTurret,
+];
+
+/// Two Helipads as soon as the economy can pay for the Tech Center.
+const AIR_POWER_PLAN: [BuildingKind; 17] = [
+    BuildingKind::PowerPlant,
+    BuildingKind::Barracks,
+    BuildingKind::Refinery,
+    BuildingKind::PowerPlant,
+    BuildingKind::Factory,
+    BuildingKind::GunTurret,
+    BuildingKind::PowerPlant,
+    BuildingKind::Refinery,
+    BuildingKind::TechCenter,
+    BuildingKind::Helipad,
+    BuildingKind::PowerPlant,
+    BuildingKind::Helipad,
+    BuildingKind::FlakCannon,
+    BuildingKind::GunTurret,
+    BuildingKind::PowerPlant,
+    BuildingKind::Refinery,
+    BuildingKind::RepairBay,
+];
+
+fn build_plan(personality: Personality) -> &'static [BuildingKind] {
+    match personality {
+        Personality::Balanced => &BUILD_PLAN,
+        Personality::Rusher => &RUSHER_PLAN,
+        Personality::Fortress => &FORTRESS_PLAN,
+        Personality::Armoured => &ARMOURED_PLAN,
+        Personality::AirPower => &AIR_POWER_PLAN,
+    }
+}
+
+fn first_wave_change(personality: Personality) -> isize {
+    match personality {
+        Personality::Rusher => -2,
+        Personality::Fortress => 2,
+        Personality::Balanced | Personality::Armoured | Personality::AirPower => 0,
+    }
+}
+
+fn wave_growth_bonus(personality: Personality) -> usize {
+    match personality {
+        Personality::Rusher => 1,
+        _ => 0,
+    }
+}
+
+/// How much longer than usual a commander waits, with no enemy army in sight, before sending what it has.
+fn patience(personality: Personality) -> f32 {
+    match personality {
+        Personality::Rusher => 0.6,
+        Personality::Fortress => 1.5,
+        Personality::Balanced | Personality::Armoured | Personality::AirPower => 1.0,
+    }
+}
+
+/// How much more or less than usual a commander likes a unit; 1 for the balanced one.
+fn preference(personality: Personality, kind: UnitKind) -> f32 {
+    use UnitKind::*;
+    match (personality, kind) {
+        (Personality::Rusher, Scout | RaiderBike | Rifleman | FlameTrooper) => 2.0,
+        (Personality::Rusher, Tank) => 1.3,
+        (Personality::Rusher, Artillery | Bulwark | Bomber | Sniper) => 0.5,
+        (Personality::Fortress, Artillery | Sniper | RepairTruck) => 2.0,
+        (Personality::Fortress, MissileTruck | Bulwark | Rocketeer) => 1.5,
+        (Personality::Fortress, Scout | RaiderBike) => 0.5,
+        (Personality::Armoured, Bulwark) => 2.5,
+        (Personality::Armoured, Tank) => 2.0,
+        (Personality::Armoured, StealthTank | Rocketeer) => 1.5,
+        (Personality::Armoured, Scout | RaiderBike) => 0.4,
+        (Personality::AirPower, Gunship | Bomber) => 2.0,
+        (Personality::AirPower, Fighter) => 1.5,
+        (Personality::AirPower, Tank | Bulwark) => 0.8,
+        _ => 1.0,
+    }
+}
+
+fn mix_for(personality: Personality, mix: &[(UnitKind, f32)]) -> Vec<(UnitKind, f32)> {
+    mix.iter()
+        .map(|&(kind, weight)| (kind, weight * preference(personality, kind)))
+        .collect()
 }
 
 #[derive(Resource, Clone, Default, Serialize, Deserialize, Debug)]
@@ -167,6 +329,7 @@ pub fn command_enemies(
         );
         let saving_for = plan_next_structure(
             ai.team,
+            ai.personality,
             &ai.sightings,
             &mut production,
             &mut economies,
@@ -470,6 +633,7 @@ fn towards_nearest_crystal(map: &GameMap, home: IVec2, frame: BaseFrame) -> IVec
 /// Queues the next structure of the build plan; returns the price it is saving up for when it cannot pay yet.
 fn plan_next_structure(
     team: Team,
+    personality: Personality,
     sightings: &Sightings,
     production: &mut Production,
     economies: &mut Economies,
@@ -494,7 +658,7 @@ fn plan_next_structure(
         && production.allows(team, flak)
         && flak.missing_requirement(owned).is_none();
     let mut planned_so_far = Vec::new();
-    let next_in_plan = BUILD_PLAN
+    let next_in_plan = build_plan(personality)
         .iter()
         .copied()
         .filter(|&kind| production.allows(team, BuildItem::Structure(kind)))
@@ -600,7 +764,7 @@ fn train_units(
     harvesters: usize,
     saving_for: Option<i32>,
 ) {
-    let (team, sightings) = (ai.team, &ai.sightings);
+    let (team, sightings, personality) = (ai.team, &ai.sightings, ai.personality);
     let refineries = owned
         .iter()
         .filter(|&&k| k == BuildingKind::Refinery)
@@ -631,9 +795,10 @@ fn train_units(
                 production.enqueue(economies, team, BuildItem::Unit(UnitKind::Harvester), owned);
         } else {
             let planned = ai.planned_vehicle.take().filter(|&kind| allowed(kind));
-            if let Some(kind) =
-                planned.or_else(|| pick_weighted(rng, &VEHICLE_MIX, sightings, allowed))
-            {
+            if let Some(kind) = planned.or_else(|| {
+                let mix = mix_for(personality, &VEHICLE_MIX);
+                pick_weighted(rng, &mix, sightings, allowed)
+            }) {
                 if affordable(economies, kind) {
                     let _ = production.enqueue(economies, team, BuildItem::Unit(kind), owned);
                 } else {
@@ -645,11 +810,16 @@ fn train_units(
     let saved_for_vehicle = ai.planned_vehicle.map_or(0, |kind| kind.spec().cost);
     let infantry_queue = production.lane(team, Lane::Infantry).queue.len();
     if infantry_queue < 2
-        && let Some(kind) = pick_weighted(rng, &INFANTRY_MIX, sightings, allowed)
-            .filter(|&kind| affordable(economies, kind))
-            .filter(|&kind| {
-                economies.of(team).credits >= kind.spec().cost + reserve + saved_for_vehicle
-            })
+        && let Some(kind) = pick_weighted(
+            rng,
+            &mix_for(personality, &INFANTRY_MIX),
+            sightings,
+            allowed,
+        )
+        .filter(|&kind| affordable(economies, kind))
+        .filter(|&kind| {
+            economies.of(team).credits >= kind.spec().cost + reserve + saved_for_vehicle
+        })
     {
         let _ = production.enqueue(economies, team, BuildItem::Unit(kind), owned);
     }
@@ -831,7 +1001,8 @@ fn launch_a_wave_when_ready(
     objective: Vec3,
 ) {
     let wave_ready = waiting_at_home.len() >= ai.wave_size;
-    let enemy_army_gone_quiet = ai.secs_since_enemy_army_seen > QUIET_FRONT_SECS;
+    let enemy_army_gone_quiet =
+        ai.secs_since_enemy_army_seen > QUIET_FRONT_SECS * patience(ai.personality);
     let finish_them_off = enemy_army_gone_quiet && !waiting_at_home.is_empty();
     if !wave_ready && !finish_them_off {
         return;
@@ -848,7 +1019,8 @@ fn launch_a_wave_when_ready(
             None => send(orders, objective),
         }
     }
-    ai.wave_size = (ai.wave_size + ai.difficulty.wave_growth()).min(MAX_WAVE_SIZE);
+    let growth = ai.difficulty.wave_growth() + wave_growth_bonus(ai.personality);
+    ai.wave_size = (ai.wave_size + growth).min(MAX_WAVE_SIZE);
 }
 
 /// Fast units waiting at home dash off to hunt an enemy harvester instead of waiting for the wave.

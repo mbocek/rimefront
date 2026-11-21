@@ -3,6 +3,7 @@
 ```sh
 make balance              # 12 AI matches per pairing, about a minute on 10 cores
 make balance MATCHES=40   # tighter numbers
+cargo run --release --bin balance -- --matches 40 --personalities   # each commander personality against Balanced
 ```
 
 `src/bin/balance.rs` runs the headless simulation (`iron_tide::headless`) in parallel and prints a Markdown report:
@@ -65,6 +66,25 @@ it is meant to fire first from hiding, which equal-cost duels do not show. The F
 against ground units its duels end even; the computer builds it only once it has seen enemy aircraft. Units now also prefer targets that can
 hurt them (a tank picks the rocketeer before the rifleman next to it), which made matches shorter and left fewer
 unfinished.
+
+## Commander personalities
+
+Each personality plays Normal against the Balanced commander on Normal, with fog of war, 40 matches per
+pairing on alternating sides and maps (`--personalities`, a few seconds):
+
+| Challenger | vs defender | fog | wins | losses | unfinished | median length | SW : NE site wins |
+|---|---|---|---|---|---|---|---|
+| Normal Rusher | Normal Balanced | on | 19 | 19 | 2 | 7.6 min | 26 : 12 |
+| Normal Fortress | Normal Balanced | on | 23 | 11 | 6 | 6.0 min | 19 : 15 |
+| Normal Armoured | Normal Balanced | on | 21 | 19 | 0 | 8.0 min | 27 : 13 |
+| Normal AirPower | Normal Balanced | on | 16 | 24 | 0 | 6.6 min | 24 : 16 |
+
+The Rusher and the Armoured commander are a match for the Balanced one; the Fortress wins about two games in
+three, as its guns stop the early waves; the Air power commander loses three in five, because most matches are
+decided before its Helipads pay off. Tuning that was measured and kept: the Armoured commander builds its first
+Gun Turret right after the War Factory and no bigger first wave (it lost 6:12 before), and the Air power
+commander builds its second Refinery before the Tech Center (14:26 before). A second early Gun Turret and no
+penalty on tanks for the Air power commander did worse (12:27).
 
 ## Tried and rejected
 

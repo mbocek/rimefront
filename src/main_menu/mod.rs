@@ -726,9 +726,10 @@ fn level_facts(level: &LevelDefinition) -> Vec<(&'static str, String, Color)> {
         facts.push((
             tr(team.name_in(level.faction_of(team))),
             format!(
-                "{}  ·  {}  ·  ${}",
+                "{}  ·  {}  ·  {}  ·  ${}",
                 enemy.force.site.name(),
                 tr_owned(&format!("{:?}", enemy.difficulty)),
+                enemy.personality.name(),
                 enemy.force.credits
             ),
             team.ui_color(),

@@ -1,4 +1,5 @@
 use super::*;
+use crate::levels::Personality;
 
 #[derive(Component)]
 pub struct EditorOption(EditorField);
@@ -94,6 +95,7 @@ pub enum EditorField {
     PlayerSite,
     FogOfWar,
     NeutralSites,
+    Personality,
     Alliance,
     Landscape,
     Weather,
@@ -103,9 +105,10 @@ pub enum EditorField {
     Faction,
 }
 
-pub(super) const EDITOR_FIELDS: [EditorField; 16] = [
+pub(super) const EDITOR_FIELDS: [EditorField; 17] = [
     EditorField::Enemies,
     EditorField::Difficulty,
+    EditorField::Personality,
     EditorField::Credits,
     EditorField::Objective,
     EditorField::Tech,
@@ -148,6 +151,7 @@ impl EditorField {
             EditorField::PlayerSite => tr("Your base"),
             EditorField::FogOfWar => tr("Fog of war"),
             EditorField::NeutralSites => tr("Neutral buildings"),
+            EditorField::Personality => tr("Commander style"),
             EditorField::Alliance => tr("Opponents"),
             EditorField::Landscape => tr("Landscape"),
             EditorField::Weather => tr("Weather"),
@@ -174,6 +178,10 @@ impl EditorField {
             EditorField::PlayerSite => options.player_site.name().into(),
             EditorField::FogOfWar => on_or_off(options.fog_of_war),
             EditorField::NeutralSites => on_or_off(options.neutral_sites),
+            EditorField::Personality => options
+                .personality
+                .map_or(tr("Mixed"), |personality| personality.name())
+                .into(),
             EditorField::Alliance => alliance_name(options.alliance).into(),
             EditorField::Landscape => tr_owned(&format!("{:?}", options.landscape)),
             EditorField::Weather => tr_owned(&format!("{:?}", options.weather)),
@@ -225,6 +233,12 @@ impl EditorField {
             }
             EditorField::FogOfWar => options.fog_of_war = !options.fog_of_war,
             EditorField::NeutralSites => options.neutral_sites = !options.neutral_sites,
+            EditorField::Personality => {
+                let choices: Vec<Option<Personality>> = std::iter::once(None)
+                    .chain(Personality::ALL.map(Some))
+                    .collect();
+                options.personality = cycle(&choices, options.personality, forward);
+            }
             EditorField::Alliance => {
                 options.alliance = cycle(&Alliance::ALL, options.alliance, forward);
             }

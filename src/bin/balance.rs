@@ -1,6 +1,6 @@
 //! Balance report: equal-cost unit duels and AI-against-AI tournaments, run headless.
 //!
-//! `cargo run --release --bin balance [-- --matches N]`
+//! `cargo run --release --bin balance [-- --matches N] [--personalities]`
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -11,7 +11,7 @@ use iron_tide::combat::DamageSource;
 use iron_tide::components::{Health, Order, Orders};
 use iron_tide::economy::Economies;
 use iron_tide::headless::{Battle, BattleSetup};
-use iron_tide::levels::{BaseSite, Difficulty, LevelDefinition};
+use iron_tide::levels::{BaseSite, Difficulty, LevelDefinition, Personality};
 use iron_tide::map::GameMap;
 use iron_tide::outcome::GameOutcome;
 
@@ -135,39 +135,41 @@ struct Pairing {
     challenger: Difficulty,
     defender: Difficulty,
     fog_of_war: bool,
+    challenger_style: Personality,
+    defender_style: Personality,
 }
 
+const fn pairing(challenger: Difficulty, defender: Difficulty, fog_of_war: bool) -> Pairing {
+    Pairing {
+        challenger,
+        defender,
+        fog_of_war,
+        challenger_style: Personality::Balanced,
+        defender_style: Personality::Balanced,
+    }
+}
+
+const fn style_against_balanced(style: Personality) -> Pairing {
+    Pairing {
+        challenger_style: style,
+        ..pairing(Difficulty::Normal, Difficulty::Normal, true)
+    }
+}
+
+const PERSONALITY_PAIRINGS: [Pairing; 4] = [
+    style_against_balanced(Personality::Rusher),
+    style_against_balanced(Personality::Fortress),
+    style_against_balanced(Personality::Armoured),
+    style_against_balanced(Personality::AirPower),
+];
+
 const PAIRINGS: [Pairing; 6] = [
-    Pairing {
-        challenger: Difficulty::Normal,
-        defender: Difficulty::Normal,
-        fog_of_war: true,
-    },
-    Pairing {
-        challenger: Difficulty::Hard,
-        defender: Difficulty::Normal,
-        fog_of_war: true,
-    },
-    Pairing {
-        challenger: Difficulty::Normal,
-        defender: Difficulty::Hard,
-        fog_of_war: true,
-    },
-    Pairing {
-        challenger: Difficulty::Easy,
-        defender: Difficulty::Normal,
-        fog_of_war: true,
-    },
-    Pairing {
-        challenger: Difficulty::Brutal,
-        defender: Difficulty::Hard,
-        fog_of_war: true,
-    },
-    Pairing {
-        challenger: Difficulty::Normal,
-        defender: Difficulty::Normal,
-        fog_of_war: false,
-    },
+    pairing(Difficulty::Normal, Difficulty::Normal, true),
+    pairing(Difficulty::Hard, Difficulty::Normal, true),
+    pairing(Difficulty::Normal, Difficulty::Hard, true),
+    pairing(Difficulty::Easy, Difficulty::Normal, true),
+    pairing(Difficulty::Brutal, Difficulty::Hard, true),
+    pairing(Difficulty::Normal, Difficulty::Normal, false),
 ];
 
 /// One full AI-against-AI match: the player's side is played by the computer too.
@@ -181,6 +183,8 @@ fn ai_match(
         challenger,
         defender,
         fog_of_war,
+        challenger_style,
+        defender_style,
     } = pairing;
     let defender_site = match challenger_site {
         BaseSite::SouthWest => BaseSite::NorthEast,
@@ -194,12 +198,18 @@ fn ai_match(
     level.player.site = challenger_site;
     level.enemies[0].force.site = defender_site;
     level.enemies[0].difficulty = defender;
+    level.enemies[0].personality = defender_style;
     let mut battle = Battle::new(BattleSetup {
         enemy_ai: true,
         starting_forces: true,
         level: Some(level),
     });
-    battle.add_ai(Team::Player, challenger_site.origin(), challenger);
+    battle.add_ai_with(
+        Team::Player,
+        challenger_site.origin(),
+        challenger,
+        challenger_style,
+    );
     battle
         .world()
         .resource_mut::<Economies>()
@@ -296,13 +306,13 @@ fn print_duel_matrix() {
     println!();
 }
 
-fn print_tournament(matches: usize) {
+fn print_tournament(matches: usize, pairings: &[Pairing]) {
     println!(
         "## AI against AI ({matches} matches per pairing, {:.0} min limit)\n",
         MATCH_TIME_LIMIT_SECS / 60.0
     );
     let sides = [BaseSite::SouthWest, BaseSite::NorthEast];
-    let jobs: Vec<(usize, Pairing, BaseSite, u64)> = PAIRINGS
+    let jobs: Vec<(usize, Pairing, BaseSite, u64)> = pairings
         .iter()
         .enumerate()
         .flat_map(|(index, &pairing)| {
@@ -313,7 +323,7 @@ fn print_tournament(matches: usize) {
         ai_match(pairing, site, seed)
     });
     let mut results: Vec<PairingResult> =
-        PAIRINGS.iter().map(|_| PairingResult::default()).collect();
+        pairings.iter().map(|_| PairingResult::default()).collect();
     for ((index, _, site, _), (outcome, secs, units)) in jobs.into_iter().zip(outcomes) {
         let result = &mut results[index];
         let challenger_in_south_west = site == BaseSite::SouthWest;
@@ -349,8 +359,9 @@ fn print_tournament(matches: usize) {
         "| Challenger | vs defender | fog | wins | losses | unfinished | median length | SW : NE site wins |"
     );
     println!("|---|---|---|---|---|---|---|---|");
-    for (pairing, result) in PAIRINGS.iter().zip(&results) {
-        let (a, b) = (pairing.challenger, pairing.defender);
+    for (pairing, result) in pairings.iter().zip(&results) {
+        let a = format!("{:?} {:?}", pairing.challenger, pairing.challenger_style);
+        let b = format!("{:?} {:?}", pairing.defender, pairing.defender_style);
         let fog = if pairing.fog_of_war { "on" } else { "off" };
         let mut lengths = result.decided_secs.clone();
         lengths.sort_by(f32::total_cmp);
@@ -358,7 +369,7 @@ fn print_tournament(matches: usize) {
             .get(lengths.len() / 2)
             .map_or("-".to_string(), |secs| format!("{:.1} min", secs / 60.0));
         println!(
-            "| {a:?} | {b:?} | {fog} | {} | {} | {} | {median} | {} : {} |",
+            "| {a} | {b} | {fog} | {} | {} | {} | {median} | {} : {} |",
             result.wins,
             result.losses,
             result.draws,
@@ -404,7 +415,11 @@ fn main() {
         .unwrap_or(DEFAULT_MATCHES_PER_PAIRING);
     let started = std::time::Instant::now();
     println!("# Iron Tide balance report\n");
-    print_duel_matrix();
-    print_tournament(matches);
+    if std::env::args().any(|arg| arg == "--personalities") {
+        print_tournament(matches, &PERSONALITY_PAIRINGS);
+    } else {
+        print_duel_matrix();
+        print_tournament(matches, &PAIRINGS);
+    }
     eprintln!("finished in {:.0} s", started.elapsed().as_secs_f32());
 }

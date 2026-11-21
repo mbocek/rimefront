@@ -84,6 +84,13 @@
   and every tree or rock that blocks movement have a twin in the opposite corner. The last row and column, which
   would have no twin, are closed. Bases in the far half face
   the other way, so every base's doors, refinery dock and new units point towards the middle of the map.
+- **Commander personalities:** a computer commander is *Balanced* (as before), a *Rusher* (attacks early and
+  often with fast, cheap units and leaves its defences for later), a *Fortress* (rings its base with guns, waits
+  longer and attacks with bigger waves behind artillery), *Armoured* (heads for the Tech Center, a Repair Bay
+  and heavy tanks) or *Air power* (two Helipads as soon as it can, gunships and bombers). Random battles roll one
+  for each commander, the battle editor sets one for all of them or mixes them (*Commander style*), and the
+  level details show each commander's. Campaign missions keep the Balanced commander. Measured against each
+  other in [balance.md](balance.md).
 - **Support powers:** two buttons under the credits call help onto any spot of the map, then recharge. A
   **recon flight** (Z, needs the Command Center, every 2 minutes) reveals 16 m around the spot for 20 s, to
   your allies too. An **artillery barrage** (C, needs a Tech Center, every 3 minutes) drops ten shells within

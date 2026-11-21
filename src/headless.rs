@@ -13,7 +13,7 @@ use crate::components::*;
 use crate::determinism::SimId;
 use crate::economy::Economies;
 use crate::levels::Difficulty;
-use crate::levels::{ActiveLevel, LevelDefinition};
+use crate::levels::{ActiveLevel, LevelDefinition, Personality};
 use crate::map::{GameMap, cell_center};
 use crate::match_flow::GameState;
 use crate::movement::order_move;
@@ -349,10 +349,20 @@ impl Battle {
 impl Battle {
     /// Lets the computer play `team` too, for AI-against-AI matches.
     pub fn add_ai(&mut self, team: Team, base: IVec2, difficulty: Difficulty) {
+        self.add_ai_with(team, base, difficulty, Personality::Balanced);
+    }
+
+    pub fn add_ai_with(
+        &mut self,
+        team: Team,
+        base: IVec2,
+        difficulty: Difficulty,
+        personality: Personality,
+    ) {
         self.world()
             .resource_mut::<AiCommanders>()
             .0
-            .push(AiCommander::new(team, base, difficulty));
+            .push(AiCommander::new(team, base, difficulty).with_personality(personality));
     }
 
     /// Gives a command as a player of `team` would; it is carried out on a later tick.

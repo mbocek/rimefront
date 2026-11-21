@@ -213,11 +213,10 @@ pub fn deploy_level_forces(
         economy.credits = enemy.force.credits;
         economy.income_rate = enemy.difficulty.income_rate();
         if rules.enemy_ai {
-            commanders.0.push(AiCommander::new(
-                team,
-                enemy.force.site.origin(),
-                enemy.difficulty,
-            ));
+            commanders.0.push(
+                AiCommander::new(team, enemy.force.site.origin(), enemy.difficulty)
+                    .with_personality(enemy.personality),
+            );
         }
     }
     if level.neutral_sites {

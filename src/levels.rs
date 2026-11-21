@@ -142,6 +142,41 @@ impl Difficulty {
     }
 }
 
+/// How a computer commander likes to fight; `Balanced` is the commander every older level had.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub enum Personality {
+    #[default]
+    Balanced,
+    /// Attacks early and often with fast, cheap units.
+    Rusher,
+    /// Fortifies its base and strikes late with artillery behind the guns.
+    Fortress,
+    /// Goes for heavy armour as soon as it can.
+    Armoured,
+    /// Builds helipads early and fights from the air.
+    AirPower,
+}
+
+impl Personality {
+    pub const ALL: [Personality; 5] = [
+        Personality::Balanced,
+        Personality::Rusher,
+        Personality::Fortress,
+        Personality::Armoured,
+        Personality::AirPower,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Personality::Balanced => crate::i18n::tr("Balanced"),
+            Personality::Rusher => crate::i18n::tr("Rusher"),
+            Personality::Fortress => crate::i18n::tr("Fortress"),
+            Personality::Armoured => crate::i18n::tr("Armoured"),
+            Personality::AirPower => crate::i18n::tr("Air power"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Objective {
     DestroyAllEnemies,
@@ -205,6 +240,7 @@ pub struct EnemySetup {
     #[serde(flatten)]
     pub force: ForceSetup,
     pub difficulty: Difficulty,
+    pub personality: Personality,
 }
 
 impl Default for EnemySetup {
@@ -215,6 +251,7 @@ impl Default for EnemySetup {
                 ..default()
             },
             difficulty: Difficulty::Normal,
+            personality: Personality::Balanced,
         }
     }
 }
@@ -501,6 +538,8 @@ pub struct SkirmishOptions {
     pub network_players: usize,
     pub player_faction: Faction,
     pub neutral_sites: bool,
+    /// `None` gives every commander its own, varied with the map.
+    pub personality: Option<Personality>,
 }
 
 impl Default for SkirmishOptions {
@@ -522,6 +561,7 @@ impl Default for SkirmishOptions {
             network_players: 2,
             player_faction: Faction::Coalition,
             neutral_sites: true,
+            personality: None,
         }
     }
 }
@@ -536,19 +576,28 @@ impl SkirmishOptions {
         }
     }
 
+    fn mixed_personality(&self, commander: usize) -> Personality {
+        let roll = self.map_variant as usize + commander * 2;
+        Personality::ALL[roll % Personality::ALL.len()]
+    }
+
     pub fn to_level(&self) -> LevelDefinition {
         let enemy_sites = BaseSite::ALL
             .into_iter()
             .filter(|&site| site != self.player_site);
         let enemies = enemy_sites
             .take(self.enemy_count())
-            .map(|site| EnemySetup {
+            .enumerate()
+            .map(|(index, site)| EnemySetup {
                 force: ForceSetup {
                     site,
                     credits: self.credits,
                     ..default()
                 },
                 difficulty: self.difficulty,
+                personality: self
+                    .personality
+                    .unwrap_or_else(|| self.mixed_personality(index)),
             })
             .collect();
         let objective = match self.objective {

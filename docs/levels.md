@@ -65,7 +65,8 @@ opens a screen with a *Back* button; Esc goes back too.
   also scatter extra forests, rock outcrops and crystal fields. Everything is point-symmetric around the map
   centre, so neither corner is favoured. A level's `terrain_seed` shapes the land; levels without one keep the
   classic landscape. Random battles, generated missions and battles from the battle editor (its *Neutral
-  buildings* option, on by default) carry neutral sites (`"neutral_sites": true` in a level, see
+  buildings* option, on by default) carry neutral sites and commanders of varied personalities (`"neutral_sites": true` and an enemy's
+  `"personality": "Fortress"` in a level, see
   [rules.md](rules.md)); campaign missions and older levels have none. *New map* rolls
   again; changing the options keeps the map. The rolled battle can be played, saved as a custom level or opened
   in the map editor.

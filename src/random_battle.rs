@@ -5,7 +5,7 @@ use rand::{RngExt, SeedableRng};
 use crate::catalog::{Alliance, Faction};
 use crate::i18n::{tr, tr_fmt};
 use crate::levels::{
-    BaseSite, Difficulty, EnemySetup, ForceSetup, LevelDefinition, Objective, Weather,
+    BaseSite, Difficulty, EnemySetup, ForceSetup, LevelDefinition, Objective, Personality, Weather,
 };
 use crate::map::{
     MapSize, map_cells, map_spread, near_base, near_crystal_field, opposite_cell, set_map_size,
@@ -69,11 +69,14 @@ impl Default for RandomBattleOptions {
 
 /// Separates the dice for the sides from those for the ground, so changing a side never moves a forest.
 const SIDES_DICE: u64 = 0x5eed_51de;
+/// The commanders' personalities have their own dice too, so adding them changed no map or side.
+const PERSONALITY_DICE: u64 = 0x5717_e5ed;
 
 /// The same options and seed always give the same battle, so a map can be kept while the credits change.
 pub fn generate(options: &RandomBattleOptions, seed: u64) -> LevelDefinition {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut sides = StdRng::seed_from_u64(seed ^ SIDES_DICE);
+    let mut personalities = StdRng::seed_from_u64(seed ^ PERSONALITY_DICE);
     let landscape = Landscape::ALL[rng.random_range(0..Landscape::ALL.len())];
     let season = Season::ALL[rng.random_range(0..Season::ALL.len())];
     let weather = if rng.random_bool(RAIN_CHANCE) {
@@ -113,6 +116,7 @@ pub fn generate(options: &RandomBattleOptions, seed: u64) -> LevelDefinition {
                     &[Difficulty::Easy, Difficulty::Normal, Difficulty::Hard],
                 ),
             },
+            personality: pick(&mut personalities, &Personality::ALL),
         })
         .collect();
     LevelDefinition {

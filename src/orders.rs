@@ -17,6 +17,7 @@ use crate::player_commands::{CommandIssuer, GroundOrder, PlayerCommand};
 use crate::settings::GameSettings;
 use crate::sound::{Sound, SoundCue};
 use crate::structure_tools::StructureTool;
+use crate::transport::{Embarked, Passengers};
 use crate::ui::UiFonts;
 
 const DRAG_THRESHOLD_PX: f32 = 8.0;
@@ -200,7 +201,7 @@ pub fn select_units(
     targets: Res<Targets>,
     mut drag: ResMut<DragSelection>,
     cameras: Query<(&Camera, &GlobalTransform), With<RtsCamera>>,
-    selectable: Query<(Entity, &Team, &Transform, Option<&Unit>)>,
+    selectable: Query<(Entity, &Team, &Transform, Option<&Unit>), Without<Embarked>>,
     selected: Query<Entity, With<Selected>>,
     mut selection_box: Query<(&mut Node, &mut Visibility), With<SelectionBoxUi>>,
     mut counts: Query<&mut Text, With<SelectionCount>>,
@@ -241,15 +242,16 @@ pub fn select_units(
             .world_to_viewport(camera_transform, position)
             .is_ok_and(|projected| projected.cmpge(min).all() && projected.cmple(max).all())
     };
-    let own_units_inside = |selectable: &Query<(Entity, &Team, &Transform, Option<&Unit>)>| {
-        selectable
-            .iter()
-            .filter(|(_, team, transform, unit)| {
-                **team == local.0 && unit.is_some() && inside_box(transform.translation)
-            })
-            .map(|(entity, ..)| entity)
-            .collect::<Vec<_>>()
-    };
+    let own_units_inside =
+        |selectable: &Query<(Entity, &Team, &Transform, Option<&Unit>), Without<Embarked>>| {
+            selectable
+                .iter()
+                .filter(|(_, team, transform, unit)| {
+                    **team == local.0 && unit.is_some() && inside_box(transform.translation)
+                })
+                .map(|(entity, ..)| entity)
+                .collect::<Vec<_>>()
+        };
     if dragging {
         let label = unit_count_label(own_units_inside(&selectable).len());
         for mut text in &mut counts {
@@ -353,7 +355,11 @@ pub fn issue_orders(
     selected_buildings: Query<(&SimId, &Building, &Team), With<Selected>>,
     structures: Query<(&SimId, &Building, &Health)>,
     sim_ids: Query<&SimId>,
-    (map, unclaimed_sites): (Res<GameMap>, Query<&SimId, With<UnclaimedSite>>),
+    (map, unclaimed_sites, carriers): (
+        Res<GameMap>,
+        Query<&SimId, With<UnclaimedSite>>,
+        Query<&SimId, With<Passengers>>,
+    ),
 ) {
     let team = issuer.team();
     let units: Vec<SimId> = selected_units
@@ -380,6 +386,16 @@ pub fn issue_orders(
         issuer.issue(PlayerCommand::SetStance {
             units: units.clone(),
             stance,
+        });
+    }
+    let own_carriers: Vec<SimId> = selected_units
+        .iter()
+        .filter(|(_, unit, owner)| **owner == team && unit.0 == UnitKind::TroopCarrier)
+        .map(|(&id, ..)| id)
+        .collect();
+    if settings.keys.just_pressed(&keys, Action::Unload) && !own_carriers.is_empty() {
+        issuer.issue(PlayerCommand::Unload {
+            carriers: own_carriers,
         });
     }
     if settings.keys.just_pressed(&keys, Action::LayMine) && !engineers.is_empty() {
@@ -435,6 +451,25 @@ pub fn issue_orders(
         issuer.issue(PlayerCommand::SendEngineers {
             units: engineers,
             structure: site,
+        });
+        acknowledge(&mut marker, ground, MarkerKind::Move);
+        return;
+    }
+
+    let infantry: Vec<SimId> = selected_units
+        .iter()
+        .filter(|(_, unit, owner)| **owner == team && unit.0.spec().armor == ArmorClass::Infantry)
+        .map(|(&id, ..)| id)
+        .collect();
+    let own_carrier = hovered
+        .filter(|target| target.team == team)
+        .and_then(|target| carriers.get(target.entity).ok());
+    if let Some(&carrier) = own_carrier
+        && !infantry.is_empty()
+    {
+        issuer.issue(PlayerCommand::Board {
+            units: infantry,
+            carrier,
         });
         acknowledge(&mut marker, ground, MarkerKind::Move);
         return;

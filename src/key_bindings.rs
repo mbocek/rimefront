@@ -28,10 +28,11 @@ pub enum Action {
     StanceAggressive,
     StanceHoldPosition,
     StanceHoldFire,
+    Unload,
 }
 
 impl Action {
-    pub const ALL: [Action; 21] = [
+    pub const ALL: [Action; 22] = [
         Action::ScrollUp,
         Action::ScrollDown,
         Action::ScrollLeft,
@@ -53,6 +54,7 @@ impl Action {
         Action::StanceAggressive,
         Action::StanceHoldPosition,
         Action::StanceHoldFire,
+        Action::Unload,
     ];
 
     pub fn name(self) -> &'static str {
@@ -78,6 +80,7 @@ impl Action {
             Action::StanceAggressive => tr("Stance: aggressive"),
             Action::StanceHoldPosition => tr("Stance: hold position"),
             Action::StanceHoldFire => tr("Stance: hold fire"),
+            Action::Unload => tr("Unload carriers"),
         }
     }
 
@@ -104,6 +107,7 @@ impl Action {
             Action::StanceAggressive => KeyCode::KeyG,
             Action::StanceHoldPosition => KeyCode::KeyH,
             Action::StanceHoldFire => KeyCode::KeyF,
+            Action::Unload => KeyCode::KeyU,
         }
     }
 }

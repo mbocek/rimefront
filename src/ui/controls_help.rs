@@ -116,6 +116,13 @@ pub(super) fn controls_overview(keys: &KeyBindings) -> Vec<(&'static str, String
             ),
         ),
         (
+            tr("Troop Carrier"),
+            tr_fmt(
+                "right-click it with infantry to board, {} unloads",
+                &[&key(Action::Unload)],
+            ),
+        ),
+        (
             tr("Groups"),
             tr_owned("Ctrl+1-9 save, 1-9 select, twice = jump"),
         ),

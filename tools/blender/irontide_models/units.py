@@ -1359,3 +1359,36 @@ def build_fighter():
         cylinder_between("Steel", nose_top, (1.35, 0.0, 0.16), 0.025, 8, name="NoseGearLeg")
         make_wheel(Vector((1.35, 0.0, 0.11)), 0.1, 0.07, side=1)
     _add_lift_nozzles(FIGHTER_AXIS_Z, [(0.3, 0.42), (0.3, -0.42), (-1.0, 0.3), (-1.0, -0.3)], 0.08)
+
+
+def build_troop_carrier():
+    """A six-wheeled armoured personnel carrier with sloped plates, a rear ramp and a small gun turret."""
+    wheel_radius, wheel_width, wheel_y = 0.4, 0.32, 0.78
+    for index, x in enumerate((1.05, 0.0, -1.05)):
+        for side in (-1, 1):
+            hub = Vector((x, side * wheel_y, wheel_radius))
+            with rolling_group(f"Wheel_{index}{'L' if side > 0 else 'R'}", hub, wheel_radius):
+                make_wheel(hub, wheel_radius, wheel_width, side=side)
+    hull_profile = [(-1.6, 0.3), (1.35, 0.3), (1.75, 0.75), (1.2, 1.15), (-1.55, 1.15), (-1.65, 0.75)]
+    prism("Armor", hull_profile, 1.36, bevel=0.03, name="Hull")
+    for side in (-1, 1):
+        box("ArmorDark", (2.9, 0.06, 0.32), (-0.1, side * 0.71, 0.85), bevel=0.01, name="SideSkirt")
+        box("TeamColor", (2.2, 0.012, 0.09), (-0.15, side * 0.745, 0.9), bevel=0.0, name="SideTeamStripe")
+        for x in (0.75, -0.45):
+            box("Glass", (0.22, 0.012, 0.1), (x, side * 0.685, 1.02), bevel=0.0, name="VisionSlit")
+        add_lamp((1.62, side * 0.45, 0.78), FACING_FRONT, radius=0.05, depth=0.06)
+    box("ArmorDark", (0.06, 1.1, 0.75), (-1.66, 0.0, 0.72), bevel=0.01, name="RearRamp")
+    add_hazard_stripes((-1.7, 0.0, 0.42), 1.0, 0.1, rotation=(0, math.pi / 2, math.pi / 2), stripe_width=0.1)
+    box("TeamColor", (0.5, 0.5, 0.012), (0.55, 0.0, 1.155), bevel=0.0, name="RoofTeamPanel")
+    for x in (-0.55, -1.05):
+        cylinder("ArmorDark", 0.2, 0.06, (x, 0.0, 1.18), segments=16, name="RoofHatch")
+    add_vent_grille((1.35, 0.0, 0.98), 0.3, 0.5, 5, rotation=(0, math.radians(-36), 0))
+    add_antenna((-1.3, 0.45, 1.15), 1.0)
+    pivot = Vector((0.15, 0.0, 1.17))
+    with group(TURRET, pivot):
+        cylinder("Armor", 0.36, 0.22, pivot + Vector((0, 0, 0.11)), segments=16, top_radius=0.3,
+                 name="TurretShell")
+        box("TeamColor", (0.3, 0.012, 0.08), (pivot.x, 0.33, pivot.z + 0.12), bevel=0.0, name="TurretTeamMark")
+        lathe("Gunmetal", [(0.0, 0.0), (0.04, 0.0), (0.04, 0.1), (0.028, 0.12), (0.028, 0.72), (0.0, 0.72)],
+              (pivot.x + 0.25, 0.0, pivot.z + 0.13), FACING_FRONT, segments=10, name="GunBarrel")
+    animate_vehicle(ground_speed=4.2)

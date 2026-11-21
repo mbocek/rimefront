@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::assets::ModelLibrary;
-use crate::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
+use crate::catalog::{ArmorClass, BuildingKind, Diplomacy, Team, UnitKind};
 use crate::components::*;
 use crate::determinism::{SimEntities, SimId};
 use crate::economy::Economies;
@@ -19,6 +19,7 @@ use crate::production::{
     placement_context,
 };
 use crate::structures::{StructureOrder, StructureOrderKind};
+use crate::transport::{BoardingTask, Unloading};
 
 /// Ticks between issuing a command and carrying it out; across a network the order needs time to arrive.
 pub const COMMAND_DELAY_TICKS: u64 = 1;
@@ -88,6 +89,14 @@ pub enum PlayerCommand {
     SetStance {
         units: Vec<SimId>,
         stance: Stance,
+    },
+    /// The infantry among `units` climbs into `carrier`.
+    Board {
+        units: Vec<SimId>,
+        carrier: SimId,
+    },
+    Unload {
+        carriers: Vec<SimId>,
     },
 }
 
@@ -308,6 +317,8 @@ impl Battlefield<'_, '_> {
             PlayerCommand::LayWall { from, to } => self.lay_wall(team, from, to),
             PlayerCommand::LayMines { units } => self.lay_mines(team, &units),
             PlayerCommand::SetStance { units, stance } => self.set_stance(team, &units, stance),
+            PlayerCommand::Board { units, carrier } => self.board(team, &units, carrier),
+            PlayerCommand::Unload { carriers } => self.unload(team, &carriers),
             PlayerCommand::OrderStructure { building, kind } => {
                 if let Some(building) = self.own_structure(team, building) {
                     self.structure_orders.write(StructureOrder {
@@ -336,6 +347,42 @@ impl Battlefield<'_, '_> {
         let entity = self.ids.get(id)?;
         let (_, owner, _) = self.structures.get(entity).ok()?;
         (owner == Some(&team)).then_some(entity)
+    }
+
+    fn own_carrier(&self, team: Team, entity: Entity) -> bool {
+        self.units
+            .get(entity)
+            .is_ok_and(|unit| *unit.2 == team && unit.1.0 == UnitKind::TroopCarrier)
+    }
+
+    fn board(&mut self, team: Team, ids: &[SimId], carrier: SimId) {
+        let Some(carrier) = self
+            .ids
+            .get(carrier)
+            .filter(|&carrier| self.own_carrier(team, carrier))
+        else {
+            return;
+        };
+        for entity in self.own_units(team, ids) {
+            let infantry = self
+                .units
+                .get(entity)
+                .is_ok_and(|unit| unit.1.0.spec().armor == ArmorClass::Infantry);
+            if infantry && entity != carrier {
+                self.commands
+                    .entity(entity)
+                    .remove::<EngineerTask>()
+                    .insert(BoardingTask::new(carrier));
+            }
+        }
+    }
+
+    fn unload(&mut self, team: Team, ids: &[SimId]) {
+        for carrier in self.own_units(team, ids) {
+            if self.own_carrier(team, carrier) {
+                self.commands.entity(carrier).insert(Unloading);
+            }
+        }
     }
 
     fn set_stance(&mut self, team: Team, ids: &[SimId], stance: Stance) {

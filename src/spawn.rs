@@ -68,6 +68,9 @@ pub fn spawn_unit(
     if kind.hides_when_still() {
         unit.insert(Camouflage::default());
     }
+    if kind == UnitKind::TroopCarrier {
+        unit.insert(crate::transport::Passengers::default());
+    }
     if kind == UnitKind::Harvester {
         unit.insert(Harvester {
             state: HarvestState::SeekingField,

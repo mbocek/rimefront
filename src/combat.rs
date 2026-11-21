@@ -21,6 +21,7 @@ use crate::production::Production;
 use crate::research::{incoming_damage_factor, outgoing_damage_factor, reload_factor};
 use crate::sim_math;
 use crate::sound::{Sound, SoundCue};
+use crate::transport::Embarked;
 use crate::veterancy::{Rank, Veterancy};
 
 const SIGHT_BEYOND_RANGE: f32 = 6.0;
@@ -198,18 +199,21 @@ pub fn snapshot_targets(
     mut targets: ResMut<Targets>,
     intel: Res<Intel>,
     diplomacy: Res<Diplomacy>,
-    damageable: Query<(
-        &SimId,
-        Entity,
-        &Team,
-        &Transform,
-        &BodyRadius,
-        &Armor,
-        Has<Building>,
-        Option<&Camouflage>,
-        &Health,
-        Option<&Weapon>,
-    )>,
+    damageable: Query<
+        (
+            &SimId,
+            Entity,
+            &Team,
+            &Transform,
+            &BodyRadius,
+            &Armor,
+            Has<Building>,
+            Option<&Camouflage>,
+            &Health,
+            Option<&Weapon>,
+        ),
+        Without<Embarked>,
+    >,
 ) {
     targets.list.clear();
     targets.by_entity.clear();
@@ -248,11 +252,17 @@ pub fn acquire_targets(
         Option<&Mobile>,
         Has<Turret>,
         Option<&Stance>,
+        Has<Embarked>,
     )>,
 ) {
-    for (&team, transform, weapon, armor, mut attack, mobile, has_turret, stance) in &mut shooters {
+    for (&team, transform, weapon, armor, mut attack, mobile, has_turret, stance, embarked) in
+        &mut shooters
+    {
         let position = transform.translation;
-        let stance = stance.copied().unwrap_or_default();
+        let stance = match stance.copied().unwrap_or_default() {
+            Stance::Aggressive if embarked => Stance::HoldPosition,
+            chosen => chosen,
+        };
         let sight = match stance {
             Stance::Aggressive => weapon.spec.range + SIGHT_BEYOND_RANGE,
             Stance::HoldPosition | Stance::HoldFire => weapon.spec.range,
@@ -294,13 +304,16 @@ pub fn chase_targets(
     time: Res<Time>,
     map: Res<GameMap>,
     targets: Res<Targets>,
-    mut chasers: Query<(
-        &Transform,
-        &Weapon,
-        &mut AttackTarget,
-        &mut Mobile,
-        Option<&Stance>,
-    )>,
+    mut chasers: Query<
+        (
+            &Transform,
+            &Weapon,
+            &mut AttackTarget,
+            &mut Mobile,
+            Option<&Stance>,
+        ),
+        Without<Embarked>,
+    >,
 ) {
     for (transform, weapon, mut attack, mut mobile, stance) in &mut chasers {
         let Some((entity, mode)) = attack.target else {

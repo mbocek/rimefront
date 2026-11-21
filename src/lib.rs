@@ -88,6 +88,7 @@ pub mod structure_tools;
 pub mod structures;
 pub mod terrain;
 pub mod terrain_material;
+pub mod transport;
 pub mod tutorial;
 pub mod ui;
 pub mod unit_orders;
@@ -266,6 +267,7 @@ impl Plugin for SimulationPlugin {
                         structures::repair_structures,
                         structures::finish_sales,
                         engineers::carry_out_engineer_tasks,
+                        transport::board_carriers,
                         medical::treat_wounded,
                         neutral_sites::deliver_supplies,
                         neutral_sites::treat_at_field_hospitals,
@@ -283,10 +285,12 @@ impl Plugin for SimulationPlugin {
                         sorties::circle_while_waiting,
                         movement::separate_units,
                         movement::settle_on_terrain,
+                        transport::carry_passengers,
                         movement::seat_new_buildings,
                         combat::aim_and_fire,
                         abilities::detonate_mines,
                         combat::fly_projectiles,
+                        transport::unload_carriers,
                         combat::remove_destroyed,
                         economy::clear_depleted_crystals,
                         scenery::clear_decor_under_new_buildings,

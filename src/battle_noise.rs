@@ -79,7 +79,9 @@ pub fn noise_of_unit(kind: UnitKind, moving: bool, harvesting: bool) -> Option<(
         UnitKind::Bomber | UnitKind::Fighter => {
             Some((Noise::JetEngines, if moving { 1.0 } else { IDLING_ENGINE }))
         }
-        UnitKind::Scout | UnitKind::MissileTruck => engine(Noise::WheeledEngines),
+        UnitKind::Scout | UnitKind::MissileTruck | UnitKind::TroopCarrier => {
+            engine(Noise::WheeledEngines)
+        }
         _ if UnitKind::INFANTRY.contains(&kind) => moving.then_some((Noise::Footsteps, 1.0)),
         _ => engine(Noise::TrackedEngines),
     }

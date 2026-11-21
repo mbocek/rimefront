@@ -1,4 +1,5 @@
 use super::*;
+use crate::transport::{CARRIER_CAPACITY, Passengers};
 
 #[derive(Component)]
 pub struct InfoIcon;
@@ -151,6 +152,7 @@ pub fn refresh_info_panel(
             &Health,
             Option<&Harvester>,
             Option<&Stance>,
+            Option<&Passengers>,
         ),
         With<Selected>,
     >,
@@ -183,7 +185,7 @@ pub fn refresh_info_panel(
             tr("Select units with a click or a drag box.").into(),
             None,
         ),
-        [(unit, building, health, harvester, stance)] => {
+        [(unit, building, health, harvester, stance, passengers)] => {
             let name = unit
                 .map(|u| tr(u.0.spec().name))
                 .or(building.map(|b| tr(b.kind.spec().name)))
@@ -208,10 +210,16 @@ pub fn refresh_info_panel(
                 ),
                 None => hp,
             };
-            let details = match stance {
-                Some(stance) => format!("{condition}\n{}\n{role}", stance_line(&[*stance])),
-                None => format!("{condition}\n{role}"),
-            };
+            let mut lines = vec![condition];
+            lines.extend(stance.map(|stance| stance_line(&[stance])));
+            lines.extend(passengers.map(|riding| {
+                tr_fmt(
+                    "Carrying {} of {} infantry",
+                    &[&riding.0.len(), &CARRIER_CAPACITY],
+                )
+            }));
+            lines.push(role.to_string());
+            let details = lines.join("\n");
             (path, name.to_string(), details, Some(health.fraction()))
         }
         many => {
@@ -224,7 +232,7 @@ pub fn refresh_info_panel(
             roster.sort_by_key(|(kind, _)| UnitKind::ALL.iter().position(|k| k == kind));
             let average =
                 many.iter().map(|(_, _, h, ..)| h.fraction()).sum::<f32>() / many.len() as f32;
-            let stances: Vec<&Stance> = many.iter().filter_map(|(.., stance)| *stance).collect();
+            let stances: Vec<&Stance> = many.iter().filter_map(|(.., stance, _)| *stance).collect();
             (
                 None,
                 tr_fmt("{} units", &[&many.len()]),

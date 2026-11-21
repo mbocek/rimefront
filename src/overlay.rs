@@ -171,16 +171,19 @@ pub fn draw_overlays(
     time: Res<Time>,
     mut marker: ResMut<OrderMarker>,
     cameras: Query<&GlobalTransform, With<RtsCamera>>,
-    entities: Query<(
-        &Transform,
-        &Health,
-        &BodyRadius,
-        &Team,
-        Option<&Harvester>,
-        Option<&Veterancy>,
-        Has<Selected>,
-        Has<Building>,
-    )>,
+    entities: Query<
+        (
+            &Transform,
+            &Health,
+            &BodyRadius,
+            &Team,
+            Option<&Harvester>,
+            Option<&Veterancy>,
+            Has<Selected>,
+            Has<Building>,
+        ),
+        Without<crate::transport::Embarked>,
+    >,
 ) {
     let Ok(camera) = cameras.single() else { return };
     let screen_right = camera.right().as_vec3();

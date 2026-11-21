@@ -9,7 +9,7 @@ use crate::{
     interpolation, lobby, local_view, main_menu, map, map_editor, map_edits, match_flow, menu,
     minimap, motion_material, network, network_hud, orders, overlay, perf_overlay, placement,
     queue_bar, replay, savegame, settings, sorties, sound, structure_tools, terrain_material,
-    tutorial, ui, unit_voices, updates, wall_joints, weather,
+    transport, tutorial, ui, unit_voices, updates, wall_joints, weather,
 };
 
 /// Draws what the simulation moves part way between ticks.
@@ -162,6 +162,7 @@ impl Plugin for BattleViewPlugin {
                         ambience::emit_crystal_sparkles,
                         ambience::pulse_crystal_glow,
                         effects::animate_sparkles,
+                        transport::deselect_passengers,
                         effects::dress_projectiles,
                         effects::show_blasts,
                         effects::animate_blasts,

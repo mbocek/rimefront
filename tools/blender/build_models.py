@@ -46,6 +46,7 @@ TEAM_MODELS = {
     "raider_bike": (units.build_raider_bike, UNIT_TRIANGLE_BUDGET),
     "bomber": (units.build_bomber, UNIT_TRIANGLE_BUDGET),
     "fighter": (units.build_fighter, UNIT_TRIANGLE_BUDGET),
+    "troop_carrier": (units.build_troop_carrier, UNIT_TRIANGLE_BUDGET),
     "command_center": (buildings.build_command_center, BUILDING_TRIANGLE_BUDGET),
     "power_plant": (buildings.build_power_plant, BUILDING_TRIANGLE_BUDGET),
     "refinery": (buildings.build_refinery, BUILDING_TRIANGLE_BUDGET),
@@ -94,7 +95,7 @@ NEUTRAL_MODELS = {
     "bush_round": (vegetation.build_bush_round, 2_000),
     "bush_flowering": (vegetation.build_bush_flowering, 2_000),
 }
-MODELS_WITH_TURRET = {"tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker"}
+MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker"}
 INFANTRY_NODES = ("Rig", "Body", "hips", "chest", "head", "rifle", "hand.L", "hand.R")
 INFANTRY_CLIPS = {"Idle": None, "Walk": None, "KneelFire": None, "Death": None}
 REQUIRED_NODES = {
@@ -127,6 +128,7 @@ REQUIRED_ANIMATIONS = {
     "scout": {"Drive": None},
     "repair_truck": {"Drive": None},
     "raider_bike": {"Drive": None},
+    "troop_carrier": {"Drive": None},
     "stealth_tank": {"Drive": None, "Fire": "Barrel"},
     "tank": {"Drive": None, "Fire": "Barrel"},
     "artillery": {"Drive": None, "Fire": "Barrel"},

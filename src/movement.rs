@@ -193,7 +193,10 @@ fn commuting_harvester(mobile: &Mobile, is_harvester: bool) -> bool {
 pub fn separate_units(
     time: Res<Time>,
     map: Res<GameMap>,
-    mut units: Query<(&SimId, &mut Transform, &BodyRadius, &Mobile, Has<Harvester>)>,
+    mut units: Query<
+        (&SimId, &mut Transform, &BodyRadius, &Mobile, Has<Harvester>),
+        Without<crate::transport::Embarked>,
+    >,
 ) {
     let mut snapshot: Vec<(SimId, Vec3, f32, bool, bool)> = units
         .iter()

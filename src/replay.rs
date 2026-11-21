@@ -330,7 +330,10 @@ pub fn record_replay_frame(
     time: Res<Time>,
     clock: Res<MatchClock>,
     mut recorder: ResMut<ReplayRecorder>,
-    units: Query<(Entity, &Unit, &Team, &Transform, &Mobile, &Health)>,
+    units: Query<
+        (Entity, &Unit, &Team, &Transform, &Mobile, &Health),
+        Without<crate::transport::Embarked>,
+    >,
     buildings: Query<(Entity, &Building, &Team, &Transform, &Health)>,
     unclaimed_sites: Query<(Entity, &Building, &Transform), With<UnclaimedSite>>,
 ) {

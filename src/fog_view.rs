@@ -12,6 +12,7 @@ use crate::local_view::LocalView;
 use crate::map::{CrystalVisual, footprint_cells, map_cells};
 use crate::neutral_sites::UnclaimedSite;
 use crate::scenery::Scenery;
+use crate::transport::Embarked;
 
 const TEXELS_PER_CELL: i32 = 4;
 const BLUR_RADIUS: i32 = 3;
@@ -205,17 +206,27 @@ pub fn show_seen_projectiles(
 pub fn show_seen_enemies(
     mut commands: Commands,
     view: LocalView,
-    mut units: Query<(&Team, &Transform, &mut Visibility, Option<&Camouflage>), With<Unit>>,
+    mut units: Query<
+        (
+            &Team,
+            &Transform,
+            &mut Visibility,
+            Option<&Camouflage>,
+            Has<Embarked>,
+        ),
+        With<Unit>,
+    >,
     mut buildings: Query<
         (Entity, &Team, &Building, &mut Visibility, Has<Discovered>),
         Without<Unit>,
     >,
 ) {
-    for (&team, transform, mut visibility, camouflage) in &mut units {
+    for (&team, transform, mut visibility, camouflage, embarked) in &mut units {
         let hidden_by_camouflage = camouflage.is_some_and(|camouflage| camouflage.concealed)
             && view.is_hostile(team)
             && !view.is_spectating();
-        let wanted = if view.reveals(team, transform.translation) && !hidden_by_camouflage {
+        let seen = view.reveals(team, transform.translation) && !hidden_by_camouflage;
+        let wanted = if seen && !embarked {
             Visibility::Inherited
         } else {
             Visibility::Hidden

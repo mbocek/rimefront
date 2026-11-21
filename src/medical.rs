@@ -24,7 +24,10 @@ pub struct Healer {
 pub fn treat_wounded(
     time: Res<Time>,
     map: Res<GameMap>,
-    mut healers: Query<(Entity, &Team, &Transform, &mut Healer, &mut Mobile, &SimId)>,
+    mut healers: Query<
+        (Entity, &Team, &Transform, &mut Healer, &mut Mobile, &SimId),
+        Without<crate::transport::Embarked>,
+    >,
     mut patients: Query<(Entity, &Team, &Transform, &Armor, &mut Health, &SimId)>,
 ) {
     let dt = time.delta_secs();

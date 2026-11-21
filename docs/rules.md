@@ -84,6 +84,12 @@
   and every tree or rock that blocks movement have a twin in the opposite corner. The last row and column, which
   would have no twin, are closed. Bases in the far half face
   the other way, so every base's doors, refinery dock and new units point towards the middle of the map.
+- **Troop Carrier:** a $700 six-wheeled personnel carrier from the War Factory, for both factions, with a
+  light machine gun. Right-click it with infantry selected and up to five soldiers climb in; U lets them out
+  on free ground around it. Inside they ride along, cannot be hit or selected, and fire from the hatches at
+  enemies within their reach (they hold position, or hold fire if told to). When the carrier is destroyed they
+  scramble out with half their health. Loading a save puts passengers beside their carrier. The computer does
+  not build carriers yet.
 - **Stances:** an armed unit is *aggressive* by default: it takes on enemies it sees and chases them. A unit
   told to *hold position* (H) fires only at enemies within its weapon's reach and stays where it is; one told
   to *hold fire* (F) shoots only at what it is ordered to attack; G makes it aggressive again. Ordered attacks

@@ -210,6 +210,7 @@ pub enum UnitKind {
     RaiderBike,
     Bomber,
     Fighter,
+    TroopCarrier,
 }
 
 pub struct UnitSpec {
@@ -247,8 +248,9 @@ impl UnitKind {
         UnitKind::Medic,
         UnitKind::Engineer,
     ];
-    pub const VEHICLES: [UnitKind; 13] = [
+    pub const VEHICLES: [UnitKind; 14] = [
         UnitKind::Scout,
+        UnitKind::TroopCarrier,
         UnitKind::RaiderBike,
         UnitKind::Tank,
         UnitKind::StealthTank,
@@ -262,7 +264,8 @@ impl UnitKind {
         UnitKind::RepairTruck,
         UnitKind::Harvester,
     ];
-    pub const ALL: [UnitKind; 20] = [
+    /// New kinds go at the end: replays store a unit's look as its place in this list.
+    pub const ALL: [UnitKind; 21] = [
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Medic,
@@ -283,6 +286,7 @@ impl UnitKind {
         UnitKind::RaiderBike,
         UnitKind::Bomber,
         UnitKind::Fighter,
+        UnitKind::TroopCarrier,
     ];
 
     pub fn flies(self) -> bool {
@@ -311,6 +315,7 @@ impl UnitKind {
             UnitKind::RaiderBike => &RAIDER_BIKE,
             UnitKind::Bomber => &BOMBER,
             UnitKind::Fighter => &FIGHTER,
+            UnitKind::TroopCarrier => &TROOP_CARRIER,
         }
     }
 
@@ -690,6 +695,26 @@ const SCOUT: UnitSpec = UnitSpec {
     faction: None,
     heal_per_sec: 0.0,
     sight: 22.0,
+};
+
+const TROOP_CARRIER: UnitSpec = UnitSpec {
+    name: "Troop Carrier",
+    role: "Armoured wheels for five infantry, who fire from its hatches. A light machine gun of its own.",
+    model_id: "troop_carrier",
+    cost: 700,
+    build_secs: 12.0,
+    max_health: 420.0,
+    speed: 4.2,
+    turn_rate: 3.5,
+    radius: 1.15,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(SCOUT_MACHINE_GUN),
+    has_turret: true,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 16.0,
 };
 
 const TANK: UnitSpec = UnitSpec {

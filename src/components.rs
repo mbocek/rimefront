@@ -117,6 +117,30 @@ pub enum TargetMode {
     Automatic,
 }
 
+/// How freely an armed unit picks its own fights; ordered attacks are always carried out.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub enum Stance {
+    /// Takes on enemies it sees and chases them.
+    #[default]
+    Aggressive,
+    /// Fires at enemies within its weapon's reach and does not move to find more.
+    HoldPosition,
+    /// Fires only when ordered to.
+    HoldFire,
+}
+
+impl Stance {
+    pub const ALL: [Stance; 3] = [Stance::Aggressive, Stance::HoldPosition, Stance::HoldFire];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Stance::Aggressive => crate::i18n::tr("Aggressive"),
+            Stance::HoldPosition => crate::i18n::tr("Hold position"),
+            Stance::HoldFire => crate::i18n::tr("Hold fire"),
+        }
+    }
+}
+
 #[derive(Component, Default)]
 pub struct AttackTarget {
     pub target: Option<(Entity, TargetMode)>,

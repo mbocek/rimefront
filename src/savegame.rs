@@ -58,6 +58,8 @@ struct SavedUnit {
     orders: Vec<Order>,
     #[serde(default)]
     experience: f32,
+    #[serde(default)]
+    stance: Stance,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -208,6 +210,7 @@ type SavableUnit<'a> = (
     Option<&'a Harvester>,
     Option<&'a Orders>,
     Option<&'a Veterancy>,
+    Option<&'a Stance>,
 );
 
 impl SavedBuilding {
@@ -233,7 +236,7 @@ impl SavedBuilding {
 
 impl SavedUnit {
     fn of(
-        (unit, &team, transform, mobile, health, harvester, orders, veterancy): SavableUnit,
+        (unit, &team, transform, mobile, health, harvester, orders, veterancy, stance): SavableUnit,
     ) -> Self {
         Self {
             team,
@@ -251,6 +254,7 @@ impl SavedUnit {
                     .collect()
             }),
             experience: veterancy.map_or(0.0, |veterancy| veterancy.experience),
+            stance: stance.copied().unwrap_or_default(),
         }
     }
 }
@@ -494,6 +498,9 @@ fn respawn_unit(commands: &mut Commands, models: &ModelLibrary, saved: &SavedUni
     );
     let (veterancy, health) = Veterancy::restored(saved.kind, saved.experience, saved.health);
     commands.entity(entity).insert(health);
+    if saved.kind.spec().weapon.is_some() {
+        commands.entity(entity).insert(saved.stance);
+    }
     if saved.experience > 0.0 {
         commands.entity(entity).insert(veterancy);
     }

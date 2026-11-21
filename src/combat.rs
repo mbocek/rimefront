@@ -247,11 +247,16 @@ pub fn acquire_targets(
         &mut AttackTarget,
         Option<&Mobile>,
         Has<Turret>,
+        Option<&Stance>,
     )>,
 ) {
-    for (&team, transform, weapon, armor, mut attack, mobile, has_turret) in &mut shooters {
+    for (&team, transform, weapon, armor, mut attack, mobile, has_turret, stance) in &mut shooters {
         let position = transform.translation;
-        let sight = weapon.spec.range + SIGHT_BEYOND_RANGE;
+        let stance = stance.copied().unwrap_or_default();
+        let sight = match stance {
+            Stance::Aggressive => weapon.spec.range + SIGHT_BEYOND_RANGE,
+            Stance::HoldPosition | Stance::HoldFire => weapon.spec.range,
+        };
         if let Some((entity, mode)) = attack.target {
             let Some(target) = targets
                 .get(entity)
@@ -260,19 +265,23 @@ pub fn acquire_targets(
                 attack.clear();
                 continue;
             };
-            let lost_sight =
-                mode == TargetMode::Automatic && surface_distance(position, target) > sight;
-            if !lost_sight {
+            let automatic = mode == TargetMode::Automatic;
+            let lost_sight = automatic && surface_distance(position, target) > sight;
+            let told_to_hold_fire = automatic && stance == Stance::HoldFire;
+            if !lost_sight && !told_to_hold_fire {
                 continue;
             }
             attack.clear();
+        }
+        if stance == Stance::HoldFire {
+            continue;
         }
 
         let on_ordered_move = mobile.is_some_and(|m| m.ordered_move && m.is_moving());
         if on_ordered_move && !has_turret {
             continue;
         }
-        let can_chase = mobile.is_some() && !on_ordered_move;
+        let can_chase = mobile.is_some() && !on_ordered_move && stance == Stance::Aggressive;
         let reach = if can_chase { sight } else { weapon.spec.range };
         if let Some(enemy) = targets.best_enemy(team, &weapon.spec, armor.0, position, reach) {
             attack.target = Some((enemy.entity, TargetMode::Automatic));
@@ -285,16 +294,23 @@ pub fn chase_targets(
     time: Res<Time>,
     map: Res<GameMap>,
     targets: Res<Targets>,
-    mut chasers: Query<(&Transform, &Weapon, &mut AttackTarget, &mut Mobile)>,
+    mut chasers: Query<(
+        &Transform,
+        &Weapon,
+        &mut AttackTarget,
+        &mut Mobile,
+        Option<&Stance>,
+    )>,
 ) {
-    for (transform, weapon, mut attack, mut mobile) in &mut chasers {
+    for (transform, weapon, mut attack, mut mobile, stance) in &mut chasers {
         let Some((entity, mode)) = attack.target else {
             continue;
         };
         let Some(target) = targets.get(entity) else {
             continue;
         };
-        if mode == TargetMode::Automatic && mobile.ordered_move {
+        let holds_its_ground = stance.is_some_and(|stance| *stance != Stance::Aggressive);
+        if mode == TargetMode::Automatic && (mobile.ordered_move || holds_its_ground) {
             continue;
         }
         let in_range = surface_distance(transform.translation, target) <= weapon.spec.range;

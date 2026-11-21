@@ -25,10 +25,13 @@ pub enum Action {
     ControlsHelp,
     GraphicsQuality,
     PerformanceOverlay,
+    StanceAggressive,
+    StanceHoldPosition,
+    StanceHoldFire,
 }
 
 impl Action {
-    pub const ALL: [Action; 18] = [
+    pub const ALL: [Action; 21] = [
         Action::ScrollUp,
         Action::ScrollDown,
         Action::ScrollLeft,
@@ -47,6 +50,9 @@ impl Action {
         Action::ControlsHelp,
         Action::GraphicsQuality,
         Action::PerformanceOverlay,
+        Action::StanceAggressive,
+        Action::StanceHoldPosition,
+        Action::StanceHoldFire,
     ];
 
     pub fn name(self) -> &'static str {
@@ -69,6 +75,9 @@ impl Action {
             Action::ControlsHelp => tr("Controls overview"),
             Action::GraphicsQuality => tr("Graphics quality"),
             Action::PerformanceOverlay => tr("Performance overlay"),
+            Action::StanceAggressive => tr("Stance: aggressive"),
+            Action::StanceHoldPosition => tr("Stance: hold position"),
+            Action::StanceHoldFire => tr("Stance: hold fire"),
         }
     }
 
@@ -92,6 +101,9 @@ impl Action {
             Action::ControlsHelp => KeyCode::F1,
             Action::GraphicsQuality => KeyCode::F2,
             Action::PerformanceOverlay => KeyCode::F3,
+            Action::StanceAggressive => KeyCode::KeyG,
+            Action::StanceHoldPosition => KeyCode::KeyH,
+            Action::StanceHoldFire => KeyCode::KeyF,
         }
     }
 }

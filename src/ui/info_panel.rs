@@ -126,6 +126,18 @@ pub(super) fn harvest_activity(state: HarvestState) -> &'static str {
     }
 }
 
+/// The stance the armed units among a selection share, or that they differ; empty without armed units.
+fn stance_line(stances: &[&Stance]) -> String {
+    let Some(first) = stances.first() else {
+        return String::new();
+    };
+    if stances.iter().all(|stance| stance == first) {
+        tr_fmt("Stance: {}", &[&first.name()])
+    } else {
+        tr("Stance: mixed").to_string()
+    }
+}
+
 pub fn refresh_info_panel(
     mut commands: Commands,
     fonts: Res<UiFonts>,
@@ -138,6 +150,7 @@ pub fn refresh_info_panel(
             Option<&Building>,
             &Health,
             Option<&Harvester>,
+            Option<&Stance>,
         ),
         With<Selected>,
     >,
@@ -170,7 +183,7 @@ pub fn refresh_info_panel(
             tr("Select units with a click or a drag box.").into(),
             None,
         ),
-        [(unit, building, health, harvester)] => {
+        [(unit, building, health, harvester, stance)] => {
             let name = unit
                 .map(|u| tr(u.0.spec().name))
                 .or(building.map(|b| tr(b.kind.spec().name)))
@@ -195,7 +208,10 @@ pub fn refresh_info_panel(
                 ),
                 None => hp,
             };
-            let details = format!("{condition}\n{role}");
+            let details = match stance {
+                Some(stance) => format!("{condition}\n{}\n{role}", stance_line(&[*stance])),
+                None => format!("{condition}\n{role}"),
+            };
             (path, name.to_string(), details, Some(health.fraction()))
         }
         many => {
@@ -207,11 +223,12 @@ pub fn refresh_info_panel(
             }
             roster.sort_by_key(|(kind, _)| UnitKind::ALL.iter().position(|k| k == kind));
             let average =
-                many.iter().map(|(_, _, h, _)| h.fraction()).sum::<f32>() / many.len() as f32;
+                many.iter().map(|(_, _, h, ..)| h.fraction()).sum::<f32>() / many.len() as f32;
+            let stances: Vec<&Stance> = many.iter().filter_map(|(.., stance)| *stance).collect();
             (
                 None,
                 tr_fmt("{} units", &[&many.len()]),
-                String::new(),
+                stance_line(&stances),
                 Some(average),
             )
         }

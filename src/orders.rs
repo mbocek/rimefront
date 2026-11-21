@@ -367,6 +367,21 @@ pub fn issue_orders(
         });
     }
     let engineers = own_engineers(&selected_units, team);
+    let chosen_stance = [
+        (Action::StanceAggressive, Stance::Aggressive),
+        (Action::StanceHoldPosition, Stance::HoldPosition),
+        (Action::StanceHoldFire, Stance::HoldFire),
+    ]
+    .into_iter()
+    .find(|&(action, _)| settings.keys.just_pressed(&keys, action));
+    if let Some((_, stance)) = chosen_stance
+        && !units.is_empty()
+    {
+        issuer.issue(PlayerCommand::SetStance {
+            units: units.clone(),
+            stance,
+        });
+    }
     if settings.keys.just_pressed(&keys, Action::LayMine) && !engineers.is_empty() {
         issuer.issue(PlayerCommand::LayMines { units: engineers });
     }

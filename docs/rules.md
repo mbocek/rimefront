@@ -84,6 +84,10 @@
   and every tree or rock that blocks movement have a twin in the opposite corner. The last row and column, which
   would have no twin, are closed. Bases in the far half face
   the other way, so every base's doors, refinery dock and new units point towards the middle of the map.
+- **Stances:** an armed unit is *aggressive* by default: it takes on enemies it sees and chases them. A unit
+  told to *hold position* (H) fires only at enemies within its weapon's reach and stays where it is; one told
+  to *hold fire* (F) shoots only at what it is ordered to attack; G makes it aggressive again. Ordered attacks
+  and moves work in every stance. The info panel shows the selection's stance, and saves keep it.
 - **Veterancy:** units earn experience worth the price of every enemy unit or structure they destroy (the last
   hit counts). At their own price in experience they become Veterans (+20 % damage and health, one gold
   chevron), at three times it Elites (+40 %, two chevrons, and they slowly mend their own wounds). Structures

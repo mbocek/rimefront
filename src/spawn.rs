@@ -46,6 +46,7 @@ pub fn spawn_unit(
                 cooldown: 0.0,
             },
             AttackTarget::default(),
+            Stance::default(),
         ));
     }
     if spec.has_turret {

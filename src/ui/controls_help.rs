@@ -105,6 +105,17 @@ pub(super) fn controls_overview(keys: &KeyBindings) -> Vec<(&'static str, String
             ),
         ),
         (
+            tr("Stance"),
+            tr_fmt(
+                "{} aggressive, {} hold position, {} hold fire",
+                &[
+                    &key(Action::StanceAggressive),
+                    &key(Action::StanceHoldPosition),
+                    &key(Action::StanceHoldFire),
+                ],
+            ),
+        ),
+        (
             tr("Groups"),
             tr_owned("Ctrl+1-9 save, 1-9 select, twice = jump"),
         ),

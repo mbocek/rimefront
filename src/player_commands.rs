@@ -85,6 +85,10 @@ pub enum PlayerCommand {
     LayMines {
         units: Vec<SimId>,
     },
+    SetStance {
+        units: Vec<SimId>,
+        stance: Stance,
+    },
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -257,6 +261,7 @@ pub struct Battlefield<'w, 's> {
     owners: Query<'w, 's, (&'static Building, &'static Team)>,
     positions: Query<'w, 's, &'static Transform, With<Unit>>,
     mines: Query<'w, 's, &'static Mine>,
+    stances: Query<'w, 's, &'static mut Stance>,
     intel: Res<'w, Intel>,
 }
 
@@ -302,6 +307,7 @@ impl Battlefield<'_, '_> {
             }
             PlayerCommand::LayWall { from, to } => self.lay_wall(team, from, to),
             PlayerCommand::LayMines { units } => self.lay_mines(team, &units),
+            PlayerCommand::SetStance { units, stance } => self.set_stance(team, &units, stance),
             PlayerCommand::OrderStructure { building, kind } => {
                 if let Some(building) = self.own_structure(team, building) {
                     self.structure_orders.write(StructureOrder {
@@ -330,6 +336,14 @@ impl Battlefield<'_, '_> {
         let entity = self.ids.get(id)?;
         let (_, owner, _) = self.structures.get(entity).ok()?;
         (owner == Some(&team)).then_some(entity)
+    }
+
+    fn set_stance(&mut self, team: Team, ids: &[SimId], stance: Stance) {
+        for entity in self.own_units(team, ids) {
+            if let Ok(mut held) = self.stances.get_mut(entity) {
+                *held = stance;
+            }
+        }
     }
 
     fn stop(&mut self, team: Team, ids: &[SimId]) {

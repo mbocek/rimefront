@@ -25,6 +25,7 @@
 | X / Esc | stop / deselect, cancel placement |
 | double-click / Ctrl+click a unit | select every unit of that kind on screen |
 | M | engineers lay a mine ($100 each) |
+| G / H / F | stance of the selected units: aggressive / hold position / hold fire |
 | V | jump to the last attack on your base or a harvester |
 | Ctrl+1-9 (Cmd+1-9) | save the selection as a group |
 | 1-9 / twice quickly | select a group / move the camera to it |

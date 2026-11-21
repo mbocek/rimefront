@@ -43,7 +43,8 @@
 | `player_commands` | player commands, their queue by tick, and carrying them out in the simulation |
 | `sim_math` | the portable trigonometry the simulation uses so every processor computes the same battle |
 | `determinism` | the seeded simulation randomness, simulation ids, single-threaded schedules and the state checksum |
-| `updates` | checking GitHub for a newer release, downloading and opening its package |
+| `updates` | checking GitHub for a newer release and downloading its package |
+| `self_update` | finding how this copy is installed, verifying a package's checksum and installing it in place |
 | `season` | summer, autumn and winter: terrain tint, snow, foliage colours, light |
 | `key_bindings` | rebindable hotkeys: actions, their default and bindable keys, swapping on conflict |
 | `engineers` | engineers capturing enemy structures and repairing own ones |

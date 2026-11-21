@@ -3376,6 +3376,7 @@ dependencies = [
  "libm",
  "pathfinding",
  "rand",
+ "ring",
  "rustls",
  "rustls-pki-types",
  "serde",

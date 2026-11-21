@@ -39,7 +39,13 @@ makes Bevy measure text and lay out the whole interface again; that took about 7
 
 At start-up the game asks GitHub for the latest release of this repository (one request to
 `api.github.com`, sent as `iron-tide/<version>` with nothing about the player). When a newer version has a
-package for this computer, the main menu shows a banner; clicking it downloads the package into the
-Downloads folder and then opens it: a disk image is mounted on macOS, the zip or archive is shown in its
-folder on Windows and Linux. Installing stays in the player's hands. Release builds are signed and notarized once the certificates are configured in CI (see [docs/signing.md](signing.md)); until then they are unsigned. The check
+package for this computer, the main menu shows a banner, and one click updates the game
+(`self_update`): it downloads the package that matches how this copy is installed (the disk image for
+`Iron Tide.app`, the archive for a folder holding the executable beside `assets`), checks it against the
+release's `SHA256SUMS.txt`, unpacks it next to the installation and moves the new files in, the old ones
+aside, then starts the new version and quits. If a move fails the old files go back. The next start removes
+the staging folder (`.update` inside a folder installation, `.iron-tide-update` beside the app) with the old
+copy in it. A copy that cannot write where it is installed, or a development build with no assets beside
+its executable, keeps the old behaviour: the package is saved into the Downloads folder and opened (a disk
+image is mounted on macOS, the zip or archive is shown in its folder on Windows and Linux). Release builds are signed and notarized once the certificates are configured in CI (see [docs/signing.md](signing.md)); until then they are unsigned. The check
 can be switched off with *Check for updates* in the menu's *Gameplay* tab, and capture runs never check.

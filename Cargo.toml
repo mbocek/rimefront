@@ -26,6 +26,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 webpki-roots = "1"
 ureq = "3"
+# Already in the build through rustls; hashes downloaded updates against SHA256SUMS.txt.
+ring = "0.17"
 
 [profile.dev]
 opt-level = 1

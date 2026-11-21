@@ -5,10 +5,12 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 
 use bevy::prelude::*;
 
+use crate::self_update::Installation;
 use crate::settings::GameSettings;
 
 const GITHUB_PREFIX: &str = "https://github.com/";
 const DOWNLOAD_CHUNK_BYTES: usize = 64 * 1024;
+const CHECKSUMS_ASSET: &str = "SHA256SUMS.txt";
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Version(u32, u32, u32);
@@ -37,10 +39,12 @@ pub struct Release {
     pub version: Version,
     pub package_name: String,
     pub package_url: String,
+    /// `None` for a release published without `SHA256SUMS.txt`, which is downloaded but not installed.
+    pub checksums_url: Option<String>,
 }
 
-/// The end of the release package name that fits this build, matching what CI publishes.
-fn package_suffix() -> &'static str {
+/// The package a copy that cannot install itself downloads for the player, matching what CI publishes.
+fn package_to_open() -> &'static str {
     if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
         "macos-arm64.dmg"
     } else if cfg!(target_os = "macos") {
@@ -52,22 +56,35 @@ fn package_suffix() -> &'static str {
     }
 }
 
-/// Reads GitHub's latest-release answer; `None` unless it is newer and has a package for this computer.
-pub fn newer_release(latest_release_json: &str, current: Version) -> Option<Release> {
+fn package_suffix(installation: Option<&Installation>) -> String {
+    installation.map_or_else(
+        || package_to_open().to_string(),
+        Installation::package_suffix,
+    )
+}
+
+/// Reads GitHub's latest-release answer; `None` unless it is newer and has a package ending in `suffix`.
+pub fn newer_release(latest_release_json: &str, current: Version, suffix: &str) -> Option<Release> {
     let release: serde_json::Value = serde_json::from_str(latest_release_json).ok()?;
     let version = Version::parse(release["tag_name"].as_str()?)?;
     if version <= current {
         return None;
     }
-    let package = release["assets"].as_array()?.iter().find(|asset| {
-        asset["name"]
-            .as_str()
-            .is_some_and(|name| name.ends_with(package_suffix()))
-    })?;
+    let assets = release["assets"].as_array()?;
+    let asset_named = |wanted: &dyn Fn(&str) -> bool| {
+        assets
+            .iter()
+            .find(|asset| asset["name"].as_str().is_some_and(wanted))
+    };
+    let package = asset_named(&|name| name.ends_with(suffix))?;
+    let checksums = asset_named(&|name| name == CHECKSUMS_ASSET);
     Some(Release {
         version,
         package_name: package["name"].as_str()?.to_string(),
         package_url: package["browser_download_url"].as_str()?.to_string(),
+        checksums_url: checksums
+            .and_then(|asset| asset["browser_download_url"].as_str())
+            .map(str::to_string),
     })
 }
 
@@ -92,6 +109,9 @@ pub enum UpdateState {
         release: Release,
         fraction: f32,
     },
+    Installing(Release),
+    /// Installed, but the new version could not be started; the player starts it.
+    Installed(Version),
     Downloaded(PathBuf),
     Failed(String),
 }
@@ -99,6 +119,8 @@ pub enum UpdateState {
 enum UpdateNews {
     Found(Release),
     Progress(f32),
+    Installing,
+    Installed,
     Saved(PathBuf),
     Failed(String),
 }
@@ -107,9 +129,16 @@ enum UpdateNews {
 pub struct Updates {
     pub state: UpdateState,
     news: Option<Mutex<Receiver<UpdateNews>>>,
+    /// `None` for a development build or an unrecognised layout, which only downloads the package.
+    installation: Option<Installation>,
 }
 
 impl Updates {
+    /// Whether a click installs the new version in place rather than downloading it for the player.
+    pub fn installs_itself(&self) -> bool {
+        self.installation.is_some()
+    }
+
     fn listen(&mut self) -> Sender<UpdateNews> {
         let (sender, receiver) = channel();
         self.news = Some(Mutex::new(receiver));
@@ -118,12 +147,17 @@ impl Updates {
 }
 
 pub fn check_for_updates(settings: Res<GameSettings>, mut updates: ResMut<Updates>) {
+    updates.installation = Installation::current();
+    if let Some(installation) = &updates.installation {
+        installation.forget_finished_update();
+    }
     if !settings.check_for_updates || crate::capture::is_capture_run() {
         return;
     }
     let Some(url) = latest_release_url() else {
         return;
     };
+    let suffix = package_suffix(updates.installation.as_ref());
     let news = updates.listen();
     std::thread::spawn(move || {
         let answer = ureq::get(&url)
@@ -133,7 +167,7 @@ pub fn check_for_updates(settings: Res<GameSettings>, mut updates: ResMut<Update
             .and_then(|mut response| response.body_mut().read_to_string());
         match answer {
             Ok(json) => {
-                if let Some(release) = newer_release(&json, Version::current()) {
+                if let Some(release) = newer_release(&json, Version::current(), &suffix) {
                     let _ = news.send(UpdateNews::Found(release));
                 }
             }
@@ -142,7 +176,7 @@ pub fn check_for_updates(settings: Res<GameSettings>, mut updates: ResMut<Update
     });
 }
 
-pub fn receive_update_news(mut updates: ResMut<Updates>) {
+pub fn receive_update_news(mut updates: ResMut<Updates>, mut exit: MessageWriter<AppExit>) {
     let Some(news) = updates.news.as_ref() else {
         return;
     };
@@ -159,6 +193,23 @@ pub fn receive_update_news(mut updates: ResMut<Updates>) {
                 }
             }
             (UpdateNews::Progress(_), state) => state.clone(),
+            (UpdateNews::Installing, UpdateState::Downloading { release, .. }) => {
+                UpdateState::Installing(release.clone())
+            }
+            (UpdateNews::Installing, state) => state.clone(),
+            (UpdateNews::Installed, state) => {
+                let restarted = updates
+                    .installation
+                    .as_ref()
+                    .is_some_and(|installation| installation.relaunch().is_ok());
+                if restarted {
+                    exit.write(AppExit::Success);
+                }
+                match state {
+                    UpdateState::Installing(release) => UpdateState::Installed(release.version),
+                    other => other.clone(),
+                }
+            }
             (UpdateNews::Saved(path), _) => {
                 reveal(&path);
                 UpdateState::Downloaded(path)
@@ -168,7 +219,8 @@ pub fn receive_update_news(mut updates: ResMut<Updates>) {
     }
 }
 
-/// Fetches the package into the player's Downloads folder; the player installs it themselves.
+/// Installs the new version over this copy and restarts it; a copy that cannot write where it is installed
+/// fetches the package into the player's Downloads folder for the player to install.
 pub fn download_update(updates: &mut Updates) {
     let UpdateState::Available(release) = updates.state.clone() else {
         if let UpdateState::Downloaded(path) = &updates.state {
@@ -176,12 +228,26 @@ pub fn download_update(updates: &mut Updates) {
         }
         return;
     };
-    let target = downloads_directory().join(&release.package_name);
+    let installation = updates
+        .installation
+        .clone()
+        .filter(|installation| installation.prepare_staging().is_ok());
     let news = updates.listen();
     updates.state = UpdateState::Downloading {
         release: release.clone(),
         fraction: 0.0,
     };
+    if let Some(installation) = installation {
+        std::thread::spawn(move || {
+            let outcome = update_in_place(&installation, &release, &news);
+            let _ = news.send(match outcome {
+                Ok(()) => UpdateNews::Installed,
+                Err(reason) => UpdateNews::Failed(reason),
+            });
+        });
+        return;
+    }
+    let target = downloads_directory().join(&release.package_name);
     std::thread::spawn(move || {
         let outcome = fetch_to_file(&release.package_url, &target, &news);
         let _ = news.send(match outcome {
@@ -189,6 +255,27 @@ pub fn download_update(updates: &mut Updates) {
             Err(reason) => UpdateNews::Failed(reason),
         });
     });
+}
+
+fn update_in_place(
+    installation: &Installation,
+    release: &Release,
+    news: &Sender<UpdateNews>,
+) -> Result<(), String> {
+    let checksums_url = release
+        .checksums_url
+        .as_deref()
+        .ok_or("the release has no checksums to verify the package with")?;
+    let package = installation.staging().join(&release.package_name);
+    fetch_to_file(&release.package_url, &package, news)?;
+    let checksums = ureq::get(checksums_url)
+        .header("User-Agent", user_agent())
+        .call()
+        .and_then(|mut response| response.body_mut().read_to_string())
+        .map_err(|error| error.to_string())?;
+    crate::self_update::verify_checksum(&checksums, &release.package_name, &package)?;
+    let _ = news.send(UpdateNews::Installing);
+    installation.install(&package)
 }
 
 fn fetch_to_file(url: &str, target: &Path, news: &Sender<UpdateNews>) -> Result<(), String> {
@@ -249,13 +336,15 @@ fn reveal(path: &Path) {
 mod tests {
     use super::*;
 
+    const SUFFIX: &str = "macos-arm64.dmg";
+
     fn release_json(tag: &str) -> String {
         format!(
             r#"{{"tag_name": "{tag}", "assets": [
-                {{"name": "iron-tide-9.0.0-{suffix}", "browser_download_url": "https://example.invalid/pkg"}},
-                {{"name": "iron-tide-9.0.0-unknown-os.zip", "browser_download_url": "https://example.invalid/other"}}
-            ]}}"#,
-            suffix = package_suffix()
+                {{"name": "iron-tide-9.0.0-{SUFFIX}", "browser_download_url": "https://example.invalid/pkg"}},
+                {{"name": "iron-tide-9.0.0-unknown-os.zip", "browser_download_url": "https://example.invalid/other"}},
+                {{"name": "SHA256SUMS.txt", "browser_download_url": "https://example.invalid/sums"}}
+            ]}}"#
         )
     }
 
@@ -268,23 +357,27 @@ mod tests {
 
     #[test]
     fn a_newer_release_offers_the_package_for_this_computer() {
-        let release = newer_release(&release_json("v9.0.0"), Version(1, 2, 0)).unwrap();
+        let release = newer_release(&release_json("v9.0.0"), Version(1, 2, 0), SUFFIX).unwrap();
         assert_eq!(release.version, Version(9, 0, 0));
-        assert!(release.package_name.ends_with(package_suffix()));
+        assert!(release.package_name.ends_with(SUFFIX));
         assert_eq!(release.package_url, "https://example.invalid/pkg");
+        assert_eq!(
+            release.checksums_url.as_deref(),
+            Some("https://example.invalid/sums")
+        );
     }
 
     #[test]
     fn the_same_or_an_older_release_is_not_offered() {
         assert_eq!(
-            newer_release(&release_json("v1.2.0"), Version(1, 2, 0)),
+            newer_release(&release_json("v1.2.0"), Version(1, 2, 0), SUFFIX),
             None
         );
         assert_eq!(
-            newer_release(&release_json("v1.1.9"), Version(1, 2, 0)),
+            newer_release(&release_json("v1.1.9"), Version(1, 2, 0), SUFFIX),
             None
         );
-        assert_eq!(newer_release("not json", Version(1, 2, 0)), None);
+        assert_eq!(newer_release("not json", Version(1, 2, 0), SUFFIX), None);
     }
 
     #[test]

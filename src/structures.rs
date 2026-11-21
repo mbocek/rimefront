@@ -52,8 +52,9 @@ pub fn structure_value(kind: BuildingKind) -> i32 {
     }
 }
 
+/// A captured neutral site cannot be sold: it would vanish from a map built around it.
 pub fn can_sell(kind: BuildingKind) -> bool {
-    kind != BuildingKind::CommandCenter
+    kind != BuildingKind::CommandCenter && !kind.is_neutral_site()
 }
 
 pub fn sale_refund(kind: BuildingKind) -> i32 {

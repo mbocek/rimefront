@@ -253,7 +253,7 @@ pub struct Battlefield<'w, 's> {
     notifications: ResMut<'w, Notifications>,
     structure_orders: MessageWriter<'w, StructureOrder>,
     units: Query<'w, 's, CommandedUnit<'static>>,
-    structures: Query<'w, 's, (&'static Building, &'static Team, &'static Health)>,
+    structures: Query<'w, 's, (&'static Building, Option<&'static Team>, &'static Health)>,
     owners: Query<'w, 's, (&'static Building, &'static Team)>,
     positions: Query<'w, 's, &'static Transform, With<Unit>>,
     mines: Query<'w, 's, &'static Mine>,
@@ -328,8 +328,8 @@ impl Battlefield<'_, '_> {
 
     fn own_structure(&self, team: Team, id: SimId) -> Option<Entity> {
         let entity = self.ids.get(id)?;
-        let (_, &owner, _) = self.structures.get(entity).ok()?;
-        (owner == team).then_some(entity)
+        let (_, owner, _) = self.structures.get(entity).ok()?;
+        (owner == Some(&team)).then_some(entity)
     }
 
     fn stop(&mut self, team: Team, ids: &[SimId]) {
@@ -371,10 +371,11 @@ impl Battlefield<'_, '_> {
         let Some(target) = self.ids.get(structure) else {
             return;
         };
-        let Ok((building, &owner, health)) = self.structures.get(target) else {
+        let Ok((building, owner, health)) = self.structures.get(target) else {
             return;
         };
-        let Some(job) = job_for(*self.diplomacy, team, owner, building.kind, health) else {
+        let Some(job) = job_for(*self.diplomacy, team, owner.copied(), building.kind, health)
+        else {
             return;
         };
         for entity in self.own_units(team, ids) {

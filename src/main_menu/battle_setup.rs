@@ -93,6 +93,7 @@ pub enum EditorField {
     MapVariant,
     PlayerSite,
     FogOfWar,
+    NeutralSites,
     Alliance,
     Landscape,
     Weather,
@@ -102,7 +103,7 @@ pub enum EditorField {
     Faction,
 }
 
-pub(super) const EDITOR_FIELDS: [EditorField; 15] = [
+pub(super) const EDITOR_FIELDS: [EditorField; 16] = [
     EditorField::Enemies,
     EditorField::Difficulty,
     EditorField::Credits,
@@ -112,6 +113,7 @@ pub(super) const EDITOR_FIELDS: [EditorField; 15] = [
     EditorField::PlayerSite,
     EditorField::Faction,
     EditorField::FogOfWar,
+    EditorField::NeutralSites,
     EditorField::Alliance,
     EditorField::Landscape,
     EditorField::Weather,
@@ -119,6 +121,10 @@ pub(super) const EDITOR_FIELDS: [EditorField; 15] = [
     EditorField::MapSize,
     EditorField::NetworkPlayers,
 ];
+
+fn on_or_off(on: bool) -> String {
+    if on { tr("On") } else { tr("Off") }.into()
+}
 
 pub(super) fn cycle<T: Copy + PartialEq>(choices: &[T], current: T, forward: bool) -> T {
     let index = choices.iter().position(|&c| c == current).unwrap_or(0);
@@ -141,6 +147,7 @@ impl EditorField {
             EditorField::MapVariant => tr("Map variant"),
             EditorField::PlayerSite => tr("Your base"),
             EditorField::FogOfWar => tr("Fog of war"),
+            EditorField::NeutralSites => tr("Neutral buildings"),
             EditorField::Alliance => tr("Opponents"),
             EditorField::Landscape => tr("Landscape"),
             EditorField::Weather => tr("Weather"),
@@ -165,12 +172,8 @@ impl EditorField {
             EditorField::Tech => options.tech.label().into(),
             EditorField::MapVariant => tr_fmt("{} of {}", &[&options.map_variant, &MAP_VARIANTS]),
             EditorField::PlayerSite => options.player_site.name().into(),
-            EditorField::FogOfWar => if options.fog_of_war {
-                tr("On")
-            } else {
-                tr("Off")
-            }
-            .into(),
+            EditorField::FogOfWar => on_or_off(options.fog_of_war),
+            EditorField::NeutralSites => on_or_off(options.neutral_sites),
             EditorField::Alliance => alliance_name(options.alliance).into(),
             EditorField::Landscape => tr_owned(&format!("{:?}", options.landscape)),
             EditorField::Weather => tr_owned(&format!("{:?}", options.weather)),
@@ -221,6 +224,7 @@ impl EditorField {
                 options.player_site = cycle(&BaseSite::ALL, options.player_site, forward)
             }
             EditorField::FogOfWar => options.fog_of_war = !options.fog_of_war,
+            EditorField::NeutralSites => options.neutral_sites = !options.neutral_sites,
             EditorField::Alliance => {
                 options.alliance = cycle(&Alliance::ALL, options.alliance, forward);
             }

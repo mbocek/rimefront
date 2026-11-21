@@ -13,6 +13,7 @@ use crate::fog_view::Discovered;
 use crate::levels::{ActiveLevel, LevelDefinition};
 use crate::local_view::LocalView;
 use crate::map::{CELL_SIZE, GameMap, footprint_cells, map_cells, map_world_size};
+use crate::neutral_sites::UnclaimedSite;
 use crate::terrain::GroundLayers;
 use crate::ui::SIDEBAR_WIDTH;
 
@@ -24,6 +25,7 @@ const REFRESH_SECS: f32 = 0.2;
 const WATER: [u8; 3] = [38, 78, 104];
 const OBSTACLE: [u8; 3] = [34, 62, 30];
 const CRYSTAL: [u8; 3] = [90, 230, 210];
+const UNCLAIMED: [u8; 3] = [150, 152, 150];
 const VIEW_FRAME: [u8; 3] = [240, 240, 240];
 const EXPLORED_BRIGHTNESS: f32 = 0.55;
 
@@ -167,6 +169,7 @@ pub fn redraw_minimap(
     view: LocalView,
     level: Res<ActiveLevel>,
     buildings: Query<(&Building, &Team, Has<Discovered>)>,
+    unclaimed_sites: Query<&Building, With<UnclaimedSite>>,
     units: Query<(&Transform, &Team), With<Unit>>,
 ) {
     minimap.refresh_timer -= time.delta_secs();
@@ -191,6 +194,19 @@ pub fn redraw_minimap(
             if map.crystal_at(cell) > 0 && fog.sight_at(cell) != CellSight::Unexplored {
                 canvas.fill(cell * PIXELS_PER_CELL + 1, IVec2::ONE, CRYSTAL);
             }
+        }
+    }
+    for site in &unclaimed_sites {
+        let footprint = site.kind.spec().footprint;
+        if fog.sight_at(site.origin) == CellSight::Unexplored {
+            continue;
+        }
+        for cell in footprint_cells(site.origin, footprint) {
+            canvas.fill(
+                cell * PIXELS_PER_CELL,
+                IVec2::splat(PIXELS_PER_CELL),
+                UNCLAIMED,
+            );
         }
     }
     for (building, &team, discovered) in &buildings {

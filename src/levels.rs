@@ -252,6 +252,8 @@ pub struct LevelDefinition {
     /// Varies the river's course, the fords, the lake and the hills; none keeps the classic landscape.
     pub terrain_seed: Option<u64>,
     pub events: Vec<LevelEvent>,
+    /// Supply Depots, Field Hospitals and an Observation Post stand unclaimed on the map.
+    pub neutral_sites: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
@@ -284,6 +286,7 @@ impl Default for LevelDefinition {
             player_faction: Faction::Coalition,
             terrain_seed: None,
             events: Vec::new(),
+            neutral_sites: false,
         }
     }
 }
@@ -497,6 +500,7 @@ pub struct SkirmishOptions {
     /// People in a network battle, the host included; the computer plays the other corners.
     pub network_players: usize,
     pub player_faction: Faction,
+    pub neutral_sites: bool,
 }
 
 impl Default for SkirmishOptions {
@@ -517,6 +521,7 @@ impl Default for SkirmishOptions {
             map_size: MapSize::Standard,
             network_players: 2,
             player_faction: Faction::Coalition,
+            neutral_sites: true,
         }
     }
 }
@@ -577,6 +582,7 @@ impl SkirmishOptions {
             map_size: self.map_size,
             map_edits: Vec::new(),
             player_faction: self.player_faction,
+            neutral_sites: self.neutral_sites,
             terrain_seed: None,
             events: Vec::new(),
         }

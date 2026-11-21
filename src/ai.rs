@@ -19,6 +19,7 @@ use crate::map::{
     mirror_centre, opposite_cell, opposite_origin, world_to_cell,
 };
 use crate::movement::order_move;
+use crate::neutral_sites::UnclaimedSite;
 use crate::production::{
     BuildItem, Lane, PlacementContext, Production, construct_building, owned_building_kinds,
     placement_context,
@@ -257,8 +258,9 @@ pub fn fortify_turrets(
     }
 }
 
-/// A commander that knows an enemy structure keeps one engineer, and sends it along once its attack wave is
-/// out in the field, to capture the nearest structure it knows.
+/// A commander keeps one engineer once it knows a structure worth taking. It sends it at once to the nearest
+/// unclaimed neutral site its side has explored, and otherwise along with its attack wave, once that is out
+/// in the field, to capture the nearest enemy structure it knows.
 pub fn employ_engineers(
     mut commands: Commands,
     time: Res<Time>,
@@ -268,6 +270,7 @@ pub fn employ_engineers(
     mut production: ResMut<Production>,
     mut economies: ResMut<Economies>,
     buildings: Query<(&Building, &Team)>,
+    unclaimed_sites: Query<(Entity, &Building, &SimId), With<UnclaimedSite>>,
     units: Query<(
         Entity,
         &Unit,
@@ -286,10 +289,24 @@ pub fn employ_engineers(
     }
     for ai in &commanders.0 {
         let home = footprint_center(ai.base, BuildingKind::CommandCenter.spec().footprint);
-        let Some((target, _)) = intel
-            .known_enemy_structure_entities(ai.team)
-            .min_by(|(_, a), (_, b)| a.distance(home).total_cmp(&b.distance(home)))
-        else {
+        let nearest = |candidates: Vec<(Entity, Vec3)>| {
+            candidates
+                .into_iter()
+                .min_by(|(_, a), (_, b)| a.distance(home).total_cmp(&b.distance(home)))
+                .map(|(entity, _)| entity)
+        };
+        let explored_site = nearest(
+            in_simulation_order(unclaimed_sites, |site| *site.2)
+                .into_iter()
+                .map(|(entity, building, _)| {
+                    let footprint = building.kind.spec().footprint;
+                    (entity, footprint_center(building.origin, footprint))
+                })
+                .filter(|(_, centre)| intel.vision(ai.team).is_explored(*centre))
+                .collect(),
+        );
+        let enemy_structure = nearest(intel.known_enemy_structure_entities(ai.team).collect());
+        let Some(target) = explored_site.or(enemy_structure) else {
             continue;
         };
         let own = |team: &Team| *team == ai.team;
@@ -312,6 +329,14 @@ pub fn employ_engineers(
                     BuildItem::Unit(UnitKind::Engineer),
                     &owned,
                 );
+            }
+            continue;
+        }
+        if explored_site.is_some() {
+            if let Some((engineer, _)) = engineers.into_iter().find(|(_, busy)| !busy) {
+                commands
+                    .entity(engineer)
+                    .insert(EngineerTask::new(target, EngineerJob::Capture));
             }
             continue;
         }

@@ -132,7 +132,7 @@ pub fn exit_cell(building: &Building) -> IVec2 {
 }
 
 /// Armed structures keep yaw zero: their turret aim is measured from it.
-fn building_yaw(kind: BuildingKind, origin: IVec2) -> f32 {
+pub(crate) fn building_yaw(kind: BuildingKind, origin: IVec2) -> f32 {
     let spec = kind.spec();
     if spec.weapon.is_none() && in_far_half(origin, spec.footprint) {
         std::f32::consts::PI

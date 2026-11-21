@@ -10,6 +10,7 @@ use crate::components::{Building, Unit};
 use crate::fog::{CellSight, FogOfWar};
 use crate::local_view::LocalView;
 use crate::map::{CrystalVisual, footprint_cells, map_cells};
+use crate::neutral_sites::UnclaimedSite;
 use crate::scenery::Scenery;
 
 const TEXELS_PER_CELL: i32 = 4;
@@ -152,7 +153,10 @@ pub fn paint_fog_texture(
 pub fn shroud_unexplored_scenery(
     mut commands: Commands,
     view: LocalView,
-    scenery: Query<(Entity, &Transform), Or<(With<Scenery>, With<CrystalVisual>)>>,
+    scenery: Query<
+        (Entity, &Transform),
+        Or<(With<Scenery>, With<CrystalVisual>, With<UnclaimedSite>)>,
+    >,
 ) {
     for (entity, transform) in &scenery {
         if !view.sight().is_explored(transform.translation) {

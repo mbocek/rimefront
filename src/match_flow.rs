@@ -219,6 +219,9 @@ pub fn deploy_level_forces(
             ));
         }
     }
+    if level.neutral_sites {
+        crate::neutral_sites::place_neutral_sites(&mut commands, &models, &mut map);
+    }
     if !rules.starting_forces {
         return;
     }

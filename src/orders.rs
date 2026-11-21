@@ -8,8 +8,9 @@ use crate::determinism::SimId;
 use crate::engineers::{EngineerJob, job_for};
 use crate::i18n::{tr, tr_fmt};
 use crate::key_bindings::Action;
-use crate::map::world_to_cell;
+use crate::map::{GameMap, world_to_cell};
 use crate::minimap::MinimapOrder;
+use crate::neutral_sites::UnclaimedSite;
 use crate::placement::Placement;
 use crate::player_commands::LocalTeam;
 use crate::player_commands::{CommandIssuer, GroundOrder, PlayerCommand};
@@ -352,6 +353,7 @@ pub fn issue_orders(
     selected_buildings: Query<(&SimId, &Building, &Team), With<Selected>>,
     structures: Query<(&SimId, &Building, &Health)>,
     sim_ids: Query<&SimId>,
+    (map, unclaimed_sites): (Res<GameMap>, Query<&SimId, With<UnclaimedSite>>),
 ) {
     let team = issuer.team();
     let units: Vec<SimId> = selected_units
@@ -408,9 +410,30 @@ pub fn issue_orders(
         return;
     }
 
+    let unclaimed_site = map
+        .building_at(goal)
+        .and_then(|entity| unclaimed_sites.get(entity).ok());
+    let engineers = own_engineers(&selected_units, team);
+    if let Some(&site) = unclaimed_site
+        && !engineers.is_empty()
+    {
+        issuer.issue(PlayerCommand::SendEngineers {
+            units: engineers,
+            structure: site,
+        });
+        acknowledge(&mut marker, ground, MarkerKind::Move);
+        return;
+    }
+
     if let Some(structure) = hovered.filter(|t| t.is_building)
         && let Ok((&id, building, health)) = structures.get(structure.entity)
-        && let Some(job) = job_for(*diplomacy, team, structure.team, building.kind, health)
+        && let Some(job) = job_for(
+            *diplomacy,
+            team,
+            Some(structure.team),
+            building.kind,
+            health,
+        )
     {
         let engineers = own_engineers(&selected_units, team);
         if !engineers.is_empty() {

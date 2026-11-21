@@ -1048,3 +1048,83 @@ def build_rocket_bunker():
                          (0, math.pi / 2, 0), segments=12, name="PodTeamBand")
     current_assembly().on_finalize(
         lambda root, merged: add_recoil_animation(merged[BARREL], "Fire", Vector((-0.15, 0.0, 0.0))))
+
+
+def build_supply_depot():
+    """A neutral supply yard: stacked containers, a fuel stand and a dispatch hut under a loading crane."""
+    add_foundation(4.0, 4.0)
+    base_z = FOUNDATION_HEIGHT
+    slab("Asphalt", chamfered_rect(3.6, 3.6, 0.2), base_z, base_z + 0.04, bevel=0.0, name="DepotYard")
+    add_outline_band(chamfered_rect(3.5, 3.5, 0.2), chamfered_rect(3.3, 3.3, 0.18), base_z + 0.04, base_z + 0.05,
+                     "TeamColor", name="YardTeamBorder")
+    container = (1.3, 0.55, 0.55)
+    for row, y in enumerate((0.85, 1.45)):
+        for level in range(2 - row):
+            z = base_z + 0.04 + container[2] * (level + 0.5)
+            box("TeamColor" if level else "Cladding", container, (0.6, y, z), bevel=0.02, name="Container")
+            for x in (0.0, 1.2):
+                box("Gunmetal", (0.03, 0.5, 0.5), (x, y, z), bevel=0.0, name="ContainerDoorFrame")
+    box("Cladding", (1.0, 0.9, 0.9), (-1.0, 1.1, base_z + 0.49), bevel=0.03, name="DispatchHut")
+    prism("Roofing", [(-0.55, 0.0), (0.55, 0.0), (0.0, 0.25)], 1.0, (-1.0, 1.1, base_z + 0.94), bevel=0.01,
+          name="HutRoof")
+    add_door((-0.48, 1.1, base_z + 0.04), 0.0, width=0.45, height=0.7)
+    for k, y in enumerate((-0.4, -0.8, -1.2)):
+        add_drum((-1.3, y, base_z + 0.04), radius=0.16, height=0.48,
+                 material_name="TeamColor" if k == 1 else "ArmorLight")
+    for x, y in ((-0.6, -1.2), (-0.2, -1.4)):
+        add_crate((x, y, base_z + 0.04), (0.38, 0.38, 0.34), 0.2)
+    mast = Vector((1.5, -1.3, base_z + 0.04))
+    box("HazardYellow", (0.16, 0.16, 2.2), mast + Vector((0, 0, 1.1)), bevel=0.01, name="CraneMast")
+    box("HazardYellow", (0.12, 2.2, 0.14), mast + Vector((0, 0.95, 2.15)), bevel=0.01, name="CraneJib")
+    cylinder_between("Steel", mast + Vector((0, 1.6, 2.1)), mast + Vector((0, 1.6, 1.15)), 0.012, 4,
+                     name="CraneCable")
+    box("Gunmetal", (0.14, 0.2, 0.12), mast + Vector((0, 1.6, 1.1)), bevel=0.01, name="CraneHook")
+    add_beacon(mast + Vector((0, 0, 2.27)), radius=0.05)
+
+
+def build_observation_post():
+    """A neutral watchtower: a lattice tower with a glazed cabin and radar, ringed by sandbags."""
+    add_foundation(6.0, 6.0)
+    base_z = FOUNDATION_HEIGHT
+    slab("ConcreteWeathered", chamfered_rect(5.2, 5.2, 0.5), base_z, base_z + 0.05, bevel=0.0, name="PostPad")
+    corners = [(2.3, 2.3), (-2.3, 2.3), (-2.3, -2.3), (2.3, -2.3)]
+    for a, b in zip(corners, corners[1:] + corners[:1]):
+        if a[0] == b[0] and a[0] > 0:
+            add_sandbag_wall((a[0], a[1] - 1.4, base_z + 0.05), (b[0], b[1] + 1.4, base_z + 0.05), layers=3)
+            continue
+        add_sandbag_wall((a[0], a[1], base_z + 0.05), (b[0], b[1], base_z + 0.05), layers=3)
+    tower_top = base_z + 4.6
+    add_lattice_mast((0.0, 0.0, base_z + 0.05), 1.0, 0.6, tower_top - base_z - 0.05, levels=5)
+    cabin = chamfered_rect(1.8, 1.8, 0.25)
+    slab("ArmorDark", cabin, tower_top, tower_top + 0.12, bevel=0.0, name="CabinFloor")
+    slab("Cladding", cabin, tower_top + 0.12, tower_top + 0.45, bevel=0.01, name="CabinWall")
+    add_outline_band(chamfered_rect(1.84, 1.84, 0.26), chamfered_rect(1.8, 1.8, 0.25), tower_top + 0.3,
+                     tower_top + 0.42, "TeamColor", name="CabinTeamBand")
+    slab(GLASS, scaled_rect(cabin, 0.97), tower_top + 0.45, tower_top + 1.0, bevel=0.0, name="CabinGlass")
+    slab("Roofing", chamfered_rect(2.1, 2.1, 0.3), tower_top + 1.0, tower_top + 1.12, top_scale=0.85, bevel=0.01,
+         name="CabinRoof")
+    add_radar_dish((0.3, 0.2, tower_top + 1.35), 0.45, math.radians(55), math.radians(30))
+    add_antenna((-0.6, -0.6, tower_top + 1.12), 1.4)
+    add_beacon((0.0, 0.0, tower_top + 1.2), radius=0.06)
+    add_flag((-2.3, -2.3, base_z + 0.05), 2.6)
+
+
+def build_field_hospital():
+    """A neutral field hospital: a long canvas ward tent with a glowing cross, an ambulance bay and supplies."""
+    add_foundation(4.0, 4.0)
+    base_z = FOUNDATION_HEIGHT
+    slab("Concrete", chamfered_rect(3.6, 3.6, 0.2), base_z, base_z + 0.04, bevel=0.0, name="HospitalPad")
+    tent = [(-0.95, 0.0), (0.95, 0.0), (0.95, 0.75), (0.0, 1.45), (-0.95, 0.75)]
+    prism("ArmorLight", tent, 2.8, (-0.4, 0.0, base_z + 0.04), bevel=0.02, name="WardTent")
+    for x in (-1.37, 0.57):
+        box("TeamColor", (0.04, 2.6, 0.12), (x, 0.0, base_z + 0.7), bevel=0.0, name="TentTeamStripe")
+    cross_z = base_z + 0.42
+    box("SignalGreen", (0.05, 0.5, 0.14), (0.58, 0.0, cross_z), bevel=0.0, name="CrossBar")
+    box("SignalGreen", (0.05, 0.14, 0.5), (0.58, 0.0, cross_z), bevel=0.0, name="CrossPost")
+    add_door((0.56, -0.8, base_z + 0.04), 0.0, width=0.5, height=0.75)
+    add_hazard_stripes((1.35, 0.6, base_z + 0.045), 1.1, 0.12, rotation=(0, 0, math.pi / 2), stripe_width=0.12)
+    for k, y in enumerate((1.0, 1.35)):
+        add_crate((1.45, -y, base_z + 0.04), (0.34, 0.3, 0.3), 0.1, material_name="Ceramic")
+    add_drum((-1.55, 1.5, base_z + 0.04), radius=0.14, height=0.42, material_name="Ceramic")
+    add_antenna((-1.5, -1.5, base_z + 0.04), 1.6)
+    add_lamp((0.62, 0.0, base_z + 1.4), (0, math.pi / 2, 0.0), radius=0.06, depth=0.06)

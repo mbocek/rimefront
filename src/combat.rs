@@ -16,6 +16,7 @@ use crate::intel::Intel;
 use crate::interpolation::TickTransforms;
 use crate::map::{CELL_SIZE, GameMap, world_to_cell};
 use crate::movement::order_move;
+use crate::neutral_sites::spawn_unclaimed_site;
 use crate::production::Production;
 use crate::research::{incoming_damage_factor, outgoing_damage_factor, reload_factor};
 use crate::sim_math;
@@ -670,6 +671,10 @@ pub fn remove_destroyed(
         let blast = match (building, unit) {
             (Some(building), _) => {
                 map.set_building(building.origin, building.kind.spec().footprint, None);
+                if building.kind.is_neutral_site() {
+                    let (kind, origin) = (building.kind, building.origin);
+                    spawn_unclaimed_site(&mut commands, &models, &mut map, kind, origin);
+                }
                 BlastSize::BuildingCollapse
             }
             (None, Some(unit)) if unit.0.spec().armor == ArmorClass::Infantry => {

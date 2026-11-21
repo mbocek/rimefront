@@ -41,17 +41,21 @@ impl EngineerTask {
     }
 }
 
-/// What an engineer of `team` would do to a structure: capture an enemy one, fully repair a damaged own one.
+/// What an engineer of `team` would do to a structure: capture an enemy or unclaimed one (`owner` `None`),
+/// fully repair a damaged own one.
 pub fn job_for(
     diplomacy: Diplomacy,
     team: Team,
-    owner: Team,
+    owner: Option<Team>,
     kind: BuildingKind,
     health: &Health,
 ) -> Option<EngineerJob> {
     if kind.is_wall() {
         return None;
     }
+    let Some(owner) = owner else {
+        return Some(EngineerJob::Capture);
+    };
     if diplomacy.hostile(owner, team) {
         return Some(EngineerJob::Capture);
     }
@@ -79,14 +83,14 @@ pub fn carry_out_engineer_tasks(
         Option<&mut Orders>,
         &SimId,
     )>,
-    mut buildings: Query<(&Building, &Team, &mut Health)>,
+    mut buildings: Query<(&Building, Option<&Team>, &mut Health)>,
     diplomacy: Res<Diplomacy>,
 ) {
     let mut entered = HashSet::new();
     let in_order = in_simulation_order(engineers.iter_mut(), |item| *item.6);
     for (engineer, &team, transform, mut mobile, mut task, orders, _) in in_order {
         let still_standing = !entered.contains(&task.building);
-        let Some((building, &owner, mut health)) = buildings
+        let Some((building, owner, mut health)) = buildings
             .get_mut(task.building)
             .ok()
             .filter(|_| still_standing)
@@ -94,6 +98,7 @@ pub fn carry_out_engineer_tasks(
             commands.entity(engineer).remove::<EngineerTask>();
             continue;
         };
+        let owner = owner.copied();
         if job_for(*diplomacy, team, owner, building.kind, &health) != Some(task.job) {
             commands.entity(engineer).remove::<EngineerTask>();
             continue;
@@ -132,7 +137,7 @@ pub fn carry_out_engineer_tasks(
                     current: kind.spec().max_health - damage,
                     max: kind.spec().max_health,
                 });
-                if owner == local.0 {
+                if owner == Some(local.0) {
                     notifications
                         .push(tr_fmt("{} captured by the enemy", &[&tr(kind.spec().name)]));
                     cues.write(SoundCue::interface(Sound::StructureLost));
@@ -161,6 +166,16 @@ mod tests {
     use crate::catalog::Alliance;
 
     #[test]
+    fn engineers_capture_unclaimed_sites() {
+        let site = BuildingKind::SupplyDepot;
+        let intact = Health::full(100.0);
+        assert_eq!(
+            job_for(Diplomacy::default(), Team::Crimson, None, site, &intact),
+            Some(EngineerJob::Capture)
+        );
+    }
+
+    #[test]
     fn engineers_capture_enemies_repair_friends_and_ignore_walls() {
         let damaged = Health {
             current: 10.0,
@@ -170,36 +185,42 @@ mod tests {
         let allied = Diplomacy::default();
         let plant = BuildingKind::PowerPlant;
         assert_eq!(
-            job_for(allied, Team::Player, Team::Crimson, plant, &intact),
+            job_for(allied, Team::Player, Some(Team::Crimson), plant, &intact),
             Some(EngineerJob::Capture)
         );
         assert_eq!(
-            job_for(allied, Team::Player, Team::Player, plant, &damaged),
+            job_for(allied, Team::Player, Some(Team::Player), plant, &damaged),
             Some(EngineerJob::Repair)
         );
         assert_eq!(
-            job_for(allied, Team::Player, Team::Player, plant, &intact),
+            job_for(allied, Team::Player, Some(Team::Player), plant, &intact),
             None
         );
         assert_eq!(
             job_for(
                 allied,
                 Team::Player,
-                Team::Crimson,
+                Some(Team::Crimson),
                 BuildingKind::Wall,
                 &intact
             ),
             None
         );
         assert_eq!(
-            job_for(allied, Team::Crimson, Team::Amber, plant, &intact),
+            job_for(allied, Team::Crimson, Some(Team::Amber), plant, &intact),
             None
         );
         let free_for_all = Diplomacy {
             alliance: Alliance::FreeForAll,
         };
         assert_eq!(
-            job_for(free_for_all, Team::Crimson, Team::Amber, plant, &intact),
+            job_for(
+                free_for_all,
+                Team::Crimson,
+                Some(Team::Amber),
+                plant,
+                &intact
+            ),
             Some(EngineerJob::Capture)
         );
     }

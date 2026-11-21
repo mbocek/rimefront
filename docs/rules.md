@@ -22,6 +22,14 @@
   segment extends the area you may build in, so walls can reach out from the base, but no structure or wall
   goes on ground its side has never explored; a wall dragged into the dark stops at its edge. Walls do not keep a
   defeated side alive, and the computer does not pick them as targets for its attack waves.
+- **Neutral sites:** maps with neutral buildings have an Observation Post in the middle (or a pair of them
+  beside it where the middle is a ford), two Supply Depots between the corners and two Field Hospitals on the
+  roads from the corners to the middle, all mirrored like the rest of the map and kept clear of fords and
+  passes. Nobody owns them and nothing can hurt them until an engineer captures one (right-click it with
+  engineers selected); then a **Supply Depot** sends its owner $50 every 5 s, an **Observation Post** sees
+  32 m around it, and a **Field Hospital** heals its owner's infantry within 9 m by 6 health a second. A
+  captured site can be destroyed, which returns it to nobody, and cannot be sold; it does not keep a beaten
+  side in the war. Computer commanders send an engineer to the nearest site their side has explored.
 - **Repair and sell:** a structure under repair regains 4 % of its health per second and pays as it goes:
   a repair from rubble to full health costs half its price (the Command Center counts as $3000). Repairs pause
   while the credits run out and stop at full health; a green cross turns above it meanwhile. Selling refunds

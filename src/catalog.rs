@@ -344,6 +344,9 @@ pub enum BuildingKind {
     TechCenter,
     RepairBay,
     RocketBunker,
+    SupplyDepot,
+    ObservationPost,
+    FieldHospital,
 }
 
 pub struct BuildingSpec {
@@ -378,9 +381,25 @@ impl BuildingKind {
         BuildingKind::Wall,
     ];
 
+    /// Stand unclaimed on the map until an engineer takes one; nobody builds them.
+    pub const NEUTRAL_SITES: [BuildingKind; 3] = [
+        BuildingKind::SupplyDepot,
+        BuildingKind::ObservationPost,
+        BuildingKind::FieldHospital,
+    ];
+
+    pub fn is_neutral_site(self) -> bool {
+        Self::NEUTRAL_SITES.contains(&self)
+    }
+
     /// Walls are bought segment by segment while being placed, and do not keep a defeated side alive.
     pub fn is_wall(self) -> bool {
         self == BuildingKind::Wall
+    }
+
+    /// Walls and captured neutral sites do not keep a side in the war.
+    pub fn keeps_a_side_alive(self) -> bool {
+        !self.is_wall() && !self.is_neutral_site()
     }
 
     pub fn spec(self) -> &'static BuildingSpec {
@@ -397,6 +416,9 @@ impl BuildingKind {
             BuildingKind::TechCenter => &TECH_CENTER,
             BuildingKind::RepairBay => &REPAIR_BAY,
             BuildingKind::RocketBunker => &ROCKET_BUNKER,
+            BuildingKind::SupplyDepot => &SUPPLY_DEPOT,
+            BuildingKind::ObservationPost => &OBSERVATION_POST,
+            BuildingKind::FieldHospital => &FIELD_HOSPITAL,
         }
     }
 }
@@ -1252,6 +1274,52 @@ const ROCKET_BUNKER: BuildingSpec = BuildingSpec {
     faction: Some(Faction::Syndicate),
 };
 
+/// `cost` of a neutral site is what destroying it is worth to a veteran; nobody pays it.
+const SUPPLY_DEPOT: BuildingSpec = BuildingSpec {
+    name: "Supply Depot",
+    role: "Neutral. Once an engineer captures it, it sends its owner credits every few seconds.",
+    model_id: "supply_depot",
+    footprint: IVec2::new(2, 2),
+    cost: 1000,
+    build_secs: 0.0,
+    max_health: 900.0,
+    power: 0,
+    prerequisites: &[],
+    weapon: None,
+    sight: 8.0,
+    faction: None,
+};
+
+const OBSERVATION_POST: BuildingSpec = BuildingSpec {
+    name: "Observation Post",
+    role: "Neutral. Once an engineer captures it, its tower watches far across the battlefield.",
+    model_id: "observation_post",
+    footprint: IVec2::new(3, 3),
+    cost: 1000,
+    build_secs: 0.0,
+    max_health: 800.0,
+    power: 0,
+    prerequisites: &[],
+    weapon: None,
+    sight: 32.0,
+    faction: None,
+};
+
+const FIELD_HOSPITAL: BuildingSpec = BuildingSpec {
+    name: "Field Hospital",
+    role: "Neutral. Once an engineer captures it, it heals its owner's infantry nearby.",
+    model_id: "field_hospital",
+    footprint: IVec2::new(2, 2),
+    cost: 1000,
+    build_secs: 0.0,
+    max_health: 800.0,
+    power: 0,
+    prerequisites: &[],
+    weapon: None,
+    sight: 10.0,
+    faction: None,
+};
+
 pub const STARTING_CREDITS: i32 = 5000;
 pub const HARVESTER_CAPACITY: u32 = 500;
 pub const CRYSTAL_PER_CELL: u32 = 600;
@@ -1270,6 +1338,16 @@ mod tests {
                 Some(kind) => owned.push(kind),
                 None => return owned,
             }
+        }
+    }
+
+    #[test]
+    fn walls_and_captured_sites_do_not_keep_a_side_in_the_war() {
+        assert!(BuildingKind::PowerPlant.keeps_a_side_alive());
+        assert!(!BuildingKind::Wall.keeps_a_side_alive());
+        for site in BuildingKind::NEUTRAL_SITES {
+            assert!(!site.keeps_a_side_alive());
+            assert!(!BuildingKind::CONSTRUCTIBLE.contains(&site));
         }
     }
 

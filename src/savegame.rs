@@ -19,6 +19,7 @@ use crate::levels::{ActiveLevel, LevelDefinition};
 use crate::map::{GameMap, cell_of_index, spawn_crystal_visual};
 use crate::match_flow::{GameState, MatchClock};
 use crate::network::NetSession;
+use crate::neutral_sites::{UnclaimedSite, spawn_unclaimed_site};
 use crate::notifications::Notifications;
 use crate::production::{BuildItem, Lane, Production};
 use crate::research::Upgrade;
@@ -96,6 +97,9 @@ pub struct SaveGame {
     explored_by_opponents: Vec<Vec<bool>>,
     #[serde(default)]
     events_fired: Vec<bool>,
+    /// Neutral sites nobody had captured yet: kind and origin.
+    #[serde(default)]
+    unclaimed_sites: Vec<(BuildingKind, [i32; 2])>,
 }
 
 /// A save waiting to be restored once the next match's map has been generated from its level.
@@ -291,6 +295,7 @@ pub fn write_requested_save(
     cameras: Query<&RtsCamera>,
     mines: Query<&Mine>,
     buildings: Query<SavableBuilding, Without<BeingSold>>,
+    unclaimed_sites: Query<&Building, With<UnclaimedSite>>,
     units: Query<SavableUnit>,
 ) {
     let Some(slot) = requests.save.take() else {
@@ -327,6 +332,10 @@ pub fn write_requested_save(
             .map_or([0.0; 3], |camera| camera.focus.to_array()),
         explored: intel.vision(Team::Player).explored_cells(),
         explored_by_syndicate: Vec::new(),
+        unclaimed_sites: unclaimed_sites
+            .iter()
+            .map(|site| (site.kind, site.origin.to_array()))
+            .collect(),
         explored_by_opponents: Team::OPPONENTS
             .map(|opponent| intel.vision(opponent).explored_cells())
             .to_vec(),
@@ -412,6 +421,15 @@ pub fn restore_pending_load(
     }
     for saved in &save.units {
         respawn_unit(&mut commands, &models, saved);
+    }
+    for &(kind, origin) in &save.unclaimed_sites {
+        spawn_unclaimed_site(
+            &mut commands,
+            &models,
+            &mut map,
+            kind,
+            IVec2::from_array(origin),
+        );
     }
     for (team, credits) in Team::ALL.into_iter().zip(&save.credits) {
         economies.of_mut(team).credits = *credits;

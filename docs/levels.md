@@ -64,7 +64,9 @@ opens a screen with a *Back* button; Esc goes back too.
   river winds and where its outer fords lie, the lake's size, ponds on the plains, the hills and mountains. They
   also scatter extra forests, rock outcrops and crystal fields. Everything is point-symmetric around the map
   centre, so neither corner is favoured. A level's `terrain_seed` shapes the land; levels without one keep the
-  classic landscape. *New map* rolls
+  classic landscape. Random battles, generated missions and battles from the battle editor (its *Neutral
+  buildings* option, on by default) carry neutral sites (`"neutral_sites": true` in a level, see
+  [rules.md](rules.md)); campaign missions and older levels have none. *New map* rolls
   again; changing the options keeps the map. The rolled battle can be played, saved as a custom level or opened
   in the map editor.
 - **Battle editor:** 1-3 enemy commanders (allied or free-for-all), landscape, difficulty Easy/Normal/Hard/Brutal, starting credits, objective

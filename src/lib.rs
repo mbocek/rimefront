@@ -59,6 +59,7 @@ pub mod motion_material;
 pub mod movement;
 pub mod network;
 pub mod network_hud;
+pub mod neutral_sites;
 pub mod notifications;
 pub mod orders;
 pub mod outcome;
@@ -266,6 +267,8 @@ impl Plugin for SimulationPlugin {
                         structures::finish_sales,
                         engineers::carry_out_engineer_tasks,
                         medical::treat_wounded,
+                        neutral_sites::deliver_supplies,
+                        neutral_sites::treat_at_field_hospitals,
                     )
                         .chain(),
                     (

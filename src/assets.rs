@@ -30,6 +30,8 @@ const NEUTRAL_MODELS: [&str; 22] = [
 ];
 
 const WALL_LINK_MODEL: &str = "wall_link";
+/// The grey variant of a neutral site that nobody holds yet (tools/blender/build_models.py).
+const UNCLAIMED_VARIANT: &str = "neutral";
 
 #[derive(Resource)]
 pub struct ModelLibrary {
@@ -48,6 +50,10 @@ impl ModelLibrary {
     /// Half a wall run, joining a wall post to its neighbour.
     pub fn wall_link(&self, team: Team) -> Handle<WorldAsset> {
         self.team_model(WALL_LINK_MODEL, team)
+    }
+
+    pub fn unclaimed_site(&self, kind: BuildingKind) -> Handle<WorldAsset> {
+        self.scenes[&format!("{}_{UNCLAIMED_VARIANT}", kind.spec().model_id)].clone()
     }
 
     pub fn neutral(&self, model_id: &str) -> Handle<WorldAsset> {
@@ -75,11 +81,15 @@ fn all_model_keys() -> Vec<String> {
         .chain(
             std::iter::once(BuildingKind::CommandCenter)
                 .chain(BuildingKind::CONSTRUCTIBLE)
+                .chain(BuildingKind::NEUTRAL_SITES)
                 .map(|kind| kind.spec().model_id),
         )
         .chain(std::iter::once(WALL_LINK_MODEL));
+    let unclaimed_sites = BuildingKind::NEUTRAL_SITES
+        .map(|kind| format!("{}_{UNCLAIMED_VARIANT}", kind.spec().model_id));
     team_model_ids
         .flat_map(|model_id| Team::ALL.map(|team| team_model_key(model_id, team)))
+        .chain(unclaimed_sites)
         .chain(NEUTRAL_MODELS.iter().map(|id| id.to_string()))
         .collect()
 }

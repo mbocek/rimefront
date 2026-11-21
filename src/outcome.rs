@@ -30,7 +30,7 @@ pub fn decide_outcome(
     if *outcome != GameOutcome::Ongoing {
         return;
     }
-    let standing = |building: &Building| !building.kind.is_wall();
+    let standing = |building: &Building| building.kind.keeps_a_side_alive();
     let hostile = |team: &Team| diplomacy.hostile(*team, local.0);
     let own_side_alive = units.iter().any(|team| !hostile(team))
         || buildings

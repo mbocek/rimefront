@@ -27,6 +27,7 @@ pub struct SimulationCadences {
     pub turret_fortification: Cadence,
     pub engineer_dispatch: Cadence,
     pub minefield_planning: Cadence,
+    pub supply_delivery: Cadence,
     /// Indexed by `Team::index`.
     pub harvester_rescue_cooldown_secs: [f32; Team::ALL.len()],
 }

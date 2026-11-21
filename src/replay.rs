@@ -15,6 +15,7 @@ use crate::levels::{ActiveLevel, LevelDefinition};
 use crate::map::{footprint_center, world_to_cell};
 use crate::match_flow::{GameState, MatchClock};
 use crate::movement::FLIGHT_ALTITUDE;
+use crate::neutral_sites::UnclaimedSite;
 use crate::outcome::GameOutcome;
 use crate::settings::game_data_directory;
 use crate::ui::{ACCENT, TEXT_MAIN, UiFonts};
@@ -101,9 +102,14 @@ pub enum Look {
 }
 
 const BUILDING_LOOKS_START: u8 = 100;
+/// Stands in an actor's team byte for a neutral site nobody holds.
+const UNCLAIMED_CODE: u8 = u8::MAX;
 
+/// New kinds go at the end, so the codes in replays recorded before them keep their meaning.
 fn all_buildings() -> impl Iterator<Item = BuildingKind> {
-    std::iter::once(BuildingKind::CommandCenter).chain(BuildingKind::CONSTRUCTIBLE)
+    std::iter::once(BuildingKind::CommandCenter)
+        .chain(BuildingKind::CONSTRUCTIBLE)
+        .chain(BuildingKind::NEUTRAL_SITES)
 }
 
 impl Look {
@@ -143,8 +149,26 @@ impl Actor {
         )
     }
 
+    pub fn unclaimed_site(id: u32, kind: BuildingKind, position: Vec3, facing: f32) -> Self {
+        let mut actor = Self::new(
+            id,
+            Look::Building(kind),
+            Team::Player,
+            position,
+            facing,
+            1.0,
+        );
+        actor.2 = UNCLAIMED_CODE;
+        actor
+    }
+
     pub fn id(self) -> u32 {
         self.0
+    }
+
+    /// `None` for a neutral site nobody holds.
+    pub fn holder(self) -> Option<Team> {
+        (self.2 != UNCLAIMED_CODE).then(|| self.team())
     }
 
     pub fn look(self) -> Option<Look> {
@@ -308,6 +332,7 @@ pub fn record_replay_frame(
     mut recorder: ResMut<ReplayRecorder>,
     units: Query<(Entity, &Unit, &Team, &Transform, &Mobile, &Health)>,
     buildings: Query<(Entity, &Building, &Team, &Transform, &Health)>,
+    unclaimed_sites: Query<(Entity, &Building, &Transform), With<UnclaimedSite>>,
 ) {
     recorder.timer -= time.delta_secs();
     if recorder.timer > 0.0 || recorder.saved {
@@ -340,6 +365,12 @@ pub fn record_replay_frame(
             facing,
             health.fraction(),
         ));
+    }
+    for (entity, site, transform) in &unclaimed_sites {
+        let id = recorder.replay_id(entity);
+        let center = footprint_center(site.origin, site.kind.spec().footprint);
+        let facing = transform.rotation.to_euler(EulerRot::YXZ).0;
+        actors.push(Actor::unclaimed_site(id, site.kind, center, facing));
     }
     let events = std::mem::take(&mut recorder.pending_events);
     recorder.frames.push(Frame {
@@ -713,7 +744,10 @@ fn spawn_actor(commands: &mut Commands, models: &ModelLibrary, actor: Actor) -> 
     let look = actor.look()?;
     let model = match look {
         Look::Unit(kind) => models.unit(kind, actor.team()),
-        Look::Building(kind) => models.building(kind, actor.team()),
+        Look::Building(kind) => match actor.holder() {
+            Some(team) => models.building(kind, team),
+            None => models.unclaimed_site(kind),
+        },
     };
     let mut spawned = commands.spawn((
         ReplayActor,

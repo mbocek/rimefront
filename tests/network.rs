@@ -1,6 +1,7 @@
 mod common;
 
 use std::net::{TcpListener, TcpStream};
+use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 use common::Battle;
@@ -17,6 +18,8 @@ use iron_tide::season::Season;
 
 const TICKS_TO_PLAY: u64 = 1200;
 const LIMIT_SECS: f32 = 0.05;
+/// Real time a late guest's handshake may take on its own thread, however busy the machine is.
+const LOBBY_PATIENCE: Duration = Duration::from_secs(30);
 
 /// Two battles in one process, joined over a real TCP connection: the host plays the Coalition, the guest
 /// the Syndicate.
@@ -603,6 +606,7 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
     let mut lobby = NetLobby::default();
     lobby.join(&door_address);
     let mut clock = 0.0;
+    let deadline = Instant::now() + LOBBY_PATIENCE;
     let start = loop {
         clock += 0.05;
         host.run_for(LIMIT_SECS);
@@ -613,7 +617,11 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
         if let Some(start) = lobby.advance(clock) {
             break start;
         }
-        assert!(clock < 30.0, "the late spectator was never let in");
+        assert!(
+            Instant::now() < deadline,
+            "the late spectator was never let in"
+        );
+        std::thread::sleep(Duration::from_millis(2));
     };
     assert!(start.session.is_spectating());
     let mut watcher = Battle::standard();
@@ -703,6 +711,7 @@ fn a_player_whose_connection_drops_rejoins_and_the_battle_goes_on() {
     let mut lobby = NetLobby::default();
     lobby.join(&door_address);
     let mut clock = 0.0;
+    let deadline = Instant::now() + LOBBY_PATIENCE;
     let start = loop {
         clock += 0.05;
         host.run_for(LIMIT_SECS);
@@ -712,7 +721,11 @@ fn a_player_whose_connection_drops_rejoins_and_the_battle_goes_on() {
         if let Some(start) = lobby.advance(clock) {
             break start;
         }
-        assert!(clock < 30.0, "the player was never let back in");
+        assert!(
+            Instant::now() < deadline,
+            "the player was never let back in"
+        );
+        std::thread::sleep(Duration::from_millis(2));
     };
     assert!(!start.session.is_spectating());
     assert_eq!(start.local_team, Team::Crimson);

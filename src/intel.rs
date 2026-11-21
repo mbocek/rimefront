@@ -90,6 +90,7 @@ pub fn update_intel(
     diplomacy: Res<Diplomacy>,
     clock: Res<crate::match_flow::MatchClock>,
     forecast: Res<crate::weather::WeatherForecast>,
+    support: Res<crate::support_powers::SupportPowers>,
     viewers: Query<(&Team, &Transform, &Sight), Or<(With<Unit>, With<Building>)>>,
     buildings: Query<(Entity, &Building, &Team, &Transform, &SimId)>,
 ) {
@@ -105,7 +106,13 @@ pub fn update_intel(
             .iter()
             .filter(|(team, ..)| !diplomacy.hostile(**team, viewer))
             .map(|(_, transform, sight)| (transform.translation, sight.0 * weather_sight));
-        intel.vision_mut(viewer).reveal_around(allied_eyes);
+        let allied_flights = support
+            .revealed_by_recon()
+            .filter(|(team, ..)| !diplomacy.hostile(*team, viewer))
+            .map(|(_, centre, radius)| (centre, radius));
+        intel
+            .vision_mut(viewer)
+            .reveal_around(allied_eyes.chain(allied_flights));
     }
 
     let intel = &mut *intel;

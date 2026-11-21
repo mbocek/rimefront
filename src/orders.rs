@@ -17,6 +17,7 @@ use crate::player_commands::{CommandIssuer, GroundOrder, PlayerCommand};
 use crate::settings::GameSettings;
 use crate::sound::{Sound, SoundCue};
 use crate::structure_tools::StructureTool;
+use crate::support_tools::SupportTool;
 use crate::transport::{Embarked, Passengers};
 use crate::ui::UiFonts;
 
@@ -196,8 +197,7 @@ pub fn select_units(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     cursor: Res<Cursor>,
-    placement: Res<Placement>,
-    tool: Res<StructureTool>,
+    (placement, tool, aiming): (Res<Placement>, Res<StructureTool>, Res<SupportTool>),
     targets: Res<Targets>,
     mut drag: ResMut<DragSelection>,
     cameras: Query<(&Camera, &GlobalTransform), With<RtsCamera>>,
@@ -207,7 +207,7 @@ pub fn select_units(
     mut counts: Query<&mut Text, With<SelectionCount>>,
 ) {
     let Some(screen) = cursor.screen else { return };
-    let pointer_busy = placement.active.is_some() || tool.0.is_some();
+    let pointer_busy = placement.active.is_some() || tool.0.is_some() || aiming.0.is_some();
     if keys.just_pressed(KeyCode::Escape) && !pointer_busy {
         deselect_all(&mut commands, &selected);
     }
@@ -345,8 +345,7 @@ pub fn issue_orders(
     mouse: Res<ButtonInput<MouseButton>>,
     (keys, settings): (Res<ButtonInput<KeyCode>>, Res<GameSettings>),
     cursor: Res<Cursor>,
-    placement: Res<Placement>,
-    tool: Res<StructureTool>,
+    (placement, tool, aiming): (Res<Placement>, Res<StructureTool>, Res<SupportTool>),
     targets: Res<Targets>,
     mut marker: ResMut<OrderMarker>,
     diplomacy: Res<Diplomacy>,
@@ -402,7 +401,7 @@ pub fn issue_orders(
         issuer.issue(PlayerCommand::LayMines { units: engineers });
     }
     let from_minimap = minimap_order.0.take();
-    if placement.active.is_some() || tool.0.is_some() {
+    if placement.active.is_some() || tool.0.is_some() || aiming.0.is_some() {
         return;
     }
     let clicked_in_world = !cursor.over_interface && mouse.just_pressed(MouseButton::Right);

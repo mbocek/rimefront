@@ -65,6 +65,7 @@ pub fn tally_losses(mut losses: MessageReader<Destroyed>, mut stats: ResMut<Matc
         match loss.what {
             DamageSource::Unit(_) => tally.units_lost += 1,
             DamageSource::Building(_) => tally.structures_lost += 1,
+            DamageSource::Support => {}
         }
         if let Some(attacker) = stats.last_attacker.remove(&loss.entity) {
             stats.of_mut(attacker).enemies_destroyed += 1;

@@ -45,6 +45,8 @@
 | `determinism` | the seeded simulation randomness, simulation ids, single-threaded schedules and the state checksum |
 | `updates` | checking GitHub for a newer release and downloading its package |
 | `neutral_sites` | Supply Depots, Observation Posts and Field Hospitals: where they stand, what they give their owner |
+| `support_powers`, `support_tools` | recon flights and artillery barrages: charging, calling and carrying them out; the sidebar buttons and aiming |
+| `transport` | Troop Carriers: boarding, carrying, unloading and escaping |
 | `self_update` | finding how this copy is installed, verifying a package's checksum and installing it in place |
 | `season` | summer, autumn and winter: terrain tint, snow, foliage colours, light |
 | `key_bindings` | rebindable hotkeys: actions, their default and bindable keys, swapping on conflict |

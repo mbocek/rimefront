@@ -27,6 +27,7 @@ use crate::production::{
 use crate::research::Upgrade;
 use crate::servicing::{service_radius, waiting_spot};
 use crate::structures::{BeingSold, Repairing, StructureOrder, StructureOrderKind};
+use crate::support_powers::{SupportPower, SupportPowers};
 
 const MAX_WAVE_SIZE: usize = 16;
 const SPLIT_WAVES_FROM: usize = 6;
@@ -1122,6 +1123,59 @@ pub fn defend_harvesters(
         });
         for (.., orders, _) in guards.into_iter().take(HARVESTER_GUARDS) {
             send(orders, spot);
+        }
+    }
+}
+
+/// Enemies within this distance of a spot count towards how many one barrage would catch there.
+const BARRAGE_CATCH_RADIUS: f32 = 7.0;
+/// A barrage on fewer visible enemies than this goes to a known structure instead.
+const BARRAGE_WORTHY_CROWD: usize = 3;
+
+/// Commanders fly recon over a base site nobody has found yet and drop barrages on the thickest crowd of
+/// enemies they can see, or else on the nearest enemy structure they know.
+pub fn call_support_powers(
+    commanders: Res<AiCommanders>,
+    targets: Res<Targets>,
+    intel: Res<Intel>,
+    mut support: ResMut<SupportPowers>,
+    buildings: Query<(&Building, &Team)>,
+) {
+    for ai in &commanders.0 {
+        let team = ai.team;
+        let owned = crate::support_powers::owned_kinds(&buildings, team);
+        let home = footprint_center(ai.base, BuildingKind::CommandCenter.spec().footprint);
+        let nothing_known = intel.known_enemy_structures(team).next().is_none();
+        if support.is_charged(team, SupportPower::ReconSweep)
+            && nothing_known
+            && let Some(site) = intel.base_site_to_search(team, home)
+        {
+            support.call(team, SupportPower::ReconSweep, world_to_cell(site), &owned);
+        }
+        if !support.is_charged(team, SupportPower::Barrage) {
+            continue;
+        }
+        let visible: Vec<Vec3> = targets
+            .iter()
+            .filter(|t| !t.is_building && targets.hostile(t.team, team) && t.seen_by(team))
+            .map(|t| t.position)
+            .collect();
+        let crowd = |spot: &Vec3| {
+            visible
+                .iter()
+                .filter(|other| other.distance(*spot) <= BARRAGE_CATCH_RADIUS)
+                .count()
+        };
+        let thickest = visible
+            .iter()
+            .copied()
+            .max_by_key(crowd)
+            .filter(|spot| crowd(spot) >= BARRAGE_WORTHY_CROWD);
+        let nearest_structure = intel
+            .known_enemy_structures(team)
+            .min_by(|a, b| a.distance(home).total_cmp(&b.distance(home)));
+        if let Some(spot) = thickest.or(nearest_structure) {
+            support.call(team, SupportPower::Barrage, world_to_cell(spot), &owned);
         }
     }
 }

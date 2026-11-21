@@ -84,6 +84,13 @@
   and every tree or rock that blocks movement have a twin in the opposite corner. The last row and column, which
   would have no twin, are closed. Bases in the far half face
   the other way, so every base's doors, refinery dock and new units point towards the middle of the map.
+- **Support powers:** two buttons under the credits call help onto any spot of the map, then recharge. A
+  **recon flight** (Z, needs the Command Center, every 2 minutes) reveals 16 m around the spot for 20 s, to
+  your allies too. An **artillery barrage** (C, needs a Tech Center, every 3 minutes) drops ten shells within
+  7 m of the spot after a 3 s warning, each hurting enemies within 3 m. Both start charging when the match
+  begins. Computer commanders fly recon over a base site while they know no enemy structure and drop barrages
+  on the thickest crowd of enemies they see, or else on the nearest enemy structure they know. Saves do not
+  keep the charge: a loaded game starts it again.
 - **Troop Carrier:** a $700 six-wheeled personnel carrier from the War Factory, for both factions, with a
   light machine gun. Right-click it with infantry selected and up to five soldiers climb in; U lets them out
   on free ground around it. Inside they ride along, cannot be hit or selected, and fire from the hatches at

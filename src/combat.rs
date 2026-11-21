@@ -146,6 +146,8 @@ pub fn surface_distance(from: Vec3, target: &TargetInfo) -> f32 {
 pub enum DamageSource {
     Unit(UnitKind),
     Building(BuildingKind),
+    /// A support power called from the sidebar; it is never what gets destroyed.
+    Support,
 }
 
 /// Sent when a unit or structure is destroyed.
@@ -510,6 +512,30 @@ pub(crate) fn fire_projectile(
             weapon,
         },
         Transform::from_translation(muzzle),
+        TickTransforms::default(),
+    ));
+}
+
+/// Where a shell called down by a support power starts its fall, straight above its impact.
+const SHELL_DROP_HEIGHT: f32 = 40.0;
+
+/// A shell falling out of the sky onto `impact`, fired by nobody on the battlefield.
+pub(crate) fn drop_shell(commands: &mut Commands, team: Team, impact: Vec3, weapon: WeaponSpec) {
+    let start = impact + Vec3::Y * SHELL_DROP_HEIGHT;
+    commands.spawn((
+        Projectile {
+            team,
+            source: DamageSource::Support,
+            shooter: Entity::PLACEHOLDER,
+            target: None,
+            start,
+            end: impact,
+            elapsed: 0.0,
+            duration: SHELL_DROP_HEIGHT / weapon.projectile_speed,
+            arc_height: 0.0,
+            weapon,
+        },
+        Transform::from_translation(start),
         TickTransforms::default(),
     ));
 }

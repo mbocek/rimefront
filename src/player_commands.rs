@@ -19,6 +19,7 @@ use crate::production::{
     placement_context,
 };
 use crate::structures::{StructureOrder, StructureOrderKind};
+use crate::support_powers::{SupportPower, SupportPowers, owned_kinds};
 use crate::transport::{BoardingTask, Unloading};
 
 /// Ticks between issuing a command and carrying it out; across a network the order needs time to arrive.
@@ -97,6 +98,10 @@ pub enum PlayerCommand {
     },
     Unload {
         carriers: Vec<SimId>,
+    },
+    CallSupport {
+        power: SupportPower,
+        cell: IVec2,
     },
 }
 
@@ -272,6 +277,7 @@ pub struct Battlefield<'w, 's> {
     mines: Query<'w, 's, &'static Mine>,
     stances: Query<'w, 's, &'static mut Stance>,
     intel: Res<'w, Intel>,
+    support: ResMut<'w, SupportPowers>,
 }
 
 pub fn carry_out_player_commands(
@@ -319,6 +325,10 @@ impl Battlefield<'_, '_> {
             PlayerCommand::SetStance { units, stance } => self.set_stance(team, &units, stance),
             PlayerCommand::Board { units, carrier } => self.board(team, &units, carrier),
             PlayerCommand::Unload { carriers } => self.unload(team, &carriers),
+            PlayerCommand::CallSupport { power, cell } => {
+                let owned = owned_kinds(&self.owners, team);
+                self.support.call(team, power, cell, &owned);
+            }
             PlayerCommand::OrderStructure { building, kind } => {
                 if let Some(building) = self.own_structure(team, building) {
                     self.structure_orders.write(StructureOrder {

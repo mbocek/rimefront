@@ -98,6 +98,7 @@ fn bounty(what: DamageSource) -> f32 {
     match what {
         DamageSource::Unit(kind) => kind.spec().cost as f32,
         DamageSource::Building(kind) => structure_value(kind) as f32,
+        DamageSource::Support => 0.0,
     }
 }
 

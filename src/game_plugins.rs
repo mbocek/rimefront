@@ -8,8 +8,8 @@ use crate::{
     damage_feedback, economy, effects, field_tips, flat_scenery, fog_view, frame_pacing, graphics,
     interpolation, lobby, local_view, main_menu, map, map_editor, map_edits, match_flow, menu,
     minimap, motion_material, network, network_hud, orders, overlay, perf_overlay, placement,
-    queue_bar, replay, savegame, settings, sorties, sound, structure_tools, terrain_material,
-    transport, tutorial, ui, unit_voices, updates, wall_joints, weather,
+    queue_bar, replay, savegame, settings, sorties, sound, structure_tools, support_tools,
+    terrain_material, transport, tutorial, ui, unit_voices, updates, wall_joints, weather,
 };
 
 /// Draws what the simulation moves part way between ticks.
@@ -88,6 +88,7 @@ impl Plugin for BattleViewPlugin {
                     .in_set(FramePhase::Presentation),
             )
             .init_resource::<structure_tools::StructureTool>()
+            .init_resource::<support_tools::SupportTool>()
             .add_systems(
                 OnEnter(match_flow::GameState::Playing),
                 (
@@ -98,6 +99,7 @@ impl Plugin for BattleViewPlugin {
                     minimap::create_minimap,
                     ui::build_interface,
                     structure_tools::prepare_structure_tools,
+                    support_tools::prepare_support_tool,
                     tutorial::start_tutorial,
                     field_tips::spawn_tip_panel,
                     weather::begin_weather,
@@ -136,6 +138,8 @@ impl Plugin for BattleViewPlugin {
                     placement::preview_wall_drag,
                     structure_tools::apply_structure_tool,
                     structure_tools::switch_tools_by_keyboard,
+                    support_tools::aim_support_by_keyboard,
+                    support_tools::call_aimed_support,
                 )
                     .chain()
                     .in_set(FramePhase::Input),
@@ -194,7 +198,11 @@ impl Plugin for BattleViewPlugin {
                             overlay::draw_planned_routes,
                             overlay::draw_weapon_ranges,
                         ),
-                        structure_tools::draw_repair_markers,
+                        (
+                            structure_tools::draw_repair_markers,
+                            support_tools::draw_support_aim,
+                            support_tools::refresh_support_buttons,
+                        ),
                         structure_tools::refresh_tool_buttons,
                         structure_tools::refresh_tool_hint,
                         ui::refresh_build_tiles,

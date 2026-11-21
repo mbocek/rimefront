@@ -60,6 +60,7 @@ pub fn reset_match_state(mut commands: Commands, level: Res<ActiveLevel>) {
     commands.insert_resource(CommandQueue::default());
     commands.insert_resource(SimulationTick::default());
     commands.insert_resource(crate::cadence::SimulationCadences::default());
+    commands.insert_resource(crate::support_powers::SupportPowers::default());
     commands.insert_resource(Intel::new(level.0.fog_of_war));
     commands.insert_resource(Diplomacy {
         alliance: level.0.effective_alliance(),

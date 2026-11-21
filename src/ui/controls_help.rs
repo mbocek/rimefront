@@ -116,6 +116,13 @@ pub(super) fn controls_overview(keys: &KeyBindings) -> Vec<(&'static str, String
             ),
         ),
         (
+            tr("Support"),
+            tr_fmt(
+                "{} recon flight, {} artillery barrage, then click the map",
+                &[&key(Action::ReconFlight), &key(Action::Barrage)],
+            ),
+        ),
+        (
             tr("Troop Carrier"),
             tr_fmt(
                 "right-click it with infantry to board, {} unloads",

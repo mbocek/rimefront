@@ -38,6 +38,7 @@ pub(super) fn spawn_resources(sidebar: &mut ChildSpawnerCommands, fonts: &UiFont
                     row.spawn((CreditsText, fonts.heading("$ 0", 26.0, ACCENT)));
                     spawn_tool_buttons(row, fonts);
                 });
+            crate::support_tools::spawn_support_buttons(panel, fonts);
             panel
                 .spawn(Node {
                     align_items: AlignItems::Center,

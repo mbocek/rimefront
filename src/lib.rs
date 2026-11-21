@@ -86,6 +86,8 @@ pub mod sound;
 pub mod spawn;
 pub mod structure_tools;
 pub mod structures;
+pub mod support_powers;
+pub mod support_tools;
 pub mod terrain;
 pub mod terrain_material;
 pub mod transport;
@@ -204,6 +206,7 @@ impl Plugin for SimulationPlugin {
             .init_resource::<control_groups::ControlGroups>()
             .init_resource::<match_flow::MatchClock>()
             .init_resource::<intel::Intel>()
+            .init_resource::<support_powers::SupportPowers>()
             .init_resource::<cadence::SimulationCadences>()
             .init_resource::<catalog::Diplomacy>()
             .init_resource::<veterancy::LastHits>()
@@ -258,6 +261,7 @@ impl Plugin for SimulationPlugin {
                         economy::tally_power,
                         production::advance_production,
                         ai::command_enemies,
+                        ai::call_support_powers,
                         ai::repair_damaged_structures,
                         ai::fortify_turrets,
                         ai::employ_engineers,
@@ -274,7 +278,7 @@ impl Plugin for SimulationPlugin {
                     )
                         .chain(),
                     (
-                        intel::update_intel,
+                        (support_powers::run_support_powers, intel::update_intel).chain(),
                         abilities::update_camouflage,
                         combat::snapshot_targets,
                         combat::acquire_targets,

@@ -52,7 +52,7 @@ impl RandomField {
             ),
             RandomField::Credits => format!("${}", options.credits),
             RandomField::Faction => match options.faction {
-                FactionChoice::Fixed(faction) => tr(Team::Player.name_in(faction)).into(),
+                FactionChoice::Fixed(faction) => tr_owned(&Team::Player.name_in(faction)),
                 FactionChoice::Random => tr("Random").into(),
             },
         }
@@ -195,7 +195,7 @@ impl EditorField {
                 ],
             ),
             EditorField::NetworkPlayers => options.network_players.to_string(),
-            EditorField::Faction => tr(Team::Player.name_in(options.player_faction)).into(),
+            EditorField::Faction => tr_owned(&Team::Player.name_in(options.player_faction)),
         }
     }
 

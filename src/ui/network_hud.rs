@@ -1,7 +1,7 @@
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
-use crate::app::i18n::{tr, tr_fmt};
+use crate::app::i18n::{tr_fmt, tr_owned};
 use crate::net::network::{NetSession, SessionState};
 use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
@@ -87,7 +87,7 @@ pub fn refresh_network_hud(
         )),
         (None, Some((team, waited))) => Some(tr_fmt(
             "{} lost the connection; waiting for them to rejoin... {} s",
-            &[&tr(team.name()), &waited.as_secs()],
+            &[&tr_owned(&team.name()), &waited.as_secs()],
         )),
         (None, None) if waiting => Some(tr_fmt(
             "Waiting for the other player... {} s",
@@ -188,7 +188,7 @@ pub fn show_chat(
 ) {
     if let Some(mut session) = session {
         for (team, text) in session.take_chat() {
-            notifications.push(tr_fmt("{}: {}", &[&tr(team.name()), &text]));
+            notifications.push(tr_fmt("{}: {}", &[&tr_owned(&team.name()), &text]));
         }
     }
     for (mut text, mut node) in &mut lines {

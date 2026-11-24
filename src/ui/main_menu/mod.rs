@@ -702,11 +702,15 @@ fn rebuild_level_list(commands: &mut Commands, list: Entity, fonts: &UiFonts, me
 }
 
 /// The facts of a level as label, value and colour, for a two-column table.
-fn level_facts(level: &LevelDefinition) -> Vec<(&'static str, String, Color)> {
+fn level_facts(level: &LevelDefinition) -> Vec<(String, String, Color)> {
     let mut facts = vec![
-        (tr("Objective"), level.objective.describe(), ACCENT),
         (
-            tr("Map"),
+            tr("Objective").to_string(),
+            level.objective.describe(),
+            ACCENT,
+        ),
+        (
+            tr("Map").to_string(),
             tr_fmt(
                 "{}, {}, {}, {} x {} cells",
                 &[
@@ -720,14 +724,14 @@ fn level_facts(level: &LevelDefinition) -> Vec<(&'static str, String, Color)> {
             TEXT_MAIN,
         ),
         (
-            tr(Team::Player.name_in(level.player_faction)),
+            tr_owned(&Team::Player.name_in(level.player_faction)),
             format!("{}  ·  ${}", level.player.site.name(), level.player.credits),
             Team::Player.ui_color(),
         ),
     ];
     for (team, enemy) in level.opponents() {
         facts.push((
-            tr(team.name_in(level.faction_of(team))),
+            tr_owned(&team.name_in(level.faction_of(team))),
             format!(
                 "{}  ·  {}  ·  {}  ·  ${}",
                 enemy.force.site.name(),
@@ -740,7 +744,7 @@ fn level_facts(level: &LevelDefinition) -> Vec<(&'static str, String, Color)> {
     }
     if level.enemies.len() > 1 {
         facts.push((
-            tr("Opponents"),
+            tr("Opponents").to_string(),
             alliance_name(level.effective_alliance()).to_string(),
             TEXT_MAIN,
         ));
@@ -755,7 +759,7 @@ fn level_facts(level: &LevelDefinition) -> Vec<(&'static str, String, Color)> {
             .collect::<Vec<_>>()
             .join(", ")
     };
-    facts.push((tr("Units"), units, TEXT_DIM));
+    facts.push((tr("Units").to_string(), units, TEXT_DIM));
     facts
 }
 

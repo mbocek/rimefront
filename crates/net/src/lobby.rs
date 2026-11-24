@@ -372,11 +372,11 @@ impl NetLobby {
             LobbyPhase::Considering { offer, .. } => Some(match offer.your_team {
                 Some(team) if offer.under_way => tr_fmt(
                     "Your battle is under way; take back {} after catching up?",
-                    &[&tr(team.name_in(offer.level.faction_of(team)))],
+                    &[&tr_owned(&team.name_in(offer.level.faction_of(team)))],
                 ),
                 Some(team) => tr_fmt(
                     "The host offers this battle; you would play {}. Ready?",
-                    &[&tr(team.name_in(offer.level.faction_of(team)))],
+                    &[&tr_owned(&team.name_in(offer.level.faction_of(team)))],
                 ),
                 None if offer.under_way => {
                     tr("The battle is under way; you can watch it after catching up. Ready?")
@@ -741,7 +741,10 @@ impl NetLobby {
             if left {
                 seats.remove(index);
                 self.notice = Some(match team {
-                    Some(team) => tr_fmt("{} left", &[&tr(team.name_in(level.faction_of(team)))]),
+                    Some(team) => tr_fmt(
+                        "{} left",
+                        &[&tr_owned(&team.name_in(level.faction_of(team)))],
+                    ),
                     None => tr("A spectator left").to_string(),
                 });
                 self.changed = true;

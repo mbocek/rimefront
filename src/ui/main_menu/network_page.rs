@@ -154,9 +154,9 @@ pub(super) fn spawn_address_row(
 pub(super) fn spawn_chat(panel: &mut ChildSpawnerCommands, fonts: &UiFonts, lobby: &NetLobby) {
     for line in lobby.chat() {
         let who = if line.mine {
-            tr("You")
+            tr("You").to_string()
         } else {
-            tr(line.team.name())
+            tr_owned(&line.team.name())
         };
         let color = line.team.ui_color();
         panel.spawn(fonts.text(format!("{who}: {}", line.text), 15.0, color));

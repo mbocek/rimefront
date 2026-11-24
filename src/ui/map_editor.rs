@@ -255,7 +255,7 @@ fn spawn_level_page(
         false,
     );
     panel.spawn(fonts.heading(tr("SIDES"), 15.0, TEXT_DIM));
-    let faction = tr(Team::Player.name_in(level.player_faction));
+    let faction = tr_owned(&Team::Player.name_in(level.player_faction));
     let faction_label = tr_fmt("Your faction: {}", &[&faction]);
     spawn_button(panel, fonts, &faction_label, EditorButton::Faction, false);
     let sides = std::iter::once((tr("You").to_string(), level.player.site, None)).chain(
@@ -290,7 +290,7 @@ fn side_name(level: &LevelDefinition, team: Team) -> String {
     match sides(level).iter().position(|&side| side == team) {
         Some(0) => tr("You").to_string(),
         Some(index) => tr_fmt("Computer {}", &[&index]),
-        None => tr(team.name()).to_string(),
+        None => tr_owned(&team.name()),
     }
 }
 

@@ -3,62 +3,133 @@ use serde::{Deserialize, Serialize};
 
 use crate::sim::cues::Sound;
 
-/// The player plus up to three computer opponents, who are allied with each other against the player.
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub enum Team {
-    Player,
-    Crimson,
-    Amber,
-    Violet,
-}
+/// A side in the battle. The first four are the sides a level names; a world that players join has more.
+#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct Team(u8);
 
+#[allow(non_upper_case_globals)]
 impl Team {
+    pub const Player: Team = Team(0);
+    pub const Crimson: Team = Team(1);
+    pub const Amber: Team = Team(2);
+    pub const Violet: Team = Team(3);
+
+    /// The sides a level names, the player's first.
     pub const ALL: [Team; 4] = [Team::Player, Team::Crimson, Team::Amber, Team::Violet];
     pub const OPPONENTS: [Team; 3] = [Team::Crimson, Team::Amber, Team::Violet];
+    pub const MOST: usize = u8::MAX as usize + 1;
+
+    pub fn from_index(index: usize) -> Team {
+        Team(u8::try_from(index).expect("at most Team::MOST sides"))
+    }
 
     pub fn index(self) -> usize {
-        match self {
-            Team::Player => 0,
-            Team::Crimson => 1,
-            Team::Amber => 2,
-            Team::Violet => 3,
-        }
+        usize::from(self.0)
+    }
+
+    fn look(self) -> &'static SideLook {
+        &SIDE_LOOKS[self.index() % SIDE_LOOKS.len()]
     }
 
     /// The name in the usual line-up, where the player leads the Coalition.
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         self.name_in(Faction::default_of(self))
     }
 
-    pub fn name_in(self, faction: Faction) -> &'static str {
-        match (self, faction) {
-            (Team::Player, Faction::Coalition) => "Coalition",
-            (Team::Player, Faction::Syndicate) => "Syndicate",
-            (Team::Crimson, Faction::Syndicate) => "Crimson Syndicate",
-            (Team::Amber, Faction::Syndicate) => "Amber Syndicate",
-            (Team::Violet, Faction::Syndicate) => "Violet Syndicate",
-            (Team::Crimson, Faction::Coalition) => "Crimson Coalition",
-            (Team::Amber, Faction::Coalition) => "Amber Coalition",
-            (Team::Violet, Faction::Coalition) => "Violet Coalition",
+    pub fn name_in(self, faction: Faction) -> String {
+        if self == Team::Player {
+            return faction.name().to_string();
         }
+        format!("{} {}", self.look().name, faction.name())
     }
 
     pub fn model_variant(self) -> &'static str {
-        match self {
-            Team::Player => "blue",
-            Team::Crimson => "red",
-            Team::Amber => "orange",
-            Team::Violet => "purple",
-        }
+        self.look().model_variant
     }
 
     pub fn ui_color(self) -> Color {
-        match self {
-            Team::Player => Color::srgb(0.25, 0.55, 1.0),
-            Team::Crimson => Color::srgb(1.0, 0.3, 0.25),
-            Team::Amber => Color::srgb(1.0, 0.62, 0.15),
-            Team::Violet => Color::srgb(0.72, 0.4, 1.0),
+        self.look().color
+    }
+
+    /// How saved games, levels and the network name the side.
+    fn key(self) -> String {
+        match NAMED_SIDES.get(self.index()) {
+            Some(name) => name.to_string(),
+            None => format!("Side{}", self.0),
         }
+    }
+
+    fn from_key(key: &str) -> Option<Team> {
+        if let Some(index) = NAMED_SIDES.iter().position(|name| *name == key) {
+            return Some(Team::from_index(index));
+        }
+        key.strip_prefix("Side")?.parse().ok().map(Team)
+    }
+}
+
+const NAMED_SIDES: [&str; 4] = ["Player", "Crimson", "Amber", "Violet"];
+
+struct SideLook {
+    name: &'static str,
+    color: Color,
+    model_variant: &'static str,
+}
+
+/// Sides past these take the same looks again; only four tints of the models exist.
+const SIDE_LOOKS: [SideLook; 8] = [
+    SideLook {
+        name: "Azure",
+        color: Color::srgb(0.25, 0.55, 1.0),
+        model_variant: "blue",
+    },
+    SideLook {
+        name: "Crimson",
+        color: Color::srgb(1.0, 0.3, 0.25),
+        model_variant: "red",
+    },
+    SideLook {
+        name: "Amber",
+        color: Color::srgb(1.0, 0.62, 0.15),
+        model_variant: "orange",
+    },
+    SideLook {
+        name: "Violet",
+        color: Color::srgb(0.72, 0.4, 1.0),
+        model_variant: "purple",
+    },
+    SideLook {
+        name: "Jade",
+        color: Color::srgb(0.25, 0.85, 0.45),
+        model_variant: "blue",
+    },
+    SideLook {
+        name: "Rust",
+        color: Color::srgb(0.75, 0.4, 0.2),
+        model_variant: "red",
+    },
+    SideLook {
+        name: "Gold",
+        color: Color::srgb(0.95, 0.85, 0.3),
+        model_variant: "orange",
+    },
+    SideLook {
+        name: "Rose",
+        color: Color::srgb(1.0, 0.5, 0.75),
+        model_variant: "purple",
+    },
+];
+
+impl Serialize for Team {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.key())
+    }
+}
+
+impl<'de> Deserialize<'de> for Team {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let key = String::deserialize(deserializer)?;
+        Team::from_key(&key)
+            .ok_or_else(|| serde::de::Error::custom(format!("no side is called {key}")))
     }
 }
 
@@ -89,6 +160,13 @@ impl Faction {
 
     fn default_of(team: Team) -> Faction {
         Faction::of(team, Faction::default())
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Faction::Coalition => "Coalition",
+            Faction::Syndicate => "Syndicate",
+        }
     }
 
     pub fn title(self) -> &'static str {
@@ -1427,5 +1505,23 @@ mod tests {
             STARTING_CREDITS
                 >= BuildingKind::PowerPlant.spec().cost + BuildingKind::Refinery.spec().cost
         );
+    }
+
+    #[test]
+    fn sides_keep_their_names_in_saved_text() {
+        assert_eq!(
+            serde_json::to_string(&Team::Crimson).unwrap(),
+            r#""Crimson""#
+        );
+        for team in [
+            Team::Player,
+            Team::Violet,
+            Team::from_index(4),
+            Team::from_index(200),
+        ] {
+            let text = serde_json::to_string(&team).unwrap();
+            assert_eq!(serde_json::from_str::<Team>(&text).unwrap(), team, "{text}");
+        }
+        assert!(serde_json::from_str::<Team>(r#""Nobody""#).is_err());
     }
 }

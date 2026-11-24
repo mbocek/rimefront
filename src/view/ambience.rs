@@ -9,7 +9,7 @@ use crate::sim::components::{Armor, BodyRadius, HarvestState, Harvester, Mobile}
 use crate::sim::fog::CellSight;
 use crate::view::effects::{EffectAssets, spawn_sparkle};
 use crate::view::local_view::LocalView;
-use crate::world::map::{GameMap, cell_center, cells_by_distance, crystal_fields, world_to_cell};
+use crate::world::map::{CrystalFields, GameMap, cell_center, cells_by_distance, world_to_cell};
 
 const CRYSTAL_GLOW_COLOR: Color = Color::srgb(0.35, 1.0, 0.9);
 const CRYSTAL_GLOW_INTENSITY: f32 = 120_000.0;
@@ -32,20 +32,20 @@ pub struct CrystalGlow {
     initial_crystal: u32,
 }
 
-fn field_crystal(map: &GameMap, field_index: usize) -> u32 {
-    let field = &crystal_fields()[field_index];
+fn field_crystal(map: &GameMap, fields: &CrystalFields, field_index: usize) -> u32 {
+    let field = &fields.0[field_index];
     cells_by_distance(field.center, field.radius.ceil() as i32)
         .map(|cell| map.crystal_at(cell))
         .sum()
 }
 
-pub fn light_crystal_fields(mut commands: Commands, map: Res<GameMap>) {
-    for (field_index, field) in crystal_fields().iter().enumerate() {
+pub fn light_crystal_fields(mut commands: Commands, map: Res<GameMap>, fields: Res<CrystalFields>) {
+    for (field_index, field) in fields.0.iter().enumerate() {
         commands.spawn((
             CrystalGlow {
                 field_index,
                 phase: field_index as f32 * 1.7,
-                initial_crystal: field_crystal(&map, field_index).max(1),
+                initial_crystal: field_crystal(&map, &fields, field_index).max(1),
             },
             PointLight {
                 color: CRYSTAL_GLOW_COLOR,
@@ -63,14 +63,16 @@ pub fn light_crystal_fields(mut commands: Commands, map: Res<GameMap>) {
 pub fn pulse_crystal_glow(
     time: Res<Time>,
     map: Res<GameMap>,
+    fields: Res<CrystalFields>,
     view: LocalView,
     mut glows: Query<(&CrystalGlow, &mut PointLight)>,
 ) {
     let t = time.elapsed_secs();
     for (glow, mut light) in &mut glows {
-        let remaining = field_crystal(&map, glow.field_index) as f32 / glow.initial_crystal as f32;
+        let remaining =
+            field_crystal(&map, &fields, glow.field_index) as f32 / glow.initial_crystal as f32;
         let pulse = 0.8 + 0.2 * (t * CRYSTAL_GLOW_PULSE_SPEED + glow.phase).sin();
-        let field_center = cell_center(crystal_fields()[glow.field_index].center);
+        let field_center = cell_center(fields.0[glow.field_index].center);
         let known = if view.sight().is_explored(field_center) {
             1.0
         } else {
@@ -150,6 +152,7 @@ pub fn emit_crystal_sparkles(
     time: Res<Time>,
     effects: Res<EffectAssets>,
     map: Res<GameMap>,
+    fields: Res<CrystalFields>,
     view: LocalView,
     mut pending: Local<f32>,
     harvesters: Query<(&Transform, &Harvester)>,
@@ -157,9 +160,9 @@ pub fn emit_crystal_sparkles(
     let mut rng = rand::rng();
     let dt = time.delta_secs();
     *pending += CRYSTAL_SPARKLES_PER_SEC * dt;
-    while *pending >= 1.0 {
+    while *pending >= 1.0 && !fields.0.is_empty() {
         *pending -= 1.0;
-        let field = &crystal_fields()[rng.random_range(0..crystal_fields().len())];
+        let field = &fields.0[rng.random_range(0..fields.0.len())];
         let reach = field.radius.ceil() as i32;
         let cell = field.center
             + IVec2::new(

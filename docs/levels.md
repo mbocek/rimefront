@@ -122,7 +122,10 @@ A level file is plain JSON; omitted fields take defaults:
 ```
 
 Landscapes: `River` (a winding river with three fords), `Lake` (a long lake between the bases with one
-causeway across its middle) and `Plains` (open ground without water); all of them are point-symmetric.
+causeway across its middle) and `Plains` (open ground without water), all three point-symmetric, and `Wilds`:
+rolling country with lakes, woods and crystal fields wherever the map seed puts them, generated chunk by chunk
+(`world::wilds`, see [persistent-world.md](persistent-world.md)) and not mirrored. Every base in the wilds
+stands on dry ground with a crystal field beside it; random battles roll only among the mirrored three.
 Weather: `Clear` or `Rain` (falling rain, a dimmer sun and sky).
 Map sizes: `Standard` (64 × 64 cells, every campaign mission), `Large` (96 × 96), `Huge` (128 × 128) and
 `Vast` (256 × 256), also

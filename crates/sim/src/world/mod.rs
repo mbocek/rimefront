@@ -5,3 +5,4 @@ pub mod scenery;
 pub mod season;
 pub mod terrain;
 pub mod weather;
+pub mod wilds;

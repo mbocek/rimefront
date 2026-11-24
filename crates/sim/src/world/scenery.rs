@@ -16,26 +16,27 @@ use crate::world::terrain::{GroundLayers, Landscape, OUTLANDS_WIDTH};
 
 const FOREST_PAIRS: usize = 8;
 const ROCK_PAIRS: usize = 20;
-const CONIFER_FOREST: [&str; 3] = ["tree_pine", "tree_pine", "tree_pine_young"];
-const DECIDUOUS_FOREST: [&str; 4] = ["tree_broadleaf", "tree", "tree_birch", "tree_broadleaf"];
-const MIXED_FOREST: [&str; 5] = [
+pub(crate) const CONIFER_FOREST: [&str; 3] = ["tree_pine", "tree_pine", "tree_pine_young"];
+pub(crate) const DECIDUOUS_FOREST: [&str; 4] =
+    ["tree_broadleaf", "tree", "tree_birch", "tree_broadleaf"];
+pub(crate) const MIXED_FOREST: [&str; 5] = [
     "tree_pine",
     "tree_broadleaf",
     "tree_birch",
     "tree",
     "tree_pine_young",
 ];
-const DEAD_TREE_CHANCE: f64 = 0.05;
-const BUSHES: [&str; 3] = ["bush", "bush_round", "bush_flowering"];
-const ROCKS: [&str; 3] = ["rock", "rock_a", "rock_b"];
+pub(crate) const DEAD_TREE_CHANCE: f64 = 0.05;
+pub(crate) const BUSHES: [&str; 3] = ["bush", "bush_round", "bush_flowering"];
+pub(crate) const ROCKS: [&str; 3] = ["rock", "rock_a", "rock_b"];
 const MEADOW_ATTEMPTS: usize = 2600;
-const CLUMP_SIZE: std::ops::Range<usize> = 2..6;
-const CLUMP_SPREAD: f32 = 0.9;
+pub(crate) const CLUMP_SIZE: std::ops::Range<usize> = 2..6;
+pub(crate) const CLUMP_SPREAD: f32 = 0.9;
 const SHORE_REEDS: usize = 420;
 const SHORE_SAMPLES: usize = 40_000;
 const OUTLAND_TREE_ATTEMPTS: usize = 1100;
 const OUTLAND_BOULDER_COUNT: usize = 90;
-const MAX_MEADOW_DIRT: f32 = 0.35;
+pub(crate) const MAX_MEADOW_DIRT: f32 = 0.35;
 
 /// Counts are authored for the standard map; a bigger map gets as much per square meter.
 fn by_area(standard_count: usize) -> usize {
@@ -93,7 +94,7 @@ pub fn scatter(
     cover_mountains(layout, landscape, rng);
 }
 
-fn pick<'a>(rng: &mut StdRng, models: &[&'a str]) -> &'a str {
+pub(crate) fn pick<'a>(rng: &mut StdRng, models: &[&'a str]) -> &'a str {
     models[rng.random_range(0..models.len())]
 }
 
@@ -246,7 +247,7 @@ fn line_shores(layout: &mut SceneryLayout, landscape: Landscape, map: &GameMap, 
     }
 }
 
-fn cover_mountains(layout: &mut SceneryLayout, landscape: Landscape, rng: &mut StdRng) {
+pub(crate) fn cover_mountains(layout: &mut SceneryLayout, landscape: Landscape, rng: &mut StdRng) {
     let bounds = map_bounds();
     let (low, high) = (
         bounds.world_min() - OUTLANDS_WIDTH,
@@ -363,7 +364,7 @@ pub enum Obstacle {
     Rock,
 }
 
-fn place_decor(
+pub(crate) fn place_decor(
     layout: &mut SceneryLayout,
     landscape: Landscape,
     rng: &mut StdRng,
@@ -378,6 +379,32 @@ fn place_decor(
         transform,
         decor: true,
     });
+}
+
+/// A blocking tree or rock on one cell, with no twin across the map.
+pub(crate) fn block_cell_with_prop(
+    layout: &mut SceneryLayout,
+    landscape: Landscape,
+    map: &mut GameMap,
+    rng: &mut StdRng,
+    cell: IVec2,
+    model_id: &'static str,
+    scale: Range<f32>,
+) {
+    map.set_obstacle(cell, true);
+    let jitter = Vec3::new(
+        rng.random_range(-0.3..0.3),
+        0.0,
+        rng.random_range(-0.3..0.3),
+    );
+    place_scenery(
+        layout,
+        landscape,
+        rng,
+        model_id,
+        cell_center(cell) + jitter,
+        scale,
+    );
 }
 
 fn place_scenery(

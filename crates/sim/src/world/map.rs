@@ -14,6 +14,7 @@ use crate::sim::sim_math;
 use crate::world::map_regions::Regions;
 use crate::world::scenery::{self, SceneryLayout};
 use crate::world::terrain::{Landscape, approximate_ground};
+use crate::world::wilds;
 
 pub const CELL_SIZE: f32 = 2.0;
 /// The map every landscape, road and crystal field is authored for; bigger maps spread them out.
@@ -615,24 +616,34 @@ pub fn near_crystal_field(cell: IVec2) -> bool {
     })
 }
 
+/// The crystal fields of the map being played, for anything that marks or lights them.
+#[derive(Resource, Default)]
+pub struct CrystalFields(pub Vec<CrystalField>);
+
 pub fn generate_map(mut commands: Commands, level: Res<ActiveLevel>) {
     let mut rng = StdRng::seed_from_u64(level.0.map_seed);
     let mut map = GameMap::empty();
     let landscape = level.0.landscape;
     block_water(&mut map, landscape);
     block_unmirrored_edge(&mut map);
-    seed_crystal_fields(&mut commands, &mut map, &mut rng);
     let mut scenery = SceneryLayout::default();
-    scenery::scatter(&mut scenery, landscape, &mut map, &mut rng);
+    let fields = if landscape.is_mirrored() {
+        seed_crystal_fields(&mut commands, &mut map, &mut rng);
+        scenery::scatter(&mut scenery, landscape, &mut map, &mut rng);
+        crystal_fields()
+    } else {
+        wilds::generate_wilds(&mut commands, &mut map, &mut scenery, level.0.map_seed)
+    };
     commands.insert_resource(map);
     commands.insert_resource(scenery);
+    commands.insert_resource(CrystalFields(fields));
 }
 
 pub fn is_water(landscape: Landscape, cell: IVec2) -> bool {
     landscape.water_depth(cell.x as f32 + 0.5, cell.y as f32 + 0.5) > RIVER_BLOCKING_DEPTH
 }
 
-fn block_water(map: &mut GameMap, landscape: Landscape) {
+pub(crate) fn block_water(map: &mut GameMap, landscape: Landscape) {
     for cell in map_bounds().cells() {
         if is_water(landscape, cell) {
             map.set_obstacle(cell, true);
@@ -916,7 +927,7 @@ mod tests {
 
     #[test]
     fn every_landscape_connects_the_bases_and_mirrors_its_water() {
-        for landscape in Landscape::ALL {
+        for landscape in Landscape::MIRRORED {
             let mut map = GameMap::empty();
             block_water(&mut map, landscape);
             for (from, to) in [

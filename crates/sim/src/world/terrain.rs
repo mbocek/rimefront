@@ -22,6 +22,13 @@ const ROLLING_HILLS_HEIGHT: f32 = 1.1;
 const MOUNTAIN_HEIGHT: f32 = 16.0;
 const MOUNTAIN_RISE_DISTANCE: f32 = 26.0;
 const BASE_FLAT_RADIUS_CELLS: f32 = 9.0;
+/// High enough that lakes stay apart and the land between the bases stays one.
+const LAKE_SHORE: f32 = 0.38;
+const WILD_LAKE_FREQUENCY: f32 = 0.035;
+const WILD_LAKES_SALT: u32 = 0x1a4e;
+const DRY_AROUND_BASES: f32 = 0.8;
+/// Roughly how many cells the lake noise takes to change by one, to read it as a distance from the shore.
+const CELLS_PER_LAKE_NOISE: f32 = 60.0;
 const BASE_PAD_RADIUS_CELLS: f32 = 4.5;
 
 /// The parts of a landscape that a level's terrain seed varies; everything stays point-symmetric around the
@@ -246,6 +253,24 @@ fn distance_to_pond_shore(column: f32, row: f32) -> f32 {
         .fold(f32::MAX, f32::min)
 }
 
+/// Lakes of the wilds fill the ground where this noise rises above `LAKE_SHORE`. Near a base it is held
+/// down, so every base stands on dry ground.
+fn wild_lakes(column: f32, row: f32) -> f32 {
+    let point = Vec2::new(column, row);
+    let lakes = fractal_noise(
+        point * WILD_LAKE_FREQUENCY,
+        3,
+        shape().hills_seed ^ WILD_LAKES_SALT,
+    );
+    let near_base = 1.0
+        - smoothstep(
+            BASE_FLAT_RADIUS_CELLS,
+            2.0 * BASE_FLAT_RADIUS_CELLS,
+            distance_to_bases_cells(column, row),
+        );
+    lakes - DRY_AROUND_BASES * near_base
+}
+
 /// Where the lake sits: `along` runs from the north-west to the south-east site, `across` from base to base.
 fn lake_coordinates(column: f32, row: f32) -> (f32, f32) {
     let offset = Vec2::new(column, row) - map_bounds().center_cells();
@@ -262,7 +287,8 @@ fn lake_ellipse(column: f32, row: f32) -> f32 {
     (along * along + across * across).sqrt()
 }
 
-/// The shape of the battlefield. Every landscape is point-symmetric around the map centre.
+/// The shape of the battlefield. The authored ones are point-symmetric around the map centre; `Wilds` is made
+/// chunk by chunk from the map seed and plays differently from each corner.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub enum Landscape {
     /// A winding river with three fords.
@@ -272,10 +298,23 @@ pub enum Landscape {
     Lake,
     /// Open ground without water.
     Plains,
+    /// Rolling country with lakes, woods and crystal fields wherever the map seed puts them.
+    Wilds,
 }
 
 impl Landscape {
-    pub const ALL: [Landscape; 3] = [Landscape::River, Landscape::Lake, Landscape::Plains];
+    pub const ALL: [Landscape; 4] = [
+        Landscape::River,
+        Landscape::Lake,
+        Landscape::Plains,
+        Landscape::Wilds,
+    ];
+    /// The landscapes made as mirror images, which random battles roll among.
+    pub const MIRRORED: [Landscape; 3] = [Landscape::River, Landscape::Lake, Landscape::Plains];
+
+    pub fn is_mirrored(self) -> bool {
+        self != Landscape::Wilds
+    }
 
     /// Depth of the water bed below the surrounding ground at a point in cell units; zero on dry land.
     pub fn water_depth(self, column: f32, row: f32) -> f32 {
@@ -293,6 +332,9 @@ impl Landscape {
             Landscape::Plains => {
                 RIVER_DEPTH * smoothstep(0.0, 1.2, -distance_to_pond_shore(column, row).min(1.2))
             }
+            Landscape::Wilds => {
+                RIVER_DEPTH * smoothstep(LAKE_SHORE, LAKE_SHORE + 0.08, wild_lakes(column, row))
+            }
         }
     }
 
@@ -302,6 +344,9 @@ impl Landscape {
             Landscape::River => distance_to_river_cells(column, row),
             Landscape::Lake => (lake_ellipse(column, row) - 0.7).max(0.0) * shape().lake_width,
             Landscape::Plains => distance_to_pond_shore(column, row).max(0.0),
+            Landscape::Wilds => {
+                (LAKE_SHORE - wild_lakes(column, row)).max(0.0) * CELLS_PER_LAKE_NOISE
+            }
         }
     }
 
@@ -309,7 +354,7 @@ impl Landscape {
     fn gorge(self, column: f32, row: f32) -> f32 {
         match self {
             Landscape::River => 1.0 - smoothstep(2.0, 7.0, distance_to_river_cells(column, row)),
-            Landscape::Lake | Landscape::Plains => 0.0,
+            Landscape::Lake | Landscape::Plains | Landscape::Wilds => 0.0,
         }
     }
 
@@ -339,7 +384,7 @@ impl Landscape {
         let shore_band = match self {
             Landscape::River => RIVER_HALF_WIDTH_CELLS + 0.2..RIVER_HALF_WIDTH_CELLS + 0.9,
             Landscape::Lake => 1.6..2.4,
-            Landscape::Plains => 0.2..0.9,
+            Landscape::Plains | Landscape::Wilds => 0.2..0.9,
         };
         self.water_depth(column, row) == 0.0
             && shore_band.contains(&self.distance_to_water(column, row))
@@ -349,6 +394,7 @@ impl Landscape {
         match self {
             Landscape::River => river_roads(),
             Landscape::Lake | Landscape::Plains => open_roads(),
+            Landscape::Wilds => Vec::new(),
         }
     }
 }
@@ -591,7 +637,7 @@ mod tests {
                     "seed {seed}"
                 );
             }
-            for landscape in Landscape::ALL {
+            for landscape in Landscape::MIRRORED {
                 for (column, row) in [(7.3, 20.1), (25.0, 33.5), (40.2, 12.7), (31.0, 29.0)] {
                     let here = landscape.water_depth(column, row);
                     let there = landscape.water_depth(mirror(column), mirror(row));

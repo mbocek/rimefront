@@ -330,7 +330,8 @@ impl LevelDefinition {
     /// Sets the map size and landscape shape that every map query on this thread uses.
     pub fn shape_the_world(&self) {
         set_map_size(self.map_size);
-        set_terrain_seed(self.terrain_seed);
+        let wilds_seed = (self.landscape == Landscape::Wilds).then_some(self.map_seed);
+        set_terrain_seed(self.terrain_seed.or(wilds_seed));
     }
 
     pub fn faction_of(&self, team: Team) -> Faction {

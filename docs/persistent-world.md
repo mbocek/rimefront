@@ -157,11 +157,17 @@ for ordinary network matches.
 
 ### B. A world that grows
 
-8. **Generation by chunk.** The landscape (height, water, forests, crystal fields, roads) comes from a function
-   of the world seed and the chunk coordinate alone, so any chunk can be generated on its own, in any order,
-   at any distance from the origin, with the same result. Replaces stretching the 64-cell landscapes for big
-   maps; the authored ones stay for the campaign and duels. Changes map generation, so the fingerprints and
-   old replays.
+8. **Generation by chunk.** Done as a landscape of its own, `Wilds` (`world::wilds`), beside the authored
+   ones, which stay as they were: fingerprints, the campaign and old replays are untouched. Height is the
+   rolling hills every landscape has; lakes rise where a noise of the map seed passes a threshold, held down
+   near the bases. Each chunk's crystal and scenery come from the map seed and the chunk's coordinate alone:
+   a chunk has a field of its own with a 40 % chance, a field reaches at most into the next chunk, and a
+   cell's crystal is a function of the cell and the fields around it, so a chunk generated alone equals the
+   same chunk of the whole map (a test compares them, props included). Scenery is as dense as on the
+   standard map but not mirrored, and every base has a home field. Over 30 seeds on Standard, Large and
+   Vast maps every base reaches the others and has crystal at hand. Roads are left out for now. The
+   crystal fields of a map are a resource (`CrystalFields`) rather than the authored list, for the glow and
+   sparkles that mark them.
 9. **Grids stored by chunk.** `GameMap`, the fog of war and the scenery layout keep a chunk only once it is
    generated, and `MapBounds` grows to cover new chunks, so the world can widen while it runs. Dense grids
    were enough for a fixed world (step 4); a growing one needs this.

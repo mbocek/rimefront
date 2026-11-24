@@ -77,7 +77,7 @@ pub fn generate(options: &RandomBattleOptions, seed: u64) -> LevelDefinition {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut sides = StdRng::seed_from_u64(seed ^ SIDES_DICE);
     let mut personalities = StdRng::seed_from_u64(seed ^ PERSONALITY_DICE);
-    let landscape = Landscape::ALL[rng.random_range(0..Landscape::ALL.len())];
+    let landscape = Landscape::MIRRORED[rng.random_range(0..Landscape::MIRRORED.len())];
     let season = Season::ALL[rng.random_range(0..Season::ALL.len())];
     let weather = if rng.random_bool(RAIN_CHANCE) {
         Weather::Rain

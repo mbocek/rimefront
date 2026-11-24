@@ -89,8 +89,8 @@ for ordinary network matches.
    texture repaints only the chunks that changed since it was last painted, exactly as a full repaint would.
    The grids themselves stay dense over the map bounds: recomputing one side's fog over 2048 × 2048 cells
    takes 0.17 ms, and a dense grid that size is a few tens of MB, so storing chunks separately pays only once
-   the world must grow while it runs. Still whole: the fog texture's upload to the GPU (16 MB at 1024 cells,
-   part of step 5) and the minimap's fog pass (step 7).
+   the world must grow while it runs. Left whole here: the fog texture's upload to the GPU (done in step 5)
+   and the minimap's fog pass (step 7).
 5. **Terrain in chunks.**
    - Done: the ground is one patch per chunk (`terrain_chunks.rs`), detailed (0.5 m) where it shows the map
      or its rim and coarse (2 m) in the mountains beyond, each built on a background thread and drawn only
@@ -104,9 +104,12 @@ for ordinary network matches.
      one patch, kept until the view is two patches away. On a Vast map that is 15 of the 196 patches at the
      usual zoom and 43 fully zoomed out, and the same on any larger map. Jumping across the map through the
      minimap shows complete ground in the first captured frame.
-   - Still to do: upload only the changed chunks of the fog texture, and stream scenery the same way. Every
-     prop is its own entity sharing a merged mesh, culled one by one, but a Vast map has about 123,000 of
-     them and each is looked at every frame, so their cost grows with the area.
+   - Done: the fog texture's changed chunks go to the GPU as regions written straight into the texture
+     (`FogUploadPlugin`), about 72 KB a chunk, instead of re-uploading the whole image asset (4 MB on a
+     Vast map, 64 MB on 1024 × 1024 cells); a new map or a switch to another side's fog still uploads it all.
+   - Still to do: stream scenery the same way. Every prop is its own entity sharing a merged mesh, culled
+     one by one, but a Vast map has about 123,000 of them and each is looked at every frame, so their cost
+     grows with the area.
 6. **Hierarchical pathfinding.** Regions labelled per chunk, chunks joined by portals on their borders; a route
    is planned over portals and refined by A* only inside the chunks it passes. A structure relabels only its own
    chunk.

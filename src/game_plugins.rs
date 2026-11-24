@@ -333,6 +333,7 @@ impl Plugin for DisplayPlugin {
             bevy::diagnostic::EntityCountDiagnosticsPlugin::default(),
             bevy::render::diagnostic::RenderDiagnosticsPlugin,
             capture::CapturePlugin,
+            fog_view::FogUploadPlugin,
             MaterialPlugin::<terrain_material::TerrainMaterial>::default(),
             MaterialPlugin::<terrain_material::WaterMaterial>::default(),
             MaterialPlugin::<motion_material::MovingMaterial>::default(),

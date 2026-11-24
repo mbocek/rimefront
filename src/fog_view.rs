@@ -2,7 +2,14 @@ use crate::abilities::Camouflage;
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_resource::{
+    Extent3d, Origin3d, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect,
+    TextureDimension, TextureFormat,
+};
+use bevy::render::renderer::RenderQueue;
+use bevy::render::texture::GpuImage;
+use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderSystems};
 
 use crate::catalog::Team;
 use crate::combat::Projectile;
@@ -105,16 +112,129 @@ fn paint_everything(fog: &FogOfWar, pixels: &mut [u8]) {
     );
 }
 
-/// Repaints the chunks that changed after `revision`, and the blur they spill into their neighbours.
-fn paint_changes(fog: &FogOfWar, revision: u64, pixels: &mut [u8]) {
+/// Repaints the chunks that changed after `revision`, and the blur they spill into their neighbours; returns
+/// the first and last texel of each area repainted.
+fn paint_changes(fog: &FogOfWar, revision: u64, pixels: &mut [u8]) -> Vec<(IVec2, IVec2)> {
     let bounds = map_bounds();
     let last_texel = resolution().as_ivec2() - IVec2::ONE;
-    for chunk in fog.chunks_changed_since(revision) {
-        let (first_cell, last_cell) = bounds.cells_of_chunk(chunk);
-        let first = (first_cell - bounds.min) * TEXELS_PER_CELL - IVec2::splat(BLUR_RADIUS);
-        let last = (last_cell - bounds.min + IVec2::ONE) * TEXELS_PER_CELL - IVec2::ONE
-            + IVec2::splat(BLUR_RADIUS);
-        paint_texels(fog, pixels, first.max(IVec2::ZERO), last.min(last_texel));
+    fog.chunks_changed_since(revision)
+        .map(|chunk| {
+            let (first_cell, last_cell) = bounds.cells_of_chunk(chunk);
+            let first = (first_cell - bounds.min) * TEXELS_PER_CELL - IVec2::splat(BLUR_RADIUS);
+            let last = (last_cell - bounds.min + IVec2::ONE) * TEXELS_PER_CELL - IVec2::ONE
+                + IVec2::splat(BLUR_RADIUS);
+            let area = (first.max(IVec2::ZERO), last.min(last_texel));
+            paint_texels(fog, pixels, area.0, area.1);
+            area
+        })
+        .collect()
+}
+
+/// A rectangle of the fog texture to write to the GPU, its texels row by row.
+#[derive(Clone)]
+struct FogRegion {
+    first: UVec2,
+    size: UVec2,
+    texels: Vec<u8>,
+}
+
+impl FogRegion {
+    fn cut_from(pixels: &[u8], first: IVec2, last: IVec2) -> Self {
+        let width = resolution().x as usize;
+        let size = (last - first + IVec2::ONE).as_uvec2();
+        let row_bytes = size.x as usize * 4;
+        let mut texels = Vec::with_capacity(row_bytes * size.y as usize);
+        for row in first.y..=last.y {
+            let start = (row as usize * width + first.x as usize) * 4;
+            texels.extend_from_slice(&pixels[start..start + row_bytes]);
+        }
+        Self {
+            first: first.as_uvec2(),
+            size,
+            texels,
+        }
+    }
+}
+
+/// The repainted parts of the fog texture, written straight into the GPU texture: changing the image
+/// asset instead would upload all of it, 64 MB on a map of 1024 × 1024 cells.
+#[derive(Resource, Default)]
+pub struct FogUploads {
+    batch: u64,
+    regions: Vec<FogRegion>,
+}
+
+#[derive(Resource, Default)]
+struct PendingFogUploads {
+    batch: u64,
+    texture: Option<AssetId<Image>>,
+    regions: Vec<FogRegion>,
+}
+
+pub struct FogUploadPlugin;
+
+impl Plugin for FogUploadPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<FogUploads>();
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+        render_app
+            .init_resource::<PendingFogUploads>()
+            .add_systems(ExtractSchedule, extract_fog_uploads)
+            .add_systems(
+                Render,
+                upload_fog_regions.in_set(RenderSystems::PrepareResources),
+            );
+    }
+}
+
+fn extract_fog_uploads(
+    uploads: Extract<Res<FogUploads>>,
+    texture: Extract<Option<Res<FogTexture>>>,
+    mut pending: ResMut<PendingFogUploads>,
+) {
+    if uploads.batch == pending.batch {
+        return;
+    }
+    pending.batch = uploads.batch;
+    pending.texture = texture.as_ref().map(|texture| texture.0.id());
+    pending.regions = uploads.regions.clone();
+}
+
+fn upload_fog_regions(
+    mut pending: ResMut<PendingFogUploads>,
+    images: Res<RenderAssets<GpuImage>>,
+    queue: Res<RenderQueue>,
+) {
+    let Some(gpu_image) = pending.texture.and_then(|texture| images.get(texture)) else {
+        return;
+    };
+    let texture = gpu_image.texture.clone();
+    for region in pending.regions.drain(..) {
+        queue.write_texture(
+            TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: Origin3d {
+                    x: region.first.x,
+                    y: region.first.y,
+                    z: 0,
+                },
+                aspect: TextureAspect::All,
+            },
+            &region.texels,
+            TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(region.size.x * 4),
+                rows_per_image: None,
+            },
+            Extent3d {
+                width: region.size.x,
+                height: region.size.y,
+                depth_or_array_layers: 1,
+            },
+        );
     }
 }
 
@@ -165,11 +285,15 @@ pub struct PaintedFog {
     revision: u64,
 }
 
+/// Repaints the fog texture: all of it through the image asset when the fog or the map changed, otherwise
+/// only the changed chunks, sent to the GPU as regions.
 pub fn paint_fog_texture(
     view: LocalView,
     texture: Res<FogTexture>,
     mut painted: Local<Option<PaintedFog>>,
+    mut canvas: Local<Vec<u8>>,
     mut images: ResMut<Assets<Image>>,
+    mut uploads: ResMut<FogUploads>,
 ) {
     let fog = view.sight();
     let now = PaintedFog {
@@ -179,21 +303,30 @@ pub fn paint_fog_texture(
     if *painted == Some(now) {
         return;
     }
-    let Some(mut image) = images.get_mut(&texture.0) else {
+    let Some(image) = images.get(&texture.0) else {
         return;
     };
     let resized = image.texture_descriptor.size != texture_extent();
-    if resized {
-        image.resize(texture_extent());
-    }
-    let Some(pixels) = image.data.as_mut() else {
-        return;
-    };
+    canvas.resize(resolution().element_product() as usize * 4, VISIBLE_SHADE);
     match *painted {
         Some(before) if before.lineage == now.lineage && !resized => {
-            paint_changes(fog, before.revision, pixels);
+            let areas = paint_changes(fog, before.revision, &mut canvas);
+            uploads.regions = areas
+                .into_iter()
+                .map(|(first, last)| FogRegion::cut_from(&canvas, first, last))
+                .collect();
+            uploads.batch += 1;
         }
-        _ => paint_everything(fog, pixels),
+        _ => {
+            paint_everything(fog, &mut canvas);
+            let Some(mut image) = images.get_mut(&texture.0) else {
+                return;
+            };
+            if resized {
+                image.resize(texture_extent());
+            }
+            image.data = Some(canvas.clone());
+        }
     }
     *painted = Some(now);
 }
@@ -325,6 +458,16 @@ mod tests {
             .collect()
     }
 
+    /// What the GPU does with an uploaded region.
+    fn write_region(texture: &mut [u8], region: &FogRegion) {
+        let width = resolution().x as usize;
+        let row_bytes = region.size.x as usize * 4;
+        for (row, texels) in region.texels.chunks(row_bytes).enumerate() {
+            let start = ((region.first.y as usize + row) * width + region.first.x as usize) * 4;
+            texture[start..start + row_bytes].copy_from_slice(texels);
+        }
+    }
+
     #[test]
     fn repainting_the_changed_chunks_matches_painting_everything() {
         let bounds = MapBounds {
@@ -339,16 +482,21 @@ mod tests {
         };
         let mut fog = FogOfWar::new(true);
         fog.reveal_around(viewers(0));
-        let mut kept_up = vec![0u8; texel_bytes];
-        paint_everything(&fog, &mut kept_up);
+        let mut canvas = vec![0u8; texel_bytes];
+        paint_everything(&fog, &mut canvas);
+        let mut on_the_gpu = canvas.clone();
         let painted = fog.revision;
 
         fog.reveal_around(viewers(3));
-        paint_changes(&fog, painted, &mut kept_up);
+        for (first, last) in paint_changes(&fog, painted, &mut canvas) {
+            let region = FogRegion::cut_from(&canvas, first, last);
+            write_region(&mut on_the_gpu, &region);
+        }
 
         let mut fresh = vec![0u8; texel_bytes];
         paint_everything(&fog, &mut fresh);
-        assert!(kept_up == fresh, "a partly repainted texture differs");
+        assert!(canvas == fresh, "a partly repainted canvas differs");
+        assert!(on_the_gpu == fresh, "the uploaded regions miss a change");
         let changed = fog.chunks_changed_since(painted).count();
         assert!(changed > 0 && changed < bounds.chunk_count());
     }

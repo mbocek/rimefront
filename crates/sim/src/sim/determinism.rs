@@ -11,6 +11,7 @@ use crate::sim::catalog::Team;
 use crate::sim::combat::Projectile;
 use crate::sim::components::{Building, Health, Unit};
 use crate::sim::economy::Economies;
+use crate::sim::sides::Sides;
 
 /// Positions are compared to the millimetre, so rounding noise in rendering-only maths cannot matter.
 const CHECKSUM_POSITION_SCALE: f32 = 1000.0;
@@ -179,8 +180,9 @@ pub fn simulation_checksum(world: &mut World) -> u64 {
         hasher.write_u8(team);
         hasher.write_i32(health);
     }
+    let sides = world.get_resource::<Sides>().copied().unwrap_or_default();
     if let Some(economies) = world.get_resource::<Economies>() {
-        for team in Team::ALL {
+        for team in sides.iter() {
             hasher.write_i32(economies.of(team).credits);
         }
     }

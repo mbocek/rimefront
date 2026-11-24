@@ -23,7 +23,7 @@ fn arrived(battle: &mut Battle, unit: Entity, goal: IVec2) -> bool {
 /// Sends every idle combat unit of the team at the nearest enemy, letting it fight whatever it meets.
 fn hunt_enemies(battle: &mut Battle, team: Team) {
     let world = battle.world();
-    let diplomacy = *world.resource::<Diplomacy>();
+    let diplomacy = world.resource::<Diplomacy>().clone();
     let enemies: Vec<Vec3> = world
         .query::<(&Team, &Transform, &Health)>()
         .iter(world)

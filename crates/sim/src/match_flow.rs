@@ -62,9 +62,8 @@ pub fn reset_match_state(mut commands: Commands, level: Res<ActiveLevel>) {
     commands.insert_resource(crate::sim::cadence::SimulationCadences::default());
     commands.insert_resource(crate::sim::support_powers::SupportPowers::default());
     commands.insert_resource(Intel::new(level.0.fog_of_war));
-    commands.insert_resource(Diplomacy {
-        alliance: level.0.effective_alliance(),
-    });
+    commands.insert_resource(crate::sim::sides::Sides::default());
+    commands.insert_resource(Diplomacy::of(level.0.effective_alliance()));
     commands.insert_resource(LastHits::default());
     commands.insert_resource(MatchStats::default());
     commands.insert_resource(Targets::default());
@@ -176,9 +175,7 @@ pub fn deploy_level_forces(
 ) {
     let level = &level.0;
     let forbidden = forbidden_items(level);
-    for team in Team::ALL {
-        production.forbid(team, forbidden.clone());
-    }
+    production.forbid_to_every_side(forbidden);
     production.set_player_faction(level.player_faction);
     if restoring.is_some() {
         return;

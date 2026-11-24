@@ -196,7 +196,7 @@ impl Alliance {
         Alliance::TwoAgainstTwo,
     ];
 
-    fn side(self, team: Team) -> usize {
+    fn camp(self, team: Team) -> usize {
         match self {
             Alliance::CoalitionAgainstSyndicate => usize::from(team != Team::Player),
             Alliance::FreeForAll => team.index(),
@@ -205,15 +205,41 @@ impl Alliance {
     }
 }
 
-/// Who fights whom in the current match.
-#[derive(Resource, Clone, Copy, PartialEq, Eq, Default, Debug)]
+/// Who fights whom in the current match: sides of one camp are allies, every other side an enemy.
+#[derive(Resource, Clone, PartialEq, Eq, Debug)]
 pub struct Diplomacy {
-    pub alliance: Alliance,
+    /// Indexed by `Team::index`; a side past the end is a camp of its own.
+    camps: Vec<usize>,
 }
 
 impl Diplomacy {
-    pub fn hostile(self, team: Team, other: Team) -> bool {
-        self.alliance.side(team) != self.alliance.side(other)
+    pub fn of(alliance: Alliance) -> Self {
+        Self {
+            camps: Team::ALL.map(|team| alliance.camp(team)).to_vec(),
+        }
+    }
+
+    fn camp(&self, team: Team) -> usize {
+        let own_camp = Team::MOST + team.index();
+        self.camps.get(team.index()).copied().unwrap_or(own_camp)
+    }
+
+    pub fn hostile(&self, team: Team, other: Team) -> bool {
+        self.camp(team) != self.camp(other)
+    }
+
+    /// `team` leaves its camp for the camp of `ally`.
+    pub fn join_camp_of(&mut self, team: Team, ally: Team) {
+        let camp = self.camp(ally);
+        let own_camps = self.camps.len()..=team.index();
+        self.camps.extend(own_camps.map(|index| Team::MOST + index));
+        self.camps[team.index()] = camp;
+    }
+}
+
+impl Default for Diplomacy {
+    fn default() -> Self {
+        Self::of(Alliance::default())
     }
 }
 

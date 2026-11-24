@@ -477,7 +477,7 @@ pub fn issue_orders(
     if let Some(structure) = hovered.filter(|t| t.is_building)
         && let Ok((&id, building, health)) = structures.get(structure.entity)
         && let Some(job) = job_for(
-            *diplomacy,
+            &diplomacy,
             team,
             Some(structure.team),
             building.kind,

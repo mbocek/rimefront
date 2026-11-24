@@ -42,6 +42,7 @@ The code is a Cargo workspace of three crates:
 | `transport` | Troop Carriers: boarding, carrying, unloading and escaping |
 | `engineers` | engineers capturing enemy structures and repairing own ones |
 | `fog` | fog of war: what each side knows of the map, with the chunks it last changed in |
+| `sides` | the sides in a battle, letting one more in, and the per-side storage everything keeps |
 | `intel` | what each side knows: the Syndicate's shared view and the enemy structures each side has spotted |
 | `outcome`, `match_stats` | mission objectives, victory and defeat; the tally shown at the end of a match |
 | `notifications` | status messages for the player, written by the simulation and shown by the sidebar |

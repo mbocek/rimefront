@@ -193,8 +193,16 @@ for ordinary network matches.
     planted along the new edge; the fog texture, the ground material and the camera follow the bounds by
     themselves. `IRON_TIDE_CAPTURE_CLAIM_SITES=6` gives out sites two seconds into a capture run, to look
     at it.
-11. **Sides as data.** Replace the four fixed teams with a side id: name, colour, allies; the interface,
-    intel, fog and AI keep one entry per side present.
+11. **Sides as data.** Done. A `Team` is a side number; the four a level names keep their names
+    (`Team::Player` and the rest), and their look (name, colour, model tint) comes from a table that repeats
+    past eight sides, the models having four tints. Saved text still names the four sides as before and
+    numbers the others (`"Side4"`). The sides in a battle are the `Sides` resource; `sim::sides::admit_side`
+    lets one more in, with fog and intel of its own, in a camp of its own: `Diplomacy` gives every side a
+    camp, an alliance setting only fills in the four level sides, and `join_camp_of` makes allies.
+    Economies, production, research, support power charge, match statistics and cadences keep a value for
+    every side that needed one (`PerSide`), so a newcomer starts from the blank values (starting credits,
+    uncharged powers); targets keep who sees them as a set of up to 256 sides. Simulation results are
+    unchanged. Still four only: the seats of a network session and what a save stores per side.
 
 ### C. A world on a server
 

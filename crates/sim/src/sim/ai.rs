@@ -1262,10 +1262,10 @@ pub fn defend_harvesters(
         }
     }
     for (team, spot) in attacked {
-        if cooldowns[team.index()] > 0.0 {
+        if *cooldowns.of(team) > 0.0 {
             continue;
         }
-        cooldowns[team.index()] = HARVESTER_RESCUE_COOLDOWN_SECS;
+        *cooldowns.of_mut(team) = HARVESTER_RESCUE_COOLDOWN_SECS;
         let Some(ai) = commanders.0.iter().find(|ai| ai.team == team) else {
             continue;
         };

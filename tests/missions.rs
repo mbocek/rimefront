@@ -102,17 +102,20 @@ fn alliances_decide_who_fights_whom() {
     assert!(against_syndicate.hostile(Team::Crimson, Team::Player));
     assert!(against_syndicate.hostile(Team::Player, Team::Violet));
     assert!(!against_syndicate.hostile(Team::Crimson, Team::Amber));
-    let pairs = Diplomacy {
-        alliance: Alliance::TwoAgainstTwo,
-    };
+    let pairs = Diplomacy::of(Alliance::TwoAgainstTwo);
     assert!(!pairs.hostile(Team::Player, Team::Amber));
     assert!(!pairs.hostile(Team::Crimson, Team::Violet));
     assert!(pairs.hostile(Team::Amber, Team::Violet));
-    let everyone = Diplomacy {
-        alliance: Alliance::FreeForAll,
-    };
+    let everyone = Diplomacy::of(Alliance::FreeForAll);
     assert!(everyone.hostile(Team::Crimson, Team::Amber));
     assert!(!everyone.hostile(Team::Violet, Team::Violet));
+    let mut joined = Diplomacy::default();
+    let newcomer = Team::from_index(6);
+    assert!(joined.hostile(newcomer, Team::Player) && joined.hostile(newcomer, Team::Crimson));
+    joined.join_camp_of(newcomer, Team::Player);
+    assert!(!joined.hostile(newcomer, Team::Player));
+    assert!(joined.hostile(newcomer, Team::Crimson));
+    assert!(joined.hostile(newcomer, Team::from_index(5)));
 }
 
 #[test]

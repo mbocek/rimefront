@@ -15,6 +15,7 @@ use crate::sim::movement::{FLIGHT_ALTITUDE, order_move};
 use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::research::Upgrade;
+use crate::sim::sides::{PerSide, Sides};
 use crate::sim::spawn::{exit_cell, spawn_building, spawn_unit};
 use crate::world::map::{GameMap, cell_center, footprint_cells, footprint_center, world_to_cell};
 
@@ -147,7 +148,7 @@ impl EnqueueRefusal {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ProductionLane {
     pub queue: VecDeque<BuildItem>,
     pub progress_secs: f32,
@@ -167,54 +168,47 @@ impl ProductionLane {
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct Production {
-    lanes: [[ProductionLane; 4]; 4],
+    lanes: PerSide<[ProductionLane; Lane::ALL.len()]>,
     /// Per team, the items the current mission does not allow.
-    forbidden: [Vec<BuildItem>; 4],
-    researched: [Vec<Upgrade>; 4],
-    factions: [Faction; 4],
-}
-
-impl Default for Production {
-    fn default() -> Self {
-        Self {
-            lanes: Default::default(),
-            forbidden: Default::default(),
-            researched: Default::default(),
-            factions: Team::ALL.map(|team| Faction::of(team, Faction::default())),
-        }
-    }
+    forbidden: PerSide<Vec<BuildItem>>,
+    researched: PerSide<Vec<Upgrade>>,
+    player_faction: Faction,
 }
 
 impl Production {
     pub fn forbid(&mut self, team: Team, items: Vec<BuildItem>) {
-        self.forbidden[team.index()] = items;
+        *self.forbidden.of_mut(team) = items;
+    }
+
+    pub fn forbid_to_every_side(&mut self, items: Vec<BuildItem>) {
+        self.forbidden.set_all(items);
     }
 
     pub fn allows(&self, team: Team, item: BuildItem) -> bool {
-        item.available_to(self.faction_of(team)) && !self.forbidden[team.index()].contains(&item)
+        item.available_to(self.faction_of(team)) && !self.forbidden.of(team).contains(&item)
     }
 
     pub fn faction_of(&self, team: Team) -> Faction {
-        self.factions[team.index()]
+        Faction::of(team, self.player_faction)
     }
 
     pub fn set_player_faction(&mut self, player_faction: Faction) {
-        self.factions = Team::ALL.map(|team| Faction::of(team, player_faction));
+        self.player_faction = player_faction;
     }
 
     pub fn has_researched(&self, team: Team, upgrade: Upgrade) -> bool {
-        self.researched[team.index()].contains(&upgrade)
+        self.researched.of(team).contains(&upgrade)
     }
 
     pub fn researched(&self, team: Team) -> &[Upgrade] {
-        &self.researched[team.index()]
+        self.researched.of(team)
     }
 
     pub fn complete_research(&mut self, team: Team, upgrade: Upgrade) {
         if !self.has_researched(team, upgrade) {
-            self.researched[team.index()].push(upgrade);
+            self.researched.of_mut(team).push(upgrade);
         }
     }
 
@@ -226,11 +220,11 @@ impl Production {
     }
 
     pub fn lane(&self, team: Team, lane: Lane) -> &ProductionLane {
-        &self.lanes[team.index()][lane.index()]
+        &self.lanes.of(team)[lane.index()]
     }
 
     pub fn lane_mut(&mut self, team: Team, lane: Lane) -> &mut ProductionLane {
-        &mut self.lanes[team.index()][lane.index()]
+        &mut self.lanes.of_mut(team)[lane.index()]
     }
 
     pub fn enqueue(
@@ -326,8 +320,9 @@ pub fn advance_production(
     mut production: ResMut<Production>,
     mut notifications: ResMut<Notifications>,
     buildings: Query<(&Building, &Team, Option<&RallyPoint>)>,
+    sides: Res<Sides>,
 ) {
-    for team in Team::ALL {
+    for team in sides.iter() {
         let rate = economies.of(team).production_rate();
         for lane_kind in Lane::ALL {
             let lane = production.lane_mut(team, lane_kind);

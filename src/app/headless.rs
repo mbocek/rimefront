@@ -38,7 +38,7 @@ pub const STEP: Duration = crate::SIMULATION_TICK;
 /// Who hurt whom since the battle started, collected from `DamageDealt` and `Destroyed` messages.
 #[derive(Resource, Default)]
 pub struct DamageLedger {
-    pub taken: [f32; 4],
+    pub taken: HashMap<Team, f32>,
     /// Damage dealt, keyed by the attacking side and what fired.
     pub dealt: HashMap<(Team, DamageSource), f32>,
     /// Units and structures destroyed, keyed by their side.
@@ -59,7 +59,7 @@ fn record_sounds(mut cues: MessageReader<SoundCue>, mut ledger: ResMut<SoundLedg
 
 fn record_damage(mut hits: MessageReader<DamageDealt>, mut ledger: ResMut<DamageLedger>) {
     for hit in hits.read() {
-        ledger.taken[hit.team.index()] += hit.amount;
+        *ledger.taken.entry(hit.team).or_default() += hit.amount;
         *ledger.dealt.entry((hit.attacker, hit.source)).or_default() += hit.amount;
     }
 }
@@ -300,7 +300,12 @@ impl Battle {
     }
 
     pub fn damage_taken(&mut self, team: Team) -> f32 {
-        self.world().resource::<DamageLedger>().taken[team.index()]
+        self.world()
+            .resource::<DamageLedger>()
+            .taken
+            .get(&team)
+            .copied()
+            .unwrap_or_default()
     }
 
     pub fn despawn_units(&mut self, team: Team) {
@@ -337,7 +342,7 @@ impl Battle {
 
     pub fn hostile_units(&mut self, team: Team) -> usize {
         let world = self.world();
-        let diplomacy = *world.resource::<Diplomacy>();
+        let diplomacy = world.resource::<Diplomacy>().clone();
         world
             .query::<&Team>()
             .iter(world)

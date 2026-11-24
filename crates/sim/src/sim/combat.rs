@@ -16,6 +16,7 @@ use crate::sim::movement::order_move;
 use crate::sim::neutral_sites::spawn_unclaimed_site;
 use crate::sim::production::Production;
 use crate::sim::research::{incoming_damage_factor, outgoing_damage_factor, reload_factor};
+use crate::sim::sides::SideSet;
 use crate::sim::sim_math;
 use crate::sim::spatial_index::SpatialIndex;
 use crate::sim::transport::Embarked;
@@ -53,13 +54,12 @@ pub struct TargetInfo {
     pub health_fraction: f32,
     /// What it shoots with, so a shooter can tell how dangerous it is; `None` for the unarmed.
     pub weapon: Option<WeaponSpec>,
-    /// Indexed by `Team::index`: whether that team can currently see it.
-    seen_by_team: [bool; 4],
+    seen_by: SideSet,
 }
 
 impl TargetInfo {
     pub fn seen_by(&self, viewer: Team) -> bool {
-        self.seen_by_team[viewer.index()]
+        self.seen_by.contains(viewer)
     }
 }
 
@@ -224,7 +224,7 @@ pub fn snapshot_targets(
 ) {
     targets.list.clear();
     targets.by_entity.clear();
-    targets.diplomacy = *diplomacy;
+    targets.diplomacy.clone_from(&diplomacy);
     for (_, entity, &team, transform, radius, armor, is_building, camouflage, health, weapon) in
         in_simulation_order(damageable, |target| *target.0)
     {
@@ -240,10 +240,13 @@ pub fn snapshot_targets(
             is_building,
             health_fraction: health.fraction(),
             weapon: weapon.map(|weapon| weapon.spec),
-            seen_by_team: Team::ALL.map(|viewer| {
-                !diplomacy.hostile(team, viewer)
-                    || (!concealed && intel.vision(viewer).is_visible(transform.translation))
-            }),
+            seen_by: intel
+                .viewers()
+                .filter(|&viewer| {
+                    !diplomacy.hostile(team, viewer)
+                        || (!concealed && intel.vision(viewer).is_visible(transform.translation))
+                })
+                .collect(),
         });
     }
     let Targets { list, nearby, .. } = &mut *targets;

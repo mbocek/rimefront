@@ -6,6 +6,7 @@ use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
 use crate::sim::player_commands::LocalTeam;
+use crate::sim::sides::PerSide;
 use crate::sim::spawn::exit_cell;
 use crate::world::map::{
     CrystalVisual, GameMap, cell_center, cells_by_distance, crystal_scale, map_bounds,
@@ -48,7 +49,7 @@ impl TeamEconomy {
 }
 
 #[derive(Resource)]
-pub struct Economies([TeamEconomy; 4]);
+pub struct Economies(PerSide<TeamEconomy>);
 
 impl Default for Economies {
     fn default() -> Self {
@@ -57,23 +58,22 @@ impl Default for Economies {
             income_rate: 1.0,
             ..default()
         };
-        Self([start; 4])
+        Self(PerSide::new(start))
     }
 }
 
 impl Economies {
     pub fn of(&self, team: Team) -> &TeamEconomy {
-        &self.0[team.index()]
+        self.0.of(team)
     }
 
     pub fn of_mut(&mut self, team: Team) -> &mut TeamEconomy {
-        &mut self.0[team.index()]
+        self.0.of_mut(team)
     }
 }
 
 pub fn tally_power(mut economies: ResMut<Economies>, buildings: Query<(&Building, &Team)>) {
-    for team in Team::ALL {
-        let economy = economies.of_mut(team);
+    for economy in economies.0.iter_mut() {
         economy.power_supply = 0;
         economy.power_demand = 0;
     }

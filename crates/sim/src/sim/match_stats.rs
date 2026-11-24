@@ -6,6 +6,7 @@ use crate::match_flow::MatchClock;
 use crate::sim::catalog::Team;
 use crate::sim::combat::{DamageDealt, DamageSource, Destroyed};
 use crate::sim::components::{Building, Unit};
+use crate::sim::sides::PerSide;
 
 /// Anything that appears within this long of the start is the starting force, not something built.
 const STARTING_FORCE_SECS: f32 = 0.5;
@@ -36,18 +37,18 @@ impl TeamTally {
 /// How the match went for every team, for the screen at its end.
 #[derive(Resource, Default, Debug)]
 pub struct MatchStats {
-    teams: [TeamTally; 4],
+    teams: PerSide<TeamTally>,
     /// Which team hit each victim last, so its destruction is credited.
     last_attacker: HashMap<Entity, Team>,
 }
 
 impl MatchStats {
     pub fn of(&self, team: Team) -> &TeamTally {
-        &self.teams[team.index()]
+        self.teams.of(team)
     }
 
     fn of_mut(&mut self, team: Team) -> &mut TeamTally {
-        &mut self.teams[team.index()]
+        self.teams.of_mut(team)
     }
 }
 

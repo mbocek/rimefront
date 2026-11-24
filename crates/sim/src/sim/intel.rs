@@ -16,18 +16,37 @@ const UPDATE_INTERVAL_SECS: f32 = 0.2;
 /// enemy structures stay known once spotted.
 #[derive(Resource, Clone)]
 pub struct Intel {
-    /// Indexed by `Team::index`.
-    visions: [FogOfWar; Team::ALL.len()],
+    /// Indexed by `Team::index`, one for every side admitted.
+    visions: Vec<FogOfWar>,
     /// Keyed by simulation id, so every machine visits them in the same order.
-    known_structures: [BTreeMap<SimId, (Entity, Vec3)>; 4],
+    known_structures: Vec<BTreeMap<SimId, (Entity, Vec3)>>,
+    fog_of_war: bool,
 }
 
 impl Intel {
+    /// Intel for the sides a level names.
     pub fn new(fog_of_war: bool) -> Self {
-        Self {
-            visions: std::array::from_fn(|_| FogOfWar::new(fog_of_war)),
-            known_structures: Default::default(),
+        let mut intel = Self {
+            visions: Vec::new(),
+            known_structures: Vec::new(),
+            fog_of_war,
+        };
+        for team in Team::ALL {
+            intel.admit(team);
         }
+        intel
+    }
+
+    /// Starts keeping intel for `team` and every side numbered before it, knowing nothing yet.
+    pub fn admit(&mut self, team: Team) {
+        while self.visions.len() <= team.index() {
+            self.visions.push(FogOfWar::new(self.fog_of_war));
+            self.known_structures.push(BTreeMap::new());
+        }
+    }
+
+    pub fn viewers(&self) -> impl Iterator<Item = Team> + use<> {
+        (0..self.visions.len()).map(Team::from_index)
     }
 
     pub fn vision(&self, viewer: Team) -> &FogOfWar {
@@ -110,7 +129,7 @@ pub fn update_intel(
         return;
     }
     let weather_sight = forecast.sight_factor(clock.elapsed_secs);
-    for viewer in Team::ALL {
+    for viewer in intel.viewers() {
         let allied_eyes = viewers
             .iter()
             .filter(|(team, ..)| !diplomacy.hostile(**team, viewer))
@@ -133,7 +152,7 @@ pub fn update_intel(
             continue;
         }
         let position = transform.translation;
-        for viewer in Team::ALL {
+        for viewer in intel.viewers() {
             let spotted =
                 diplomacy.hostile(team, viewer) && intel.vision(viewer).is_visible(position);
             if spotted {

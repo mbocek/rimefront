@@ -21,6 +21,7 @@ pub mod player_commands;
 pub mod production;
 pub mod research;
 pub mod servicing;
+pub mod sides;
 pub mod sim_math;
 pub mod sorties;
 pub mod spatial_index;

@@ -451,7 +451,7 @@ impl Battlefield<'_, '_> {
         let Ok((building, owner, health)) = self.structures.get(target) else {
             return;
         };
-        let Some(job) = job_for(*self.diplomacy, team, owner.copied(), building.kind, health)
+        let Some(job) = job_for(&self.diplomacy, team, owner.copied(), building.kind, health)
         else {
             return;
         };

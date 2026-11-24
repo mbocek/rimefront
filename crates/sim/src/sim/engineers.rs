@@ -43,7 +43,7 @@ impl EngineerTask {
 /// What an engineer of `team` would do to a structure: capture an enemy or unclaimed one (`owner` `None`),
 /// fully repair a damaged own one.
 pub fn job_for(
-    diplomacy: Diplomacy,
+    diplomacy: &Diplomacy,
     team: Team,
     owner: Option<Team>,
     kind: BuildingKind,
@@ -97,7 +97,7 @@ pub fn carry_out_engineer_tasks(
             continue;
         };
         let owner = owner.copied();
-        if job_for(*diplomacy, team, owner, building.kind, &health) != Some(task.job) {
+        if job_for(&diplomacy, team, owner, building.kind, &health) != Some(task.job) {
             commands.entity(engineer).remove::<EngineerTask>();
             continue;
         }
@@ -168,7 +168,7 @@ mod tests {
         let site = BuildingKind::SupplyDepot;
         let intact = Health::full(100.0);
         assert_eq!(
-            job_for(Diplomacy::default(), Team::Crimson, None, site, &intact),
+            job_for(&Diplomacy::default(), Team::Crimson, None, site, &intact),
             Some(EngineerJob::Capture)
         );
     }
@@ -183,20 +183,20 @@ mod tests {
         let allied = Diplomacy::default();
         let plant = BuildingKind::PowerPlant;
         assert_eq!(
-            job_for(allied, Team::Player, Some(Team::Crimson), plant, &intact),
+            job_for(&allied, Team::Player, Some(Team::Crimson), plant, &intact),
             Some(EngineerJob::Capture)
         );
         assert_eq!(
-            job_for(allied, Team::Player, Some(Team::Player), plant, &damaged),
+            job_for(&allied, Team::Player, Some(Team::Player), plant, &damaged),
             Some(EngineerJob::Repair)
         );
         assert_eq!(
-            job_for(allied, Team::Player, Some(Team::Player), plant, &intact),
+            job_for(&allied, Team::Player, Some(Team::Player), plant, &intact),
             None
         );
         assert_eq!(
             job_for(
-                allied,
+                &allied,
                 Team::Player,
                 Some(Team::Crimson),
                 BuildingKind::Wall,
@@ -205,15 +205,13 @@ mod tests {
             None
         );
         assert_eq!(
-            job_for(allied, Team::Crimson, Some(Team::Amber), plant, &intact),
+            job_for(&allied, Team::Crimson, Some(Team::Amber), plant, &intact),
             None
         );
-        let free_for_all = Diplomacy {
-            alliance: Alliance::FreeForAll,
-        };
+        let free_for_all = Diplomacy::of(Alliance::FreeForAll);
         assert_eq!(
             job_for(
-                free_for_all,
+                &free_for_all,
                 Team::Crimson,
                 Some(Team::Amber),
                 plant,

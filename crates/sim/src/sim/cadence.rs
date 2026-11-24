@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::sim::catalog::Team;
+use crate::sim::sides::PerSide;
 
 /// Fires the first time it is asked, then once per interval of game time.
 #[derive(Clone, Copy, Default)]
@@ -28,6 +28,5 @@ pub struct SimulationCadences {
     pub engineer_dispatch: Cadence,
     pub minefield_planning: Cadence,
     pub supply_delivery: Cadence,
-    /// Indexed by `Team::index`.
-    pub harvester_rescue_cooldown_secs: [f32; Team::ALL.len()],
+    pub harvester_rescue_cooldown_secs: PerSide<f32>,
 }

@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
 use crate::network::{Arrival, Link, Message};
+use crate::world_view::SentView;
 use iron_tide_sim::SimulationPlugin;
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
 use iron_tide_sim::match_flow::{GameState, deploy_newcomer};
@@ -74,6 +75,7 @@ struct WorldPlayer {
     connection: Box<dyn WorldConnection>,
     /// None until the player has asked to enter.
     team: Option<Team>,
+    sent: SentView,
 }
 
 /// A persistent world: the simulation of a wilds world run without drawing anything, its players' orders
@@ -132,15 +134,34 @@ impl WorldHost {
         self.players.push(WorldPlayer {
             connection,
             team: None,
+            sent: SentView::default(),
         });
     }
 
-    /// Takes in what the players sent, then lets `elapsed` of time pass in the world.
+    /// Takes in what the players sent, lets `elapsed` of time pass in the world, then shows every player
+    /// what changed in their view if a tick went by.
     pub fn step(&mut self, elapsed: Duration) {
         self.receive();
+        let before = self.tick();
         self.app
             .insert_resource(TimeUpdateStrategy::ManualDuration(elapsed));
         self.app.update();
+        if self.tick() != before {
+            self.show_views();
+        }
+    }
+
+    fn show_views(&mut self) {
+        let tick = self.tick();
+        let world = self.app.world_mut();
+        for player in &mut self.players {
+            let Some(team) = player.team else { continue };
+            if let Some(change) = player.sent.next(world, team, tick) {
+                player
+                    .connection
+                    .send(&Message::WorldView(Box::new(change)));
+            }
+        }
     }
 
     fn receive(&mut self) {
@@ -215,11 +236,94 @@ pub fn world_level(map_seed: u64) -> LevelDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::world_view::{Thing, WorldMirror, things_in_view};
     use iron_tide_sim::SIMULATION_TICK;
-    use iron_tide_sim::sim::catalog::UnitKind;
+    use iron_tide_sim::sim::catalog::{BuildingKind, UnitKind};
+    use iron_tide_sim::sim::components::Building;
     use iron_tide_sim::sim::components::Unit;
     use iron_tide_sim::sim::determinism::SimId;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
+    use iron_tide_sim::world::map::map_bounds;
+
+    fn follow(mirror: &mut WorldMirror, player: &mut LocalConnection) -> usize {
+        let mut bytes = 0;
+        for arrival in player.drain() {
+            if let Arrival::Message(message @ Message::WorldView(_)) = arrival {
+                bytes += serde_json::to_vec(&message).unwrap().len();
+                let Message::WorldView(change) = message else {
+                    unreachable!()
+                };
+                mirror.apply(*change);
+            }
+        }
+        bytes
+    }
+
+    #[test]
+    fn a_player_mirrors_what_their_side_sees_and_nothing_in_the_fog() {
+        let mut host = WorldHost::new(29);
+        let (mut player, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        player.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+        });
+        let team = Team::Player;
+        let mut mirror = WorldMirror::default();
+        let mut bytes = 0;
+        let minute_of_ticks = 60 * 20;
+        for _ in 0..minute_of_ticks {
+            host.step(SIMULATION_TICK);
+            bytes += follow(&mut mirror, &mut player);
+        }
+        let tick = host.tick();
+        let seen = things_in_view(host.world(), team);
+        assert!(mirror.tick <= tick);
+        assert_eq!(mirror.things, seen);
+        assert_eq!(mirror.bounds, Some(map_bounds()));
+        assert!(mirror.things.values().any(|thing| thing.team == team));
+        let world = host.world();
+        let enemy_base = world
+            .query::<(&SimId, &Team, &Building)>()
+            .iter(world)
+            .find(|(_, team, building)| {
+                **team == Team::Crimson && building.kind == BuildingKind::CommandCenter
+            })
+            .map(|(id, ..)| *id)
+            .expect("the world has a computer side");
+        assert!(
+            !mirror.things.contains_key(&enemy_base),
+            "seen through the fog"
+        );
+        println!("a minute of a world's view: {bytes} bytes of JSON");
+
+        let tank = mirror
+            .things
+            .values()
+            .find(|thing| thing.team == team && thing.thing == Thing::Unit(UnitKind::Tank))
+            .copied()
+            .expect("the player sees their tank");
+        let goal = iron_tide_sim::world::map::world_to_cell(tank.position()) + IVec2::new(0, -12);
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::Ground {
+                units: vec![tank.id],
+                goal,
+                order: GroundOrder::Move,
+                queued: false,
+                refinery: None,
+            }],
+        });
+        let ten_seconds_of_ticks = 10 * 20;
+        let mut moving_bytes = 0;
+        for _ in 0..ten_seconds_of_ticks {
+            host.step(SIMULATION_TICK);
+            moving_bytes += follow(&mut mirror, &mut player);
+        }
+        assert_ne!(
+            mirror.things[&tank.id], tank,
+            "the mirrored tank never moved"
+        );
+        println!("ten seconds of a tank driving: {moving_bytes} bytes of JSON");
+    }
 
     fn entered(player: &mut LocalConnection) -> Option<Team> {
         player

@@ -8,6 +8,7 @@ use iron_tide_sim::match_flow::GameState;
 use serde::{Deserialize, Serialize};
 
 use crate::relay::Relay;
+use crate::world_view::ViewChange;
 use iron_tide_sim::i18n::{tr, tr_fmt};
 use iron_tide_sim::levels::LevelDefinition;
 use iron_tide_sim::sim::ai::AiCommanders;
@@ -102,6 +103,8 @@ pub enum Message {
         team: Team,
         tick: u64,
     },
+    /// From a world: what changed in what its player sees.
+    WorldView(Box<ViewChange>),
     /// To a world: what its player ordered; the world decides when it runs.
     Orders {
         commands: Vec<PlayerCommand>,
@@ -450,6 +453,7 @@ impl NetSession {
                 | Message::EnterWorld { .. }
                 | Message::Entered { .. }
                 | Message::Orders { .. }
+                | Message::WorldView(_)
                 | Message::Offer { .. }
                 | Message::Ready
                 | Message::Go

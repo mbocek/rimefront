@@ -226,6 +226,16 @@ for ordinary network matches.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.
+    Done in the protocol (`iron_tide_net::world_view`): after every tick a world sends each player a
+    `WorldView` of what changed in what their side sees, nothing when nothing did: the units and structures
+    in the chunks within sight of their side's and allies' units and structures (`chunks_in_sight`) that the
+    fog does not hide from them, each with its kind, side, position (hundredths of a cell), facing, health
+    and a structure's origin; those gone from view; their credits; and the world's bounds when they widened.
+    A player's `WorldMirror` applies them, and a test checks that after a minute it holds exactly what the
+    world shows that side, the computer side's Command Center not among it. Measured in that test, as JSON:
+    a minute of a quiet start costs 6 kB, and a tank driving costs 41 kB in 10 s, about 4 kB/s for every
+    moving unit, so a compact binary format (step 15) is due before crowds. The game drawing a mirror is
+    still to do.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.

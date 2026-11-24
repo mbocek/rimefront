@@ -51,7 +51,7 @@ impl MapSize {
 }
 
 /// The cells of the map being played: `size` cells along each axis, starting at `min`.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct MapBounds {
     pub min: IVec2,
     pub size: IVec2,

@@ -79,6 +79,7 @@ The code is a Cargo workspace of three crates:
 | `link` | one WebSocket connection, plain or over TLS, its threads, and the join address |
 | `relay` | the hub of a network battle: passing messages on, the order history, late guests and rejoining players ([server.md](server.md)) |
 | `server` | the dedicated server's rooms: gathering players around an owner's battle, then one relay per room |
+| `world_view` | what a player of a world is shown: the things in sight, sent as changes, and the player's mirror of them |
 | `world_host` | a persistent world run without drawing: players entering it and their orders, over the network or a channel |
 | `lobby` | hosting and joining a network battle from the main menu |
 

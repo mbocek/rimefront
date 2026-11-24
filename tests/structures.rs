@@ -2,12 +2,12 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::components::Health;
-use iron_tide::levels::LevelDefinition;
-use iron_tide::map::{GameMap, footprint_cells};
-use iron_tide::savegame::SaveRequests;
-use iron_tide::structures::{Repairing, StructureOrderKind};
+use iron_tide::app::savegame::SaveRequests;
+use iron_tide::missions::levels::LevelDefinition;
+use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
+use iron_tide::sim::components::Health;
+use iron_tide::sim::structures::{Repairing, StructureOrderKind};
+use iron_tide::world::map::{GameMap, footprint_cells};
 
 const FACTORY_SITE: IVec2 = IVec2::new(20, 44);
 

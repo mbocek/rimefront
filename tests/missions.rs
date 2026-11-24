@@ -2,17 +2,17 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{Alliance, BuildingKind, Diplomacy, Team, UnitKind};
-use iron_tide::components::*;
-use iron_tide::engineers::{EngineerJob, EngineerTask};
-use iron_tide::levels::{
+use iron_tide::app::savegame::SaveRequests;
+use iron_tide::missions::levels::{
     BaseSite, Difficulty, LevelDefinition, Objective, SkirmishOptions, campaign,
 };
-use iron_tide::map::GameMap;
-use iron_tide::outcome::GameOutcome;
-use iron_tide::production::BuildItem;
-use iron_tide::savegame::SaveRequests;
-use iron_tide::season::Season;
+use iron_tide::sim::catalog::{Alliance, BuildingKind, Diplomacy, Team, UnitKind};
+use iron_tide::sim::components::*;
+use iron_tide::sim::engineers::{EngineerJob, EngineerTask};
+use iron_tide::sim::outcome::GameOutcome;
+use iron_tide::sim::production::BuildItem;
+use iron_tide::world::map::GameMap;
+use iron_tide::world::season::Season;
 
 const OPEN_FIELD: IVec2 = IVec2::new(30, 45);
 
@@ -179,7 +179,7 @@ fn a_full_treasury_wins_an_economy_mission() {
 #[test]
 fn missions_can_withhold_units() {
     let mut battle = Battle::on_level(LevelDefinition {
-        player: iron_tide::levels::ForceSetup {
+        player: iron_tide::missions::levels::ForceSetup {
             site: BaseSite::SouthWest,
             credits: 50_000,
             buildings: vec![
@@ -255,7 +255,7 @@ fn a_saved_mission_reloads_with_its_level() {
     assert_eq!(
         battle
             .world()
-            .resource::<iron_tide::levels::ActiveLevel>()
+            .resource::<iron_tide::missions::levels::ActiveLevel>()
             .0,
         level
     );

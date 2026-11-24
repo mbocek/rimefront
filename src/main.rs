@@ -3,8 +3,8 @@
 use bevy::prelude::*;
 use bevy::render::RenderPlugin;
 use bevy::render::settings::{RenderCreation, WgpuFeatures, WgpuSettings};
-use iron_tide::determinism::run_schedules_on_one_thread;
-use iron_tide::{GamePlugin, capture};
+use iron_tide::sim::determinism::run_schedules_on_one_thread;
+use iron_tide::{GamePlugin, app::capture};
 
 fn game_window() -> Window {
     let window = Window {

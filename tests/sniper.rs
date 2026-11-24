@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{Team, UnitKind};
-use iron_tide::components::Health;
-use iron_tide::map::CELL_SIZE;
+use iron_tide::sim::catalog::{Team, UnitKind};
+use iron_tide::sim::components::Health;
+use iron_tide::world::map::CELL_SIZE;
 
 const FIELD: IVec2 = IVec2::new(20, 45);
 

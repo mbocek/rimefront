@@ -7,13 +7,13 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{Team, UnitKind};
-use iron_tide::determinism::simulation_checksum;
-use iron_tide::levels::{ActiveLevel, LevelDefinition};
-use iron_tide::lobby::{BattleStart, NetLobby};
-use iron_tide::network::SessionState;
-use iron_tide::player_commands::{GroundOrder, PlayerCommand};
-use iron_tide::server::Server;
+use iron_tide::missions::levels::{ActiveLevel, LevelDefinition};
+use iron_tide::net::lobby::{BattleStart, NetLobby};
+use iron_tide::net::network::SessionState;
+use iron_tide::net::server::Server;
+use iron_tide::sim::catalog::{Team, UnitKind};
+use iron_tide::sim::determinism::simulation_checksum;
+use iron_tide::sim::player_commands::{GroundOrder, PlayerCommand};
 
 const STEP_SECS: f32 = 0.05;
 

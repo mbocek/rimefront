@@ -5,16 +5,16 @@ use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::Alliance;
-use iron_tide::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::determinism::simulation_checksum;
-use iron_tide::economy::Economies;
-use iron_tide::levels::{BaseSite, EnemySetup, ForceSetup, LevelDefinition};
-use iron_tide::lobby::NetLobby;
-use iron_tide::network::{Link, NetSession, SessionState, Side};
-use iron_tide::player_commands::{GroundOrder, PlayerCommand};
-use iron_tide::production::BuildItem;
-use iron_tide::season::Season;
+use iron_tide::missions::levels::{BaseSite, EnemySetup, ForceSetup, LevelDefinition};
+use iron_tide::net::lobby::NetLobby;
+use iron_tide::net::network::{Link, NetSession, SessionState, Side};
+use iron_tide::sim::catalog::Alliance;
+use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
+use iron_tide::sim::determinism::simulation_checksum;
+use iron_tide::sim::economy::Economies;
+use iron_tide::sim::player_commands::{GroundOrder, PlayerCommand};
+use iron_tide::sim::production::BuildItem;
+use iron_tide::world::season::Season;
 
 const TICKS_TO_PLAY: u64 = 1200;
 const LIMIT_SECS: f32 = 0.05;
@@ -148,9 +148,9 @@ fn a_lost_connection_stops_the_battle() {
 
 #[test]
 fn each_player_wins_or_loses_from_their_own_side() {
-    use iron_tide::components::Building;
-    use iron_tide::outcome::GameOutcome;
-    use iron_tide::player_commands::LocalTeam;
+    use iron_tide::sim::components::Building;
+    use iron_tide::sim::outcome::GameOutcome;
+    use iron_tide::sim::player_commands::LocalTeam;
     let mut guest = Battle::standard();
     guest.world().insert_resource(LocalTeam(Team::Crimson));
     guest.despawn_units(Team::Player);
@@ -577,7 +577,7 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
     let mut host = Battle::standard();
     let level = host
         .world()
-        .resource::<iron_tide::levels::ActiveLevel>()
+        .resource::<iron_tide::missions::levels::ActiveLevel>()
         .0
         .clone();
     host.join_session(
@@ -656,7 +656,7 @@ fn a_player_whose_connection_drops_rejoins_and_the_battle_goes_on() {
     let mut host = Battle::standard();
     let level = host
         .world()
-        .resource::<iron_tide::levels::ActiveLevel>()
+        .resource::<iron_tide::missions::levels::ActiveLevel>()
         .0
         .clone();
     host.join_session(

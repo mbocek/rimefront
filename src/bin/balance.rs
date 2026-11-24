@@ -6,14 +6,14 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use bevy::prelude::*;
-use iron_tide::catalog::{Team, UnitKind};
-use iron_tide::combat::DamageSource;
-use iron_tide::components::{Health, Order, Orders};
-use iron_tide::economy::Economies;
-use iron_tide::headless::{Battle, BattleSetup};
-use iron_tide::levels::{BaseSite, Difficulty, LevelDefinition, Personality};
-use iron_tide::map::GameMap;
-use iron_tide::outcome::GameOutcome;
+use iron_tide::app::headless::{Battle, BattleSetup};
+use iron_tide::missions::levels::{BaseSite, Difficulty, LevelDefinition, Personality};
+use iron_tide::sim::catalog::{Team, UnitKind};
+use iron_tide::sim::combat::DamageSource;
+use iron_tide::sim::components::{Health, Order, Orders};
+use iron_tide::sim::economy::Economies;
+use iron_tide::sim::outcome::GameOutcome;
+use iron_tide::world::map::GameMap;
 
 const COMBAT_UNITS: [UnitKind; 16] = [
     UnitKind::Rifleman,
@@ -50,7 +50,7 @@ fn fogless(level: LevelDefinition) -> LevelDefinition {
 fn army_value(battle: &mut Battle, team: Team) -> f32 {
     let world = battle.world();
     world
-        .query::<(&iron_tide::components::Unit, &Team, &Health)>()
+        .query::<(&iron_tide::sim::components::Unit, &Team, &Health)>()
         .iter(world)
         .filter(|(_, owner, _)| **owner == team)
         .map(|(unit, _, health)| health.fraction() * unit.0.spec().cost as f32)

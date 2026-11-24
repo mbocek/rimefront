@@ -20,7 +20,7 @@ with a host in the game.
 ## How it works
 
 The simulation is deterministic lockstep ([determinism.md](determinism.md)): every machine runs the whole battle
-and they exchange only orders, so a hub only handles messages. `Relay` (`src/relay.rs`) is that hub, used both by
+and they exchange only orders, so a hub only handles messages. `Relay` (`src/net/relay.rs`) is that hub, used both by
 a host in the game and by the server:
 
 - passing each machine's turns, checksums and chat on to every other machine, and answering pings;
@@ -30,7 +30,7 @@ a host in the game and by the server:
   anyone else a place to watch; on accepting they get the whole history and catch up at 40x speed;
 - holding the battle up to three minutes for a dropped player.
 
-The server (`src/server.rs`) adds rooms. A room is named by the path of the WebSocket request
+The server (`src/net/server.rs`) adds rooms. A room is named by the path of the WebSocket request
 (`Link::requested_path`). Before its battle a room gathers: whoever sends it a battle (`OpenRoom`) owns it,
 whatever order the handshakes finish in; guests waiting for it are then offered seats, the owner hears how many
 are seated and ready (`RoomStatus`), and its `Start` begins the battle once all are. The owner plays

@@ -2,12 +2,12 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::components::{Building, Health, Order, Orders, RallyPoint};
-use iron_tide::levels::LevelDefinition;
-use iron_tide::map::cell_center;
-use iron_tide::production::BuildItem;
-use iron_tide::savegame::SaveRequests;
+use iron_tide::app::savegame::SaveRequests;
+use iron_tide::missions::levels::LevelDefinition;
+use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
+use iron_tide::sim::components::{Building, Health, Order, Orders, RallyPoint};
+use iron_tide::sim::production::BuildItem;
+use iron_tide::world::map::cell_center;
 
 const START: IVec2 = IVec2::new(20, 45);
 const DESTINATION: IVec2 = IVec2::new(40, 45);

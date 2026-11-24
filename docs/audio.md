@@ -37,7 +37,7 @@ or a harvester under attack and a structure lost. The recordings are made by esp
 overdrive, hiss and squelch. One report plays at a time, after its chime, and routine news is not repeated
 for a few seconds.
 
-Units answer over the same radio when the player selects them or gives them a move or attack order (`src/unit_voices.rs`):
+Units answer over the same radio when the player selects them or gives them a move or attack order (`src/audio/unit_voices.rs`):
 infantry, vehicle crews and pilots each have their own voice and two lines per reply in every language. A
 mixed group answers in the voice of most of it; replies do not overlap and stay at least 0.9 s apart, so
 clicking through orders does not turn into chatter.

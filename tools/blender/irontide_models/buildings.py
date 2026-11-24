@@ -750,7 +750,7 @@ def _build_defense_turret_head(pivot):
 
 
 # A wall is a post on every cell, joined to each neighbouring wall cell by a run (`wall_link`) reaching from the
-# post to the cell edge, where it meets the neighbour's run: the game adds the runs (src/wall_joints.rs).
+# post to the cell edge, where it meets the neighbour's run: the game adds the runs (src/view/wall_joints.rs).
 WALL_CELL_HALF = 1.0
 WALL_POST_HEIGHT = 1.6
 WALL_RUN_HEIGHT = 1.35

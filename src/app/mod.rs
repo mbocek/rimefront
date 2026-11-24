@@ -1,0 +1,12 @@
+pub mod capture;
+pub mod capture_pointer;
+pub mod frame_pacing;
+pub mod game_plugins;
+pub mod headless;
+pub mod i18n;
+pub mod match_flow;
+pub mod replay;
+pub mod savegame;
+pub mod self_update;
+pub mod settings;
+pub mod updates;

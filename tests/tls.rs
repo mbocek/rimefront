@@ -2,8 +2,8 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use iron_tide::catalog::Team;
-use iron_tide::network::{Dialling, Link, LobbyNews};
+use iron_tide::net::network::{Dialling, Link, LobbyNews};
+use iron_tide::sim::catalog::Team;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 

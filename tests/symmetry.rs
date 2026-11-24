@@ -2,10 +2,10 @@ mod common;
 
 use bevy::prelude::*;
 use common::*;
-use iron_tide::catalog::Team;
-use iron_tide::components::{Building, Unit};
-use iron_tide::levels::{BaseSite, Difficulty, LevelDefinition};
-use iron_tide::map::{GameMap, map_bounds, mirror_centre, opposite_cell, opposite_origin};
+use iron_tide::missions::levels::{BaseSite, Difficulty, LevelDefinition};
+use iron_tide::sim::catalog::Team;
+use iron_tide::sim::components::{Building, Unit};
+use iron_tide::world::map::{GameMap, map_bounds, mirror_centre, opposite_cell, opposite_origin};
 
 /// Long enough for both commanders to build and move, short enough that their dice have not yet differed.
 const SAME_DICE_SECS: f32 = 15.0;

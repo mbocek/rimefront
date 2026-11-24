@@ -175,6 +175,19 @@ for ordinary network matches.
 
 12. **The world runs on the server.** `iron-tide-server` gains a world mode that runs `SimulationPlugin`
     headless (as the tests already do) and takes player commands from the network instead of relaying them.
+    First the simulation (`src/sim`, `src/world`) becomes a crate of its own, so the server links only it (it
+    links the whole game today) and the compiler keeps drawing out of it. What it still reaches into, each
+    to be turned into an event the view or sound answers:
+    - `sim::catalog` names each weapon's sound (`audio::sound`);
+    - `sim::combat`, `sim::spawn` and `sim::economy` attach models, corpses and effects as they spawn things
+      (`view::assets`, `view::animation`, `view::effects`, `view::interpolation`);
+    - `world::map` spawns the ground and water and knows the fog texture (`view::terrain_chunks`,
+      `view::terrain_material`, `view::fog_view`, `view::crystal_models`); `world::weather` and
+      `world::scenery` reach into materials and graphics settings;
+    - `sim::abilities` draws mines (`view::local_view`);
+    - `SimulationPlugin` schedules systems of `app::match_flow` (which reaches into `ui::control_groups` and
+      `ui::placement`), `app::savegame`, `net::network` and `ui::notifications`: the match states and
+      messages belong with the simulation, saving and the network session around it.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

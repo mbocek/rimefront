@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::levels::LevelDefinition;
-use iron_tide::map::{GameMap, is_water, player_base_cell};
-use iron_tide::map_edits::{Brush, MapEdit};
+use iron_tide::missions::levels::LevelDefinition;
+use iron_tide::world::map::{GameMap, is_water, player_base_cell};
+use iron_tide::world::map_edits::{Brush, MapEdit};
 
 fn open_cells(count: usize) -> Vec<IVec2> {
     let level = LevelDefinition::default();

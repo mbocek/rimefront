@@ -2,10 +2,10 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team};
-use iron_tide::components::Building;
-use iron_tide::levels::{EnemySetup, LevelDefinition, Personality};
-use iron_tide::random_battle::{RandomBattleOptions, generate};
+use iron_tide::missions::levels::{EnemySetup, LevelDefinition, Personality};
+use iron_tide::missions::random_battle::{RandomBattleOptions, generate};
+use iron_tide::sim::catalog::{BuildingKind, Team};
+use iron_tide::sim::components::Building;
 
 fn against(personality: Personality) -> Battle {
     Battle::on_level(LevelDefinition {

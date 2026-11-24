@@ -55,7 +55,7 @@
   levels, overwriting the custom level it was opened from. The LEVEL page sets the name, the briefing (click the
   field and type, Enter ends), the objective, and which corner each side starts in, with one to three computer
   opponents and their difficulty. Bases stay in the four corners, where the ground is levelled for them. The
-  EVENTS page scripts the level one event at a time (`src/event_editing.rs`): when (after minutes, or a side down
+  EVENTS page scripts the level one event at a time (`src/missions/event_editing.rs`): when (after minutes, or a side down
   to so many structures or units), an optional message typed like the briefing, and then reinforcements (an
   infantry squad, armour platoon or air wing of that side's faction, from a chosen corner) or credits; up to
   eight events, empty messages are dropped on saving. PLAY IT starts a battle on the level as it stands.

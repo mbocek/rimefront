@@ -4,9 +4,9 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team};
-use iron_tide::components::*;
-use iron_tide::levels::{BaseSite, Difficulty, LevelDefinition};
+use iron_tide::missions::levels::{BaseSite, Difficulty, LevelDefinition};
+use iron_tide::sim::catalog::{BuildingKind, Team};
+use iron_tide::sim::components::*;
 
 const MAP_SEEDS: std::ops::Range<u64> = 0..40;
 const MATCH_SECS: f32 = 900.0;

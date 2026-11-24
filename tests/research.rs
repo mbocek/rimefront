@@ -2,10 +2,10 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::components::Health;
-use iron_tide::production::{BuildItem, Production};
-use iron_tide::research::Upgrade;
+use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
+use iron_tide::sim::components::Health;
+use iron_tide::sim::production::{BuildItem, Production};
+use iron_tide::sim::research::Upgrade;
 
 const BASE: IVec2 = IVec2::new(14, 50);
 const FIELD: IVec2 = IVec2::new(30, 45);
@@ -60,7 +60,7 @@ fn tank_health_after_a_rocketeer_volley(armoured: bool) -> f32 {
     battle
         .world()
         .entity_mut(tank)
-        .remove::<iron_tide::components::Weapon>();
+        .remove::<iron_tide::sim::components::Weapon>();
     battle.spawn_unit(UnitKind::Rocketeer, Team::Crimson, FIELD + IVec2::new(3, 0));
     battle.run_for(6.0);
     battle
@@ -90,7 +90,7 @@ fn rifleman_loss_to(shooter_upgrade: Option<Upgrade>) -> f32 {
     battle
         .world()
         .entity_mut(target)
-        .remove::<iron_tide::components::Weapon>();
+        .remove::<iron_tide::sim::components::Weapon>();
     battle.spawn_unit(UnitKind::Rifleman, Team::Crimson, FIELD + IVec2::new(3, 0));
     battle.run_for(8.0);
     UnitKind::Tank.spec().max_health

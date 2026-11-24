@@ -1,9 +1,9 @@
 mod common;
 
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team};
-use iron_tide::map::MapSize;
-use iron_tide::random_battle::{DifficultyChoice, RandomBattleOptions, generate};
+use iron_tide::missions::random_battle::{DifficultyChoice, RandomBattleOptions, generate};
+use iron_tide::sim::catalog::{BuildingKind, Team};
+use iron_tide::world::map::MapSize;
 
 #[test]
 fn rolled_battles_of_every_size_start_with_a_base_for_every_side() {
@@ -29,7 +29,7 @@ fn rolled_battles_of_every_size_start_with_a_base_for_every_side() {
 
 #[test]
 fn rolled_forests_and_rocks_never_cut_a_base_off() {
-    use iron_tide::map::GameMap;
+    use iron_tide::world::map::GameMap;
     for seed in 0..30u64 {
         let options = RandomBattleOptions {
             opponents: 3,
@@ -42,7 +42,7 @@ fn rolled_forests_and_rocks_never_cut_a_base_off() {
             .collect();
         let battle = &mut Battle::on_level(level);
         let map = battle.world().resource::<GameMap>();
-        let gate = |site: iron_tide::levels::BaseSite| {
+        let gate = |site: iron_tide::missions::levels::BaseSite| {
             map.nearest_passable(site.origin() + bevy::prelude::IVec2::new(4, 4))
                 .expect("open ground near the base")
         };

@@ -2,11 +2,11 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::components::{Building, Health};
-use iron_tide::level_events::{EventAction, LevelEvent, Trigger};
-use iron_tide::levels::{BaseSite, LevelDefinition};
-use iron_tide::map::cell_center;
+use iron_tide::missions::level_events::{EventAction, LevelEvent, Trigger};
+use iron_tide::missions::levels::{BaseSite, LevelDefinition};
+use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
+use iron_tide::sim::components::{Building, Health};
+use iron_tide::world::map::cell_center;
 
 fn level_with(events: Vec<LevelEvent>) -> LevelDefinition {
     let mut level = LevelDefinition {

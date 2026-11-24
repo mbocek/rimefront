@@ -2,16 +2,16 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::catalog::{BuildingKind, Diplomacy, STARTING_CREDITS, Team, UnitKind};
-use iron_tide::components::*;
-use iron_tide::levels::{LevelDefinition, campaign};
-use iron_tide::map::{
+use iron_tide::app::savegame::SaveRequests;
+use iron_tide::missions::levels::{LevelDefinition, campaign};
+use iron_tide::sim::catalog::{BuildingKind, Diplomacy, STARTING_CREDITS, Team, UnitKind};
+use iron_tide::sim::components::*;
+use iron_tide::sim::movement::order_move;
+use iron_tide::sim::outcome::GameOutcome;
+use iron_tide::sim::production::BuildItem;
+use iron_tide::world::map::{
     GameMap, cell_center, footprint_cells, map_bounds, opposite_cell, world_to_cell,
 };
-use iron_tide::movement::order_move;
-use iron_tide::outcome::GameOutcome;
-use iron_tide::production::BuildItem;
-use iron_tide::savegame::SaveRequests;
 
 const PLAYER_REFINERY_SITE: IVec2 = IVec2::new(11, 51);
 const OPEN_FIELD: IVec2 = IVec2::new(30, 45);

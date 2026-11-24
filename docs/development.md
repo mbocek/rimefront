@@ -16,7 +16,7 @@ make server           # the dedicated network battle server (PORT=47300), see do
 make help             # every target
 ```
 
-Capture runs (`IRON_TIDE_CAPTURE=shot.png`, options in `src/capture.rs`) can also play a mouse script through
+Capture runs (`IRON_TIDE_CAPTURE=shot.png`, options in `src/app/capture.rs`) can also play a mouse script through
 the real input path, interface picking included, without moving the desktop cursor. It is how menu clicks, box
 selection, minimap orders, wall dragging and clicking aircraft in the air are checked without a person at the
 mouse:

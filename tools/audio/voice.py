@@ -107,7 +107,7 @@ UNIT_SPEAKERS = {
     "aircraft": ("62", "175", "+m5"),
 }
 
-# Two lines per reply so a busy player does not hear the same words every click; must match src/unit_voices.rs.
+# Two lines per reply so a busy player does not hear the same words every click; must match src/audio/unit_voices.rs.
 UNIT_REPLIES = {
     ("infantry", "select"): {
         "en": ("Ready.", "Standing by."), "sk": ("Pripravený.", "Čakám na rozkazy."),

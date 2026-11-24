@@ -4,15 +4,15 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 
 use serde::{Deserialize, Serialize};
 
-use crate::map::{CELL_SIZE, base_sites, map_bounds, map_spread, relocate};
+use crate::map::{
+    CELL_SIZE, MapBounds, base_sites, map_bounds, map_spread, relocate, set_map_bounds,
+};
 use crate::sim_math;
 
 pub const WATER_LEVEL: f32 = -0.45;
 /// How far the mountains surrounding the playable area reach beyond the map edge.
 pub const OUTLANDS_WIDTH: f32 = 44.0;
 
-const MESH_SPACING: f32 = 0.5;
-const FAR_MESH_SPACING: f32 = 2.0;
 /// How far beyond the detailed rim the coarse mountains reach, enough for the farthest zoom.
 pub const FAR_RING_WIDTH: f32 = 110.0;
 const RIVER_DEPTH: f32 = 1.5;
@@ -542,77 +542,66 @@ fn layer_weights(
     Vec4::new(dirt, rock, riverbed, pad)
 }
 
-/// Builds the visible ground including the mountain rim, with layer weights stored as vertex colors.
-pub fn build_terrain_mesh(landscape: Landscape, crystal_soil: impl Fn(IVec2) -> bool) -> Mesh {
-    let bounds = map_bounds();
-    let area = Rect::from_corners(
-        bounds.world_min() - OUTLANDS_WIDTH,
-        bounds.world_max() + OUTLANDS_WIDTH,
-    );
-    build_terrain_grid(landscape, area, MESH_SPACING, None, crystal_soil)
-}
+/// How far a patch's skirt hangs below its edge, deep enough to hide the crack where it meets a coarser one.
+const SKIRT_DEPTH: f32 = 3.0;
 
-/// Coarse mountains beyond the rim, so the farthest zoom never looks past the edge of the world; it leaves
-/// out the area the detailed mesh already covers.
-pub fn build_far_terrain_mesh(landscape: Landscape) -> Mesh {
-    let bounds = map_bounds();
-    let beyond_map = OUTLANDS_WIDTH + FAR_RING_WIDTH;
-    let area = Rect::from_corners(
-        bounds.world_min() - beyond_map,
-        bounds.world_max() + beyond_map,
-    );
-    let covered = Rect::from_corners(
-        bounds.world_min() - OUTLANDS_WIDTH + FAR_MESH_SPACING,
-        bounds.world_max() + OUTLANDS_WIDTH - FAR_MESH_SPACING,
-    );
-    build_terrain_grid(landscape, area, FAR_MESH_SPACING, Some(covered), |_| false)
-}
+/// Ground with a vertex every `spacing` metres: the map and its rim, or the coarse mountains beyond.
+pub const DETAILED_SPACING: f32 = 0.5;
+pub const COARSE_SPACING: f32 = 2.0;
 
-fn build_terrain_grid(
-    landscape: Landscape,
+/// The ground over `area` with its layer weights as vertex colours. Normals come from the heights around each
+/// vertex, so neighbouring patches meet without a lighting seam, and a skirt hangs from the edges to hide the
+/// crack where a patch meets a coarser one.
+pub fn build_terrain_patch(
+    ground: &GroundLayers,
     area: Rect,
     spacing: f32,
-    hole: Option<Rect>,
     crystal_soil: impl Fn(IVec2) -> bool,
 ) -> Mesh {
-    let start = area.min;
-    let vertices = (area.size() / spacing).as_uvec2() + UVec2::ONE;
-    let ground = GroundLayers::new(landscape);
-    let mut positions = Vec::with_capacity(vertices.element_product() as usize);
-    let mut colors = Vec::with_capacity(positions.capacity());
-    let mut uvs = Vec::with_capacity(positions.capacity());
+    let landscape = ground.landscape;
+    let vertices = (area.size() / spacing).round().as_ivec2() + IVec2::ONE;
+    let point = |x: i32, z: i32| area.min + Vec2::new(x as f32, z as f32) * spacing;
+    let with_apron = vertices + IVec2::splat(2);
+    let heights: Vec<f32> = (0..with_apron.element_product())
+        .map(|i| {
+            let at = point(i % with_apron.x - 1, i / with_apron.x - 1);
+            landscape.height(at.x, at.y)
+        })
+        .collect();
+    let height = |x: i32, z: i32| heights[((z + 1) * with_apron.x + x + 1) as usize];
 
-    for zi in 0..vertices.y {
-        for xi in 0..vertices.x {
-            let position = start + Vec2::new(xi as f32, zi as f32) * spacing;
-            let cell = (position / CELL_SIZE).floor().as_ivec2();
-            let soil = if crystal_soil(cell) { 1.0 } else { 0.0 };
-            positions.push([
-                position.x,
-                landscape.height(position.x, position.y),
-                position.y,
-            ]);
-            colors.push(ground.weights(position, soil).to_array());
-            uvs.push([position.x, position.y]);
+    let count = vertices.element_product() as usize;
+    let mut positions = Vec::with_capacity(count);
+    let mut normals = Vec::with_capacity(count);
+    let mut colors = Vec::with_capacity(count);
+    let mut uvs = Vec::with_capacity(count);
+    for z in 0..vertices.y {
+        for x in 0..vertices.x {
+            let at = point(x, z);
+            let soil = if crystal_soil((at / CELL_SIZE).floor().as_ivec2()) {
+                1.0
+            } else {
+                0.0
+            };
+            let slope_x = height(x + 1, z) - height(x - 1, z);
+            let slope_z = height(x, z + 1) - height(x, z - 1);
+            positions.push([at.x, height(x, z), at.y]);
+            normals.push(
+                Vec3::new(-slope_x, 2.0 * spacing, -slope_z)
+                    .normalize()
+                    .to_array(),
+            );
+            colors.push(ground.weights(at, soil).to_array());
+            uvs.push([at.x, at.y]);
         }
     }
 
-    let mut indices = Vec::with_capacity(((vertices - UVec2::ONE).element_product() * 6) as usize);
-    for zi in 0..vertices.y - 1 {
-        for xi in 0..vertices.x - 1 {
-            let corner = |x: u32, z: u32| start + Vec2::new(x as f32, z as f32) * spacing;
-            let inside_hole = hole.is_some_and(|hole| {
-                [corner(xi, zi), corner(xi + 1, zi + 1)]
-                    .iter()
-                    .all(|&point| point.cmpge(hole.min).all() && point.cmplt(hole.max).all())
-            });
-            if inside_hole {
-                continue;
-            }
-            let top_left = zi * vertices.x + xi;
-            let top_right = top_left + 1;
-            let bottom_left = top_left + vertices.x;
-            let bottom_right = bottom_left + 1;
+    let index_of = |x: i32, z: i32| (z * vertices.x + x) as u32;
+    let mut indices = Vec::with_capacity(((vertices - IVec2::ONE).element_product() * 6) as usize);
+    for z in 0..vertices.y - 1 {
+        for x in 0..vertices.x - 1 {
+            let (top_left, top_right) = (index_of(x, z), index_of(x + 1, z));
+            let (bottom_left, bottom_right) = (index_of(x, z + 1), index_of(x + 1, z + 1));
             indices.extend_from_slice(&[
                 top_left,
                 bottom_left,
@@ -624,16 +613,58 @@ fn build_terrain_grid(
         }
     }
 
-    let mut mesh = Mesh::new(
+    let last = vertices - IVec2::ONE;
+    let rim: Vec<u32> = (0..last.x)
+        .map(|x| index_of(x, 0))
+        .chain((0..last.y).map(|z| index_of(last.x, z)))
+        .chain((1..=last.x).rev().map(|x| index_of(x, last.y)))
+        .chain((1..=last.y).rev().map(|z| index_of(0, z)))
+        .collect();
+    for (step, &edge) in rim.iter().enumerate() {
+        let next_edge = rim[(step + 1) % rim.len()];
+        let hanging = positions.len() as u32;
+        for source in [edge, next_edge] {
+            let [x, y, z] = positions[source as usize];
+            positions.push([x, y - SKIRT_DEPTH, z]);
+            normals.push(normals[source as usize]);
+            colors.push(colors[source as usize]);
+            uvs.push(uvs[source as usize]);
+        }
+        let (below, next_below) = (hanging, hanging + 1);
+        indices.extend_from_slice(&[edge, below, next_edge, next_edge, below, next_below]);
+        indices.extend_from_slice(&[edge, next_edge, below, next_edge, next_below, below]);
+    }
+
+    Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-    .with_inserted_indices(Indices::U32(indices));
-    mesh.compute_smooth_normals();
-    mesh
+    .with_inserted_indices(Indices::U32(indices))
+}
+
+/// The ambient state a landscape's height depends on, carried to a thread that builds ground for it.
+#[derive(Clone, Copy)]
+pub struct LandscapeContext {
+    bounds: MapBounds,
+    shape: TerrainShape,
+}
+
+impl LandscapeContext {
+    pub fn current() -> Self {
+        Self {
+            bounds: map_bounds(),
+            shape: shape(),
+        }
+    }
+
+    pub fn enter(self) {
+        set_map_bounds(self.bounds);
+        ACTIVE_SHAPE.set(self.shape);
+    }
 }
 
 #[cfg(test)]

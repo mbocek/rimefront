@@ -9,7 +9,8 @@ use crate::{
     interpolation, lobby, local_view, main_menu, map, map_editor, map_edits, match_flow, menu,
     minimap, motion_material, network, network_hud, orders, overlay, perf_overlay, placement,
     queue_bar, replay, savegame, settings, sorties, sound, structure_tools, support_tools,
-    terrain_material, transport, tutorial, ui, unit_voices, updates, wall_joints, weather,
+    terrain_chunks, terrain_material, transport, tutorial, ui, unit_voices, updates, wall_joints,
+    weather,
 };
 
 /// Draws what the simulation moves part way between ticks.
@@ -214,7 +215,11 @@ impl Plugin for BattleViewPlugin {
                         queue_bar::animate_queue_progress,
                         (ui::announce_mission_messages, ui::refresh_notifications).chain(),
                         (ui::refresh_objective, ui::refresh_match_time),
-                        terrain_material::dress_terrain_surfaces,
+                        (
+                            terrain_chunks::finish_terrain_chunks,
+                            terrain_material::dress_terrain_surfaces,
+                        )
+                            .chain(),
                         fog_view::paint_fog_texture,
                         fog_view::reveal_explored_scenery,
                         fog_view::show_seen_enemies,
@@ -499,6 +504,7 @@ fn world_view() -> ScheduleConfigs<ScheduleSystem> {
         fog_view::paint_fog_texture,
         terrain_material::assemble_terrain_material,
         terrain_material::fit_terrain_to_level,
+        terrain_chunks::finish_terrain_chunks,
         terrain_material::dress_terrain_surfaces,
         terrain_material::animate_water,
         battlefield::draw_rain,

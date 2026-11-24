@@ -18,11 +18,11 @@ use crate::level_editing::{
 use crate::level_events::{EventAction, Trigger};
 use crate::levels::{ActiveLevel, LevelDefinition, custom_levels_directory, save_custom_level};
 use crate::map::{
-    GameMap, PlayfieldGround, cell_center, cells_by_distance, footprint_center, opposite_cell,
-    playfield_ground_mesh, world_to_cell,
+    GameMap, cell_center, cells_by_distance, footprint_center, opposite_cell, world_to_cell,
 };
 use crate::map_edits::{Brush, Ground, MapEdit, MapPainter};
 use crate::match_flow::GameState;
+use crate::terrain_chunks::{TerrainChunk, resoil_terrain_chunks};
 use crate::ui::{ACCENT, FRAME, GOOD, PANEL, SIDEBAR_WIDTH, TEXT_DIM, TEXT_MAIN, UiFonts};
 
 const BRUSH_SIZES: [i32; 3] = [0, 1, 2];
@@ -643,12 +643,12 @@ fn brush_cells(center: IVec2, radius: i32, mirror: bool) -> Vec<IVec2> {
 
 /// Rebuilds the ground once a stroke ends, so painted or cleared crystals get or lose their soil.
 pub fn resoil_after_stroke(
+    mut commands: Commands,
     mut painted: Local<bool>,
     mouse: Res<ButtonInput<MouseButton>>,
     level: Res<ActiveLevel>,
     map: Res<GameMap>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    grounds: Query<&Mesh3d, With<PlayfieldGround>>,
+    mut chunks: Query<(Entity, &mut TerrainChunk)>,
 ) {
     *painted |= level.is_changed();
     let stroke_ended = mouse.any_just_released([MouseButton::Left, MouseButton::Right]);
@@ -656,9 +656,7 @@ pub fn resoil_after_stroke(
         return;
     }
     *painted = false;
-    for ground in &grounds {
-        let _ = meshes.insert(&ground.0, playfield_ground_mesh(level.0.landscape, &map));
-    }
+    resoil_terrain_chunks(&mut commands, &map, &level, &mut chunks);
 }
 
 pub fn draw_brush_outline(cursor: Res<Cursor>, editor: Res<MapEditor>, mut gizmos: Gizmos) {

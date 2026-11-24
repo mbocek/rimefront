@@ -91,9 +91,18 @@ for ordinary network matches.
    takes 0.17 ms, and a dense grid that size is a few tens of MB, so storing chunks separately pays only once
    the world must grow while it runs. Still whole: the fog texture's upload to the GPU (16 MB at 1024 cells,
    part of step 5) and the minimap's fog pass (step 7).
-5. **Terrain and scenery in chunks.** One terrain mesh per chunk with coarser levels of detail by distance,
-   culled outside the view; scenery and crystal meshes merged per chunk instead of per map. The far ring stays
-   as the backdrop beyond the world's edge.
+5. **Terrain in chunks.**
+   - Done: the ground is one patch per chunk (`terrain_chunks.rs`), detailed (0.5 m) where it shows the map
+     or its rim and coarse (2 m) in the mountains beyond, each built on a background thread and drawn only
+     when in view; an editor stroke rebuilds only the chunks whose crystal soil changed. Normals come from the
+     heights around each vertex, so patches meet without a lighting seam, and a 3 m skirt hides the crack
+     where a detailed patch meets a coarse one. On a Vast map the patches hold 1.9 million vertices against
+     1.6 million in the two meshes before (detailed patches run to the edge of their chunk) and take the same
+     0.6 s of CPU to build, now off the main thread; CPU time over a 50 s capture is unchanged within noise
+     (47.1 s against 46.8 s, three runs each in rotating order).
+   - Still to do: keep only the patches around the camera, so a world larger than memory allows can be
+     drawn, and upload only the changed chunks of the fog texture. Scenery needs nothing here: every prop
+     is its own entity sharing a merged mesh, already culled one by one.
 6. **Hierarchical pathfinding.** Regions labelled per chunk, chunks joined by portals on their borders; a route
    is planned over portals and refined by A* only inside the chunks it passes. A structure relabels only its own
    chunk.

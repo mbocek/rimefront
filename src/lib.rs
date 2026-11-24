@@ -90,6 +90,7 @@ pub mod structures;
 pub mod support_powers;
 pub mod support_tools;
 pub mod terrain;
+pub mod terrain_chunks;
 pub mod terrain_material;
 pub mod transport;
 pub mod tutorial;

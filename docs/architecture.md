@@ -17,6 +17,7 @@
 | `army_mix` | what the computer has seen of the enemy army and which units counter it |
 | `headless` | windowless battle harness shared by the tests and the balance tool |
 | `terrain`, `terrain_material` | landscapes (river, lake, plains): terrain height, water, roads, texture layers, WESL shader |
+| `terrain_chunks` | the ground as one patch per chunk, built on background threads and rebuilt when its crystal soil changes |
 | `scenery`, `flat_scenery` | forests, meadows, reeds, mountains with boulders; scenery models merged into one mesh each |
 | `crystal_models`, `motion_material` | crystal deposits merged into one mesh per material; GPU vertex motion (wind, hovering shards) |
 | `minimap`, `notifications` | minimap, status messages |

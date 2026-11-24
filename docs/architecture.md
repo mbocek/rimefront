@@ -1,7 +1,9 @@
 # Code layout
 
-`src/lib.rs` holds `SimulationPlugin` (battle logic, also used headless by the tests) and `GamePlugin` (the
-full game); everything else lives in one directory per domain. A domain may use another's types, but the
+`src/lib.rs` holds `SimulationPlugin` (battle logic, also used headless by the tests), the steps of a tick
+(`TickStep`) and of starting a match (`MatchStart`) that the lockstep session (`net::network::LockstepPlugin`)
+and saving (`app::savegame::SavePlugin`) slot into, and `GamePlugin` (the full game); everything else lives
+in one directory per domain. A domain may use another's types, but the
 simulation (`sim`, `world`) is meant not to reach into drawing, sound or the interface: where it still does,
 it is listed in [persistent-world.md](persistent-world.md) as the work before it becomes a crate of its own.
 

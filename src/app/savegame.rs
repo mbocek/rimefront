@@ -514,6 +514,26 @@ fn restore_explored_ground(intel: &mut Intel, save: &SaveGame) {
     }
 }
 
+/// Saving and loading around the simulation: a save is written after a tick's rules, and a loaded game
+/// takes the place of the level's start.
+pub struct SavePlugin;
+
+impl Plugin for SavePlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<SaveRequests>()
+            .init_resource::<SaveDirectory>()
+            .add_systems(
+                OnEnter(GameState::Playing),
+                restore_pending_load.in_set(crate::MatchStart::Restore),
+            )
+            .add_systems(Update, begin_requested_load)
+            .add_systems(
+                FixedUpdate,
+                write_requested_save.in_set(crate::TickStep::Save),
+            );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

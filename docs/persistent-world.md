@@ -181,8 +181,9 @@ for ordinary network matches.
     answered by `view` and `audio`. What ties remain:
     - it uses `app::i18n` for its messages, `app::match_flow` for the match clock and states and
       `missions::levels` for the level being played, all three to go into the crate with it;
-    - `SimulationPlugin` schedules systems of `app::savegame` and `net::network` inside its tick: saving and
-      the lockstep session are to be added around the simulation by the game instead.
+    That is all: the network session and saving add their systems through the steps of a tick and of a
+    match's start (`TickStep`, `MatchStart`) from plugins of their own, so the crate can be cut along
+    `src/sim`, `src/world`, `missions::levels`, `missions::level_events`, `app::i18n` and `app::match_flow`.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

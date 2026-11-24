@@ -5,10 +5,12 @@ use std::time::Duration;
 
 use crate::SimulationPlugin;
 use crate::app::match_flow::GameState;
-use crate::app::savegame::SaveDirectory;
+use crate::app::savegame::{SaveDirectory, SavePlugin};
 use crate::missions::levels::Difficulty;
 use crate::missions::levels::{ActiveLevel, LevelDefinition, Personality};
-use crate::net::network::{NETWORK_COMMAND_DELAY_TICKS, NetSession, SessionState, Side};
+use crate::net::network::{
+    LockstepPlugin, NETWORK_COMMAND_DELAY_TICKS, NetSession, SessionState, Side,
+};
 use crate::sim::ai::{AiCommander, AiCommanders};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::combat::DamageDealt;
@@ -25,7 +27,6 @@ use crate::sim::player_commands::{
 use crate::sim::production::{BuildItem, Production, construct_building};
 use crate::sim::spawn::spawn_unit;
 use crate::sim::structures::{StructureOrder, StructureOrderKind};
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cell_center};
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
@@ -99,14 +100,17 @@ impl Battle {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .insert_resource(TimeUpdateStrategy::ManualDuration(STEP))
-            .insert_resource(ModelLibrary::placeholder())
             .insert_resource(SaveDirectory(save_directory.clone()))
             .init_resource::<DamageLedger>()
             .init_resource::<SoundLedger>()
-            .add_plugins(SimulationPlugin {
-                enemy_ai: setup.enemy_ai,
-                starting_forces: setup.starting_forces,
-            })
+            .add_plugins((
+                SimulationPlugin {
+                    enemy_ai: setup.enemy_ai,
+                    starting_forces: setup.starting_forces,
+                },
+                LockstepPlugin,
+                SavePlugin,
+            ))
             .add_systems(
                 FixedUpdate,
                 (record_damage, record_sounds, record_losses, record_recruits)

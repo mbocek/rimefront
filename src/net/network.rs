@@ -3,6 +3,8 @@ use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
+
+use crate::app::match_flow::GameState;
 use serde::{Deserialize, Serialize};
 
 use crate::app::i18n::{tr, tr_fmt};
@@ -615,6 +617,34 @@ pub fn retire_commanders_of_players(
     commanders.0.retain(|commander| {
         commander.team != local.0 && !session.remote_teams.contains(&commander.team)
     });
+}
+
+/// The lockstep session around the simulation: turns go out before a tick's rules, the state's fingerprint
+/// after them, and the simulation waits for every player's turn. Without a session it does nothing.
+pub struct LockstepPlugin;
+
+impl Plugin for LockstepPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<CatchingUp>()
+            .configure_sets(
+                FixedUpdate,
+                crate::FramePhase::Simulation.run_if(simulation_may_advance),
+            )
+            .add_systems(FixedFirst, receive_turns)
+            .add_systems(
+                PreUpdate,
+                (receive_turns, measure_latency, admit_late_guests),
+            )
+            .add_systems(
+                OnEnter(GameState::Playing),
+                retire_commanders_of_players.in_set(crate::MatchStart::Players),
+            )
+            .add_systems(FixedUpdate, send_turn.in_set(crate::TickStep::SendOrders))
+            .add_systems(
+                FixedUpdate,
+                fingerprint_tick.in_set(crate::TickStep::Fingerprint),
+            );
+    }
 }
 
 #[cfg(test)]

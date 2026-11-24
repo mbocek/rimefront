@@ -41,8 +41,27 @@ pub enum FramePhase {
     Presentation,
 }
 
-/// The battle itself: map, economy, production, enemy AI, movement, combat, saving and the outcome.
-/// It needs a `ModelLibrary`; `GamePlugin` loads the real one, tests insert a placeholder.
+/// The steps of one simulation tick. The battle's rules run in `Rules`; the network session and saving,
+/// which the game adds around the simulation, take the other steps.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TickStep {
+    SendOrders,
+    Rules,
+    Save,
+    Fingerprint,
+    Count,
+}
+
+/// The steps of starting a match: the world and its forces, then who plays which side, then a saved game
+/// taking the place of the level's start.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MatchStart {
+    Deploy,
+    Players,
+    Restore,
+}
+
+/// The battle itself: map, economy, production, enemy AI, movement, combat and the outcome.
 pub struct SimulationPlugin {
     pub enemy_ai: bool,
     pub starting_forces: bool,
@@ -84,18 +103,23 @@ impl Plugin for SimulationPlugin {
             )
             .configure_sets(
                 FixedUpdate,
-                FramePhase::Simulation
-                    .run_if(in_state(match_flow::GameState::Playing))
-                    .run_if(network::simulation_may_advance),
+                FramePhase::Simulation.run_if(in_state(match_flow::GameState::Playing)),
             )
-            .add_systems(FixedFirst, network::receive_turns)
-            .add_systems(
-                PreUpdate,
+            .configure_sets(
+                FixedUpdate,
                 (
-                    network::receive_turns,
-                    network::measure_latency,
-                    network::admit_late_guests,
-                ),
+                    TickStep::SendOrders,
+                    TickStep::Rules,
+                    TickStep::Save,
+                    TickStep::Fingerprint,
+                    TickStep::Count,
+                )
+                    .chain()
+                    .in_set(FramePhase::Simulation),
+            )
+            .configure_sets(
+                OnEnter(match_flow::GameState::Playing),
+                (MatchStart::Deploy, MatchStart::Players, MatchStart::Restore).chain(),
             )
             .insert_resource(Time::<Fixed>::from_duration(SIMULATION_TICK))
             .insert_resource(match_flow::MatchRules {
@@ -103,7 +127,6 @@ impl Plugin for SimulationPlugin {
                 starting_forces: self.starting_forces,
             })
             .init_resource::<levels::ActiveLevel>()
-            .init_resource::<network::CatchingUp>()
             .init_resource::<combat::Targets>()
             .init_resource::<determinism::SimulationRng>()
             .init_resource::<determinism::SimIds>()
@@ -129,8 +152,6 @@ impl Plugin for SimulationPlugin {
             .init_resource::<catalog::Diplomacy>()
             .init_resource::<veterancy::LastHits>()
             .init_resource::<match_stats::MatchStats>()
-            .init_resource::<savegame::SaveRequests>()
-            .init_resource::<savegame::SaveDirectory>()
             .add_message::<combat::DamageDealt>()
             .add_message::<combat::Destroyed>()
             .add_message::<combat::Impact>()
@@ -147,16 +168,14 @@ impl Plugin for SimulationPlugin {
                     map::generate_map,
                     map_edits::apply_map_edits,
                     match_flow::deploy_level_forces,
-                    network::retire_commanders_of_players,
-                    savegame::restore_pending_load,
                 )
-                    .chain(),
+                    .chain()
+                    .in_set(MatchStart::Deploy),
             )
             .add_systems(
                 OnEnter(match_flow::GameState::Restarting),
                 match_flow::continue_after_restart,
             )
-            .add_systems(Update, savegame::begin_requested_load)
             .add_systems(
                 Last,
                 match_flow::scope_match_entities.run_if(
@@ -169,7 +188,6 @@ impl Plugin for SimulationPlugin {
                 FixedUpdate,
                 (
                     (
-                        network::send_turn,
                         player_commands::carry_out_player_commands,
                         (
                             match_flow::advance_match_clock,
@@ -230,14 +248,15 @@ impl Plugin for SimulationPlugin {
                         servicing::service_waiting_units,
                         notifications::watch_base,
                         outcome::decide_outcome,
-                        savegame::write_requested_save,
-                        network::fingerprint_tick,
-                        player_commands::count_ticks,
                     )
                         .chain(),
                 )
                     .chain()
-                    .in_set(FramePhase::Simulation),
+                    .in_set(TickStep::Rules),
+            )
+            .add_systems(
+                FixedUpdate,
+                player_commands::count_ticks.in_set(TickStep::Count),
             );
     }
 }
@@ -247,7 +266,12 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(SimulationPlugin::default()).add_plugins((
+        app.add_plugins((
+            SimulationPlugin::default(),
+            network::LockstepPlugin,
+            savegame::SavePlugin,
+        ))
+        .add_plugins((
             game_plugins::InterpolationPlugin,
             game_plugins::BattleViewPlugin,
             game_plugins::MenusPlugin,

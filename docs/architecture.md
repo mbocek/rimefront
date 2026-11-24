@@ -52,9 +52,10 @@ The code is a Cargo workspace of three crates:
 | --- | --- |
 | `map` | the cell grid and its bounds (64, 96, 128 or 256 cells a side), chunks, terrain with a river and fords, crystals, A* pathfinding that refuses routes between unconnected areas without searching |
 | `map_regions` | the map's connected areas, labelled per chunk and joined across chunk edges |
+| `chunked_grid` | a value per cell kept by chunk, so a map can widen without moving the chunks it has |
 | `terrain` | landscapes (river, lake, plains): terrain height, water, roads, ground patches |
 | `scenery` | forests, meadows, reeds, mountains with boulders as a layout of props by chunk |
-| `wilds` | the `Wilds` landscape's crystal fields and scenery, generated chunk by chunk from the map seed |
+| `wilds` | the `Wilds` landscape's crystal fields and scenery, generated chunk by chunk from the map seed; widening a wilds world |
 | `map_edits` | the map editor's brush strokes applied to a generated map |
 | `season` | summer, autumn and winter: terrain tint, snow, foliage colours, light |
 | `weather` | the forecast of a match: clouds and showers, and the sight they cost |

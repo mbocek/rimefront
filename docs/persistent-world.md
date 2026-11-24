@@ -168,9 +168,19 @@ for ordinary network matches.
    Vast maps every base reaches the others and has crystal at hand. Roads are left out for now. The
    crystal fields of a map are a resource (`CrystalFields`) rather than the authored list, for the glow and
    sparkles that mark them.
-9. **Grids stored by chunk.** `GameMap`, the fog of war and the scenery layout keep a chunk only once it is
-   generated, and `MapBounds` grows to cover new chunks, so the world can widen while it runs. Dense grids
-   were enough for a fixed world (step 4); a growing one needs this.
+9. **Grids stored by chunk.** Done. `GameMap` (one `MapCell` per cell: blocked, building, crystal) and the fog
+   of war keep their cells in a `ChunkedGrid`, a table of 32 × 32 chunks over the bounds; a chunk exists once
+   it is opened, and widening re-lays only the table. Saves still get dense grids, row by row. The world's
+   bounds (`map_bounds`) may now outgrow the level's (`level_bounds`), which the bases, the authored layout and
+   the mirror stay with. `wilds::widen_world` widens a Wilds world by whole chunks: the map, every side's fog
+   and the crystal fields cover the new ground, which is generated chunk by chunk exactly as a chunk generated
+   alone, and known ground stays known (a test checks all of it, and a route into the new ground). The wilds
+   no longer block the map's last row and column, which only evens out the mirror of authored maps.
+   Simulation results are unchanged (fingerprints, balance report byte for byte) and so is the speed within
+   noise: the balance tool took 42.8 s of CPU against 42.1 s (three runs each in rotating order), the crowd
+   benchmark the same, one side's fog 0.11 ms instead of 0.15 ms on 256 × 256 cells and 1.6 ms instead of
+   1.4 ms on 2048 × 2048. Still to do: the view answering a widening while a match runs (terrain patches,
+   minimap, fog texture), and saves of a widened world, whose grids are larger than the level's map.
 10. **Starting sites across the world.** Generated sites, each with a crystal field and buildable ground
     nearby, spaced out; a new player gets the nearest free one, and the world generates a new ring of chunks
     when the free sites run low. No mirror symmetry in world mode (duels keep it).

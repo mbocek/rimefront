@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::levels::ActiveLevel;
 use crate::sim::catalog::CRYSTAL_PER_CELL;
 use crate::sim::sim_math;
+use crate::world::chunked_grid::ChunkedGrid;
 use crate::world::map_regions::Regions;
 use crate::world::scenery::{self, SceneryLayout};
 use crate::world::terrain::{Landscape, approximate_ground};
@@ -182,28 +183,43 @@ pub fn chunk_of(cell: IVec2) -> IVec2 {
 // that play several battles at once each run on their own thread.
 thread_local! {
     static ACTIVE_MAP_BOUNDS: Cell<MapBounds> = const { Cell::new(MapBounds::square(STANDARD_MAP_CELLS)) };
+    static ACTIVE_LEVEL_BOUNDS: Cell<MapBounds> = const { Cell::new(MapBounds::square(STANDARD_MAP_CELLS)) };
 }
 
 pub fn set_map_size(size: MapSize) {
     set_map_bounds(MapBounds::square(size.cells()));
 }
 
+/// The level's map and the world are the same until the world widens.
 pub fn set_map_bounds(bounds: MapBounds) {
     ACTIVE_MAP_BOUNDS.set(bounds);
+    ACTIVE_LEVEL_BOUNDS.set(bounds);
 }
 
+/// Widens the world past the level's map; the bases, the authored layout and the mirror stay where the level
+/// put them.
+pub fn widen_map_bounds(wider: MapBounds) {
+    ACTIVE_MAP_BOUNDS.set(wider);
+}
+
+/// The world as it stands: every cell that exists.
 pub fn map_bounds() -> MapBounds {
     ACTIVE_MAP_BOUNDS.get()
 }
 
+/// The map the level was made for, which the bases, the authored layout and the mirror belong to.
+pub fn level_bounds() -> MapBounds {
+    ACTIVE_LEVEL_BOUNDS.get()
+}
+
 /// How much farther apart things are than on the standard map; for shapes that do not follow one axis.
 pub fn map_spread() -> f32 {
-    map_bounds().spread().min_element()
+    level_bounds().spread().min_element()
 }
 
 /// Command Center origins of the four corner base sites; levels decide who starts where.
 pub fn base_sites() -> [IVec2; 4] {
-    let bounds = map_bounds();
+    let bounds = level_bounds();
     let (near, far) = (bounds.min, bounds.min + bounds.size);
     [
         IVec2::new(near.x + 6, far.y - 12),
@@ -246,13 +262,13 @@ pub fn relocate(standard: Vec2) -> Vec2 {
         return new + (standard - old);
     }
     let old_middle = MapBounds::square(STANDARD_MAP_CELLS).center_cells();
-    let bounds = map_bounds();
+    let bounds = level_bounds();
     bounds.center_cells() + (standard - old_middle) * bounds.spread()
 }
 
 /// A cell and its mirror image always add up to this, so the map plays the same from opposite corners.
 fn mirror_sum() -> IVec2 {
-    let bounds = map_bounds();
+    let bounds = level_bounds();
     bounds.min * 2 + bounds.size - IVec2::splat(2)
 }
 
@@ -294,9 +310,7 @@ const DIAGONAL_COST: u32 = 14;
 
 #[derive(Resource)]
 pub struct GameMap {
-    pub(crate) terrain_blocked: Vec<bool>,
-    building: Vec<Option<Entity>>,
-    crystal: Vec<u32>,
+    cells: ChunkedGrid<MapCell>,
     /// How many cells still hold crystal, so a search of the whole map can be skipped once it is mined out.
     crystal_cells: usize,
     regions: Mutex<Regions>,
@@ -311,16 +325,36 @@ pub struct CrystalVisual {
     pub size: f32,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+struct MapCell {
+    blocked: bool,
+    building: Option<Entity>,
+    crystal: u32,
+}
+
 impl GameMap {
     fn empty() -> Self {
-        let cells = map_bounds().area();
         Self {
-            terrain_blocked: vec![false; cells],
-            building: vec![None; cells],
-            crystal: vec![0; cells],
+            cells: ChunkedGrid::filled(map_bounds(), MapCell::default()),
             crystal_cells: 0,
             regions: Mutex::new(Regions::new()),
         }
+    }
+
+    /// Covers `wider`, which contains the map and is already the active bounds; the cells the map has stay as
+    /// they are, and each new chunk exists once `open_chunk` opens it.
+    pub fn widen(&mut self, wider: MapBounds) {
+        self.cells.widen(wider);
+        *self.regions_mut() = Regions::new();
+    }
+
+    pub fn open_chunk(&mut self, chunk: IVec2) {
+        self.cells.open_chunk(chunk);
+        self.regions_mut().forget_around(chunk * CHUNK_CELLS);
+    }
+
+    pub fn has_chunk(&self, chunk: IVec2) -> bool {
+        self.cells.has_chunk(chunk)
     }
 
     /// A map with no river, crystals or obstacles, for tests.
@@ -337,11 +371,17 @@ impl GameMap {
     }
 
     pub fn is_passable(&self, cell: IVec2) -> bool {
-        Self::index(cell).is_some_and(|i| !self.terrain_blocked[i] && self.building[i].is_none())
+        self.cells
+            .get(cell)
+            .is_some_and(|at| !at.blocked && at.building.is_none())
+    }
+
+    pub(crate) fn is_blocked_terrain(&self, cell: IVec2) -> bool {
+        self.cells.get(cell).is_some_and(|at| at.blocked)
     }
 
     pub fn building_at(&self, cell: IVec2) -> Option<Entity> {
-        Self::index(cell).and_then(|i| self.building[i])
+        self.cells.get(cell).and_then(|at| at.building)
     }
 
     pub fn is_buildable(&self, cell: IVec2) -> bool {
@@ -350,31 +390,41 @@ impl GameMap {
 
     pub fn set_building(&mut self, origin: IVec2, footprint: IVec2, occupant: Option<Entity>) {
         for cell in footprint_cells(origin, footprint) {
-            if let Some(i) = Self::index(cell) {
-                self.building[i] = occupant;
+            if let Some(at) = self.cells.get_mut(cell) {
+                at.building = occupant;
             }
             self.regions_mut().forget_around(cell);
         }
     }
 
+    /// Crystal of every cell of the bounds, row by row, as saved games keep it.
     pub fn crystal_amounts(&self) -> Vec<u32> {
-        self.crystal.clone()
+        self.cells.to_dense().iter().map(|at| at.crystal).collect()
     }
 
     /// Restores a saved crystal grid and forgets every building footprint, ready for buildings to be respawned.
     pub fn reset_for_load(&mut self, crystal: Vec<u32>) {
-        if crystal.len() == self.crystal.len() {
+        let bounds = self.cells.bounds();
+        if crystal.len() == bounds.area() {
             self.crystal_cells = crystal.iter().filter(|&&amount| amount > 0).count();
-            self.crystal = crystal;
+            for (cell, amount) in bounds.cells().zip(crystal) {
+                if let Some(at) = self.cells.get_mut(cell) {
+                    at.crystal = amount;
+                }
+            }
         }
-        self.building.fill(None);
+        for cell in bounds.cells() {
+            if let Some(at) = self.cells.get_mut(cell) {
+                at.building = None;
+            }
+        }
         self.regions_mut().forget_all();
     }
 
     pub fn set_crystal(&mut self, cell: IVec2, amount: u32) {
-        if let Some(i) = Self::index(cell) {
-            let had = self.crystal[i] > 0;
-            self.crystal[i] = amount;
+        if let Some(at) = self.cells.get_mut(cell) {
+            let had = at.crystal > 0;
+            at.crystal = amount;
             match (had, amount > 0) {
                 (false, true) => self.crystal_cells += 1,
                 (true, false) => self.crystal_cells -= 1,
@@ -388,8 +438,8 @@ impl GameMap {
     }
 
     pub fn set_obstacle(&mut self, cell: IVec2, blocked: bool) {
-        if let Some(i) = Self::index(cell) {
-            self.terrain_blocked[i] = blocked;
+        if let Some(at) = self.cells.get_mut(cell) {
+            at.blocked = blocked;
         }
         self.regions_mut().forget_around(cell);
     }
@@ -411,21 +461,22 @@ impl GameMap {
     }
 
     pub fn crystal_at(&self, cell: IVec2) -> u32 {
-        Self::index(cell).map_or(0, |i| self.crystal[i])
+        self.cells.get(cell).map_or(0, |at| at.crystal)
     }
 
     /// Returns the amount actually mined and whether the cell is now depleted.
     pub fn mine_crystal(&mut self, cell: IVec2, wanted: u32) -> (u32, bool) {
-        let Some(i) = Self::index(cell) else {
+        let Some(at) = self.cells.get_mut(cell) else {
             return (0, true);
         };
-        let mined = wanted.min(self.crystal[i]);
-        let depleted = mined > 0 && mined == self.crystal[i];
-        self.crystal[i] -= mined;
+        let mined = wanted.min(at.crystal);
+        let depleted = mined > 0 && mined == at.crystal;
+        at.crystal -= mined;
+        let left = at.crystal;
         if depleted {
             self.crystal_cells -= 1;
         }
-        (mined, self.crystal[i] == 0)
+        (mined, left == 0)
     }
 
     pub fn nearest_crystal(&self, from: IVec2, max_radius: i32) -> Option<IVec2> {
@@ -625,9 +676,9 @@ pub fn generate_map(mut commands: Commands, level: Res<ActiveLevel>) {
     let mut map = GameMap::empty();
     let landscape = level.0.landscape;
     block_water(&mut map, landscape);
-    block_unmirrored_edge(&mut map);
     let mut scenery = SceneryLayout::default();
     let fields = if landscape.is_mirrored() {
+        block_unmirrored_edge(&mut map);
         seed_crystal_fields(&mut commands, &mut map, &mut rng);
         scenery::scatter(&mut scenery, landscape, &mut map, &mut rng);
         crystal_fields()
@@ -644,7 +695,15 @@ pub fn is_water(landscape: Landscape, cell: IVec2) -> bool {
 }
 
 pub(crate) fn block_water(map: &mut GameMap, landscape: Landscape) {
-    for cell in map_bounds().cells() {
+    block_water_among(map, landscape, map_bounds().cells());
+}
+
+pub(crate) fn block_water_among(
+    map: &mut GameMap,
+    landscape: Landscape,
+    cells: impl Iterator<Item = IVec2>,
+) {
+    for cell in cells {
         if is_water(landscape, cell) {
             map.set_obstacle(cell, true);
         }
@@ -705,10 +764,10 @@ fn seed_crystal_fields(commands: &mut Commands, map: &mut GameMap, rng: &mut Std
             let edge = field.radius * outline.reach(sim_math::atan2(offset.y, offset.x));
             let inside = distance + rng.random_range(-EDGE_JITTER..EDGE_JITTER) <= edge;
             let stray = !inside && distance <= edge + STRAY_REACH && rng.random_bool(STRAY_CHANCE);
-            let Some(i) = GameMap::index(cell) else {
+            if !GameMap::in_bounds(cell) {
                 continue;
-            };
-            if !(inside || stray) || map.terrain_blocked[i] {
+            }
+            if !(inside || stray) || map.is_blocked_terrain(cell) {
                 continue;
             }
             if GameMap::index(opposite_cell(cell)).is_none() {

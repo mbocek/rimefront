@@ -3,7 +3,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::world::map::{CELL_SIZE, chunk_of, map_bounds, world_to_cell};
+use crate::world::chunked_grid::ChunkedGrid;
+use crate::world::map::{CELL_SIZE, MapBounds, map_bounds, world_to_cell};
 
 static NEXT_LINEAGE: AtomicU64 = AtomicU64::new(1);
 
@@ -18,7 +19,7 @@ pub enum CellSight {
 /// What one side knows about each map cell; `Intel` keeps one per team.
 pub struct FogOfWar {
     enabled: bool,
-    cells: Vec<CellSight>,
+    cells: ChunkedGrid<CellSight>,
     /// Bumped whenever any cell changes, so presentation systems can skip unchanged frames.
     pub revision: u64,
     /// The revision each chunk last changed at, so presentation can redraw only those.
@@ -53,7 +54,7 @@ impl FogOfWar {
         let revision = 1;
         Self {
             enabled,
-            cells: vec![state; map_bounds().area()],
+            cells: ChunkedGrid::filled(map_bounds(), state),
             revision,
             chunk_revisions: vec![revision; map_bounds().chunk_count()],
             lineage: NEXT_LINEAGE.fetch_add(1, Ordering::Relaxed),
@@ -68,9 +69,26 @@ impl FogOfWar {
         self.lineage
     }
 
+    /// Covers `wider`, which contains the map: known cells stay known, new ground is unexplored.
+    pub fn widen(&mut self, wider: MapBounds) {
+        let narrow = self.cells.bounds();
+        self.cells.widen(wider);
+        for index in 0..wider.chunk_count() {
+            self.cells.open_chunk(wider.chunk_at(index));
+        }
+        self.revision += 1;
+        let mut revisions = vec![self.revision; wider.chunk_count()];
+        for (index, &revision) in self.chunk_revisions.iter().enumerate() {
+            if let Some(wider_index) = wider.chunk_index(narrow.chunk_at(index)) {
+                revisions[wider_index] = revision;
+            }
+        }
+        self.chunk_revisions = revisions;
+    }
+
     /// The chunks with a cell that changed after `revision`.
     pub fn chunks_changed_since(&self, revision: u64) -> impl Iterator<Item = IVec2> {
-        let bounds = map_bounds();
+        let bounds = self.cells.bounds();
         self.chunk_revisions
             .iter()
             .enumerate()
@@ -78,14 +96,12 @@ impl FogOfWar {
             .map(move |(index, _)| bounds.chunk_at(index))
     }
 
-    fn index(cell: IVec2) -> Option<usize> {
-        map_bounds().index(cell)
-    }
-
     /// Ground outside the playable map shares the sight of the nearest map edge, so the fog runs on past it.
     pub fn sight_at(&self, cell: IVec2) -> CellSight {
-        let nearest_map_cell = map_bounds().clamp(cell);
-        Self::index(nearest_map_cell).map_or(CellSight::Explored, |i| self.cells[i])
+        let nearest_map_cell = self.cells.bounds().clamp(cell);
+        self.cells
+            .get(nearest_map_cell)
+            .unwrap_or(CellSight::Explored)
     }
 
     pub fn is_visible(&self, position: Vec3) -> bool {
@@ -96,20 +112,26 @@ impl FogOfWar {
         self.sight_at(world_to_cell(position)) != CellSight::Unexplored
     }
 
+    /// Whether each cell of the bounds was ever seen, row by row, as saved games keep it.
     pub fn explored_cells(&self) -> Vec<bool> {
         self.cells
+            .to_dense()
             .iter()
             .map(|&sight| sight != CellSight::Unexplored)
             .collect()
     }
 
     pub fn restore_explored(&mut self, explored: &[bool]) {
-        if !self.enabled || explored.len() != self.cells.len() {
+        let bounds = self.cells.bounds();
+        if !self.enabled || explored.len() != bounds.area() {
             return;
         }
-        for (cell, &was_explored) in self.cells.iter_mut().zip(explored) {
-            if was_explored && *cell == CellSight::Unexplored {
-                *cell = CellSight::Explored;
+        for (cell, &was_explored) in bounds.cells().zip(explored) {
+            if let Some(sight) = self.cells.get_mut(cell)
+                && was_explored
+                && *sight == CellSight::Unexplored
+            {
+                *sight = CellSight::Explored;
             }
         }
         self.revision += 1;
@@ -121,46 +143,40 @@ impl FogOfWar {
         if !self.enabled {
             return;
         }
-        let mut next: Vec<CellSight> = self
-            .cells
-            .iter()
-            .map(|&sight| {
-                if sight == CellSight::Unexplored {
-                    sight
-                } else {
-                    CellSight::Explored
-                }
-            })
-            .collect();
+        let before = self.cells.clone();
+        self.cells.update_all(|sight| {
+            if sight == CellSight::Unexplored {
+                sight
+            } else {
+                CellSight::Explored
+            }
+        });
         for (position, radius) in viewers {
             let center = world_to_cell(position);
             let reach = (radius / CELL_SIZE).ceil() as i32;
             for dy in -reach..=reach {
                 for dx in -reach..=reach {
                     let cell = center + IVec2::new(dx, dy);
-                    let Some(i) = Self::index(cell) else { continue };
                     let cell_middle = (cell.as_vec2() + 0.5) * CELL_SIZE;
-                    if cell_middle.distance(position.xz()) <= radius {
-                        next[i] = CellSight::Visible;
+                    if cell_middle.distance(position.xz()) > radius {
+                        continue;
+                    }
+                    if let Some(sight) = self.cells.get_mut(cell) {
+                        *sight = CellSight::Visible;
                     }
                 }
             }
         }
-        let bounds = map_bounds();
-        let revision = self.revision + 1;
-        let mut changed = false;
-        for (index, (old, new)) in self.cells.iter().zip(&next).enumerate() {
-            if old != new {
-                changed = true;
-                let chunk = chunk_of(bounds.cell_at(index));
-                if let Some(chunk_index) = bounds.chunk_index(chunk) {
-                    self.chunk_revisions[chunk_index] = revision;
-                }
-            }
+        let changed = self.cells.chunks_differing_from(&before);
+        if changed.is_empty() {
+            return;
         }
-        if changed {
-            self.cells = next;
-            self.revision = revision;
+        self.revision += 1;
+        let bounds = self.cells.bounds();
+        for chunk in changed {
+            if let Some(index) = bounds.chunk_index(chunk) {
+                self.chunk_revisions[index] = self.revision;
+            }
         }
     }
 }

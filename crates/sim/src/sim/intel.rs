@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 
+use crate::world::map::MapBounds;
+
 use crate::sim::catalog::{Diplomacy, Team};
 use crate::sim::components::{Building, Unit};
 use crate::sim::determinism::SimId;
@@ -30,6 +32,13 @@ impl Intel {
 
     pub fn vision(&self, viewer: Team) -> &FogOfWar {
         &self.visions[viewer.index()]
+    }
+
+    /// Every side's fog covers `wider`, where the new ground is unexplored.
+    pub fn widen(&mut self, wider: MapBounds) {
+        for vision in &mut self.visions {
+            vision.widen(wider);
+        }
     }
 
     pub fn vision_mut(&mut self, viewer: Team) -> &mut FogOfWar {

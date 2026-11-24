@@ -4,10 +4,13 @@ use bevy::prelude::*;
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 
+use crate::levels::ActiveLevel;
 use crate::sim::catalog::CRYSTAL_PER_CELL;
+use crate::sim::intel::Intel;
 use crate::world::map::{
-    CELL_SIZE, CHUNK_CELLS, CrystalField, GameMap, base_sites, is_water, map_bounds, near_base,
-    spawn_crystal_visual,
+    CELL_SIZE, CHUNK_CELLS, CrystalField, CrystalFields, GameMap, MapBounds, base_sites,
+    block_water_among, is_water, level_bounds, map_bounds, near_base, spawn_crystal_visual,
+    widen_map_bounds,
 };
 use crate::world::scenery::{
     BUSHES, CLUMP_SIZE, CLUMP_SPREAD, CONIFER_FOREST, DEAD_TREE_CHANCE, DECIDUOUS_FOREST,
@@ -55,10 +58,55 @@ pub fn generate_wilds(
     let mut outlands = StdRng::seed_from_u64(map_seed ^ OUTLANDS_SALT);
     cover_mountains(scenery, Landscape::Wilds, &mut outlands);
     let mut fields = home_fields();
-    fields.extend(
-        (0..bounds.chunk_count()).filter_map(|index| own_field(map_seed, bounds.chunk_at(index))),
-    );
+    fields.extend(own_fields_among(
+        map_seed,
+        (0..bounds.chunk_count()).map(|index| bounds.chunk_at(index)),
+    ));
     fields
+}
+
+fn own_fields_among(
+    map_seed: u64,
+    chunks: impl Iterator<Item = IVec2>,
+) -> impl Iterator<Item = CrystalField> {
+    chunks.filter_map(move |chunk| own_field(map_seed, chunk))
+}
+
+/// Widens the world to `wider`, which contains it and like it starts and ends on chunk edges: the map and every
+/// side's fog cover the new ground, and each new chunk is generated as `generate_chunk` makes it.
+pub fn widen_world(world: &mut World, wider: MapBounds) {
+    let narrow = map_bounds();
+    let on_chunk_edges = |bounds: MapBounds| {
+        bounds.min.rem_euclid(IVec2::splat(CHUNK_CELLS)) == IVec2::ZERO
+            && bounds.size.rem_euclid(IVec2::splat(CHUNK_CELLS)) == IVec2::ZERO
+    };
+    assert!(
+        on_chunk_edges(narrow) && on_chunk_edges(wider),
+        "the wilds widen by whole chunks"
+    );
+    let map_seed = world.resource::<ActiveLevel>().0.map_seed;
+    widen_map_bounds(wider);
+    let new_chunks: Vec<IVec2> = (0..wider.chunk_count())
+        .map(|index| wider.chunk_at(index))
+        .filter(|&chunk| !narrow.contains(chunk * CHUNK_CELLS))
+        .collect();
+    world.resource_scope(|world, mut map: Mut<GameMap>| {
+        world.resource_scope(|world, mut scenery: Mut<SceneryLayout>| {
+            map.widen(wider);
+            let mut commands = world.commands();
+            for &chunk in &new_chunks {
+                map.open_chunk(chunk);
+                let (first, last) = wider.cells_of_chunk(chunk);
+                block_water_among(&mut map, Landscape::Wilds, cells_between(first, last));
+                generate_chunk(&mut commands, &mut map, &mut scenery, map_seed, chunk);
+            }
+        });
+    });
+    world.flush();
+    world.resource_mut::<Intel>().widen(wider);
+    let new_fields: Vec<CrystalField> =
+        own_fields_among(map_seed, new_chunks.into_iter()).collect();
+    world.resource_mut::<CrystalFields>().0.extend(new_fields);
 }
 
 /// The crystal and scenery of one chunk; it changes no cell outside the chunk.
@@ -109,7 +157,7 @@ fn crystal_look(map_seed: u64, cell: IVec2) -> StdRng {
 /// A field beside every base, where the standard map has the player's: diagonally towards the middle of the
 /// map, so every side starts with crystal at hand.
 fn home_fields() -> Vec<CrystalField> {
-    let middle = map_bounds().center_cells();
+    let middle = level_bounds().center_cells();
     base_sites()
         .iter()
         .map(|site| {
@@ -123,7 +171,8 @@ fn home_fields() -> Vec<CrystalField> {
         .collect()
 }
 
-/// The field a chunk has of its own, if any; never beside a base, where the home fields are.
+/// The field a chunk has of its own, if any; never beside a base, where the home fields are. It does not
+/// depend on the map's bounds, so a chunk at the edge has its neighbour's crystal before the map widens there.
 fn own_field(map_seed: u64, chunk: IVec2) -> Option<CrystalField> {
     let mut rng = chunk_rng(map_seed ^ FIELDS_SALT, chunk);
     if !rng.random_bool(FIELD_CHANCE) {
@@ -136,7 +185,7 @@ fn own_field(map_seed: u64, chunk: IVec2) -> Option<CrystalField> {
     let clear_of_bases = base_sites()
         .iter()
         .all(|site| (center - *site).as_vec2().length() > 2.0 * 9.0);
-    (clear_of_bases && map_bounds().contains(center)).then_some(CrystalField { center, radius })
+    clear_of_bases.then_some(CrystalField { center, radius })
 }
 
 fn fields_reaching(map_seed: u64, chunk: IVec2) -> Vec<CrystalField> {
@@ -361,7 +410,7 @@ mod tests {
 
     use super::*;
     use crate::levels::{ActiveLevel, LevelDefinition};
-    use crate::world::map::{MapBounds, MapSize, generate_map, set_map_bounds};
+    use crate::world::map::{MapSize, cell_center, chunk_of, generate_map, set_map_bounds};
 
     fn wilds(map_seed: u64, map_size: MapSize) -> World {
         let level = LevelDefinition {
@@ -449,6 +498,65 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn widening_keeps_the_old_ground_and_makes_the_new_as_if_alone() {
+        let seed = 23;
+        let mut world = wilds(seed, MapSize::Large);
+        world.insert_resource(Intel::new(true));
+        let narrow = map_bounds();
+        let base = base_sites()[0];
+        world
+            .resource_mut::<Intel>()
+            .vision_mut(crate::sim::catalog::Team::Player)
+            .reveal_around([(cell_center(base), 10.0)]);
+        let before = crystal_and_obstacles(world.resource::<GameMap>(), narrow.cells());
+        let wider = MapBounds {
+            min: narrow.min - IVec2::splat(CHUNK_CELLS),
+            size: narrow.size + IVec2::splat(2 * CHUNK_CELLS),
+        };
+
+        widen_world(&mut world, wider);
+
+        let map = world.resource::<GameMap>();
+        assert_eq!(before, crystal_and_obstacles(map, narrow.cells()));
+        assert_eq!(
+            base_sites()[0],
+            base,
+            "the bases stay where the level put them"
+        );
+        let explored = world
+            .resource::<Intel>()
+            .vision(crate::sim::catalog::Team::Player)
+            .is_explored(cell_center(base));
+        assert!(explored, "known ground stays known");
+
+        let corner = chunk_of(wider.min);
+        let (first, last) = wider.cells_of_chunk(corner);
+        let mut alone_world = World::new();
+        let mut alone_map = GameMap::open_field();
+        crate::world::map::block_water(&mut alone_map, Landscape::Wilds);
+        let mut alone_scenery = SceneryLayout::default();
+        let mut commands = alone_world.commands();
+        generate_chunk(
+            &mut commands,
+            &mut alone_map,
+            &mut alone_scenery,
+            seed,
+            corner,
+        );
+        assert_eq!(
+            crystal_and_obstacles(map, cells_between(first, last)),
+            crystal_and_obstacles(&alone_map, cells_between(first, last))
+        );
+        let out_there = map
+            .nearest_passable(first + IVec2::splat(CHUNK_CELLS / 2))
+            .unwrap();
+        assert!(
+            map.find_path(base, out_there).is_some(),
+            "the new ground is reachable"
+        );
     }
 
     #[test]

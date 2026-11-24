@@ -49,6 +49,7 @@ pub mod map;
 pub mod map_editor;
 pub mod map_edits;
 pub mod map_preview;
+pub mod map_regions;
 pub mod match_flow;
 pub mod match_stats;
 pub mod medical;

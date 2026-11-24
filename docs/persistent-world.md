@@ -131,10 +131,22 @@ for ordinary network matches.
    ahead), and that changes routes and so the fingerprints; it becomes worth it when orders across a world
    larger than 1024 cells are common.
 
-   What does grow with the area is labelling the map's connected regions, which the route search uses to
-   refuse unreachable goals at once: the whole map again after every structure placed or removed, 0.5 ms on
-   a Vast map, 1.8 ms on 512 cells, 5.7 ms on 1024. A persistent world where many players build needs it
-   per chunk.
+   What did grow with the area was labelling the map's connected regions, which the route search uses to
+   refuse unreachable goals at once: the whole map again after every structure placed or removed. Done:
+   each chunk now labels its own parts and the parts are joined across chunk edges (`map_regions.rs`), so a
+   structure relabels its chunk and redoes the joins. Connections are exactly those of one flood fill (a test
+   compares them over random maps and edits); fingerprints and the balance report are unchanged. After a
+   structure, on River maps with forests:
+
+   | Map | Whole map | After a structure |
+   | --- | --- | --- |
+   | 256 × 256 | 0.54 ms | 0.03 ms |
+   | 512 × 512 | 1.83 ms | 0.10 ms |
+   | 1024 × 1024 | 7.25 ms | 0.44 ms |
+   | 2048 × 2048 | 29.6 ms | 2.1 ms |
+
+   The joins still walk every chunk edge; joining only around the changed chunk is the next step if a
+   world of 2048 cells sees many structures a second.
 7. **Minimap for a world.** The minimap shows the surroundings of the camera at a fixed scale, with a separate
    overview downsampled from the chunks.
 

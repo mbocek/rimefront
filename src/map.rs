@@ -12,6 +12,7 @@ use crate::catalog::CRYSTAL_PER_CELL;
 use crate::crystal_models::{CRYSTAL_MODELS, CrystalModel};
 use crate::fog_view::FogTexture;
 use crate::levels::ActiveLevel;
+use crate::map_regions::Regions;
 use crate::scenery::{self, SceneryLayout};
 use crate::sim_math;
 use crate::terrain::{FAR_RING_WIDTH, Landscape, OUTLANDS_WIDTH, WATER_LEVEL, approximate_ground};
@@ -301,49 +302,7 @@ pub struct GameMap {
     crystal: Vec<u32>,
     /// How many cells still hold crystal, so a search of the whole map can be skipped once it is mined out.
     crystal_cells: usize,
-    /// `None` after passability changed; labelled again by the next route search that needs it.
-    regions: Mutex<Option<Regions>>,
-}
-
-/// Areas of passable cells a unit can drive between, so a route into another one fails at once instead of
-/// after searching every cell it could reach.
-struct Regions(Vec<u32>);
-
-impl Regions {
-    const IMPASSABLE: u32 = 0;
-
-    fn label(map: &GameMap) -> Self {
-        let bounds = map_bounds();
-        let mut labels = vec![Self::IMPASSABLE; bounds.area()];
-        let mut next_label = Self::IMPASSABLE;
-        let mut frontier = Vec::new();
-        for index in 0..labels.len() {
-            let seed = bounds.cell_at(index);
-            if labels[index] != Self::IMPASSABLE || !map.is_passable(seed) {
-                continue;
-            }
-            next_label += 1;
-            labels[index] = next_label;
-            frontier.push(seed);
-            while let Some(cell) = frontier.pop() {
-                for step in [IVec2::X, IVec2::NEG_X, IVec2::Y, IVec2::NEG_Y] {
-                    let next = cell + step;
-                    let Some(i) = GameMap::index(next) else {
-                        continue;
-                    };
-                    if labels[i] == Self::IMPASSABLE && map.is_passable(next) {
-                        labels[i] = next_label;
-                        frontier.push(next);
-                    }
-                }
-            }
-        }
-        Self(labels)
-    }
-
-    fn of(&self, cell: IVec2) -> u32 {
-        GameMap::index(cell).map_or(Self::IMPASSABLE, |i| self.0[i])
-    }
+    regions: Mutex<Regions>,
 }
 
 #[derive(Component)]
@@ -361,7 +320,7 @@ impl GameMap {
             building: vec![None; cells],
             crystal: vec![0; cells],
             crystal_cells: 0,
-            regions: Mutex::new(None),
+            regions: Mutex::new(Regions::new()),
         }
     }
 
@@ -396,8 +355,8 @@ impl GameMap {
             if let Some(i) = Self::index(cell) {
                 self.building[i] = occupant;
             }
+            self.regions_mut().forget_around(cell);
         }
-        self.forget_regions();
     }
 
     pub fn crystal_amounts(&self) -> Vec<u32> {
@@ -411,7 +370,7 @@ impl GameMap {
             self.crystal = crystal;
         }
         self.building.fill(None);
-        self.forget_regions();
+        self.regions_mut().forget_all();
     }
 
     pub fn set_crystal(&mut self, cell: IVec2, amount: u32) {
@@ -434,14 +393,13 @@ impl GameMap {
         if let Some(i) = Self::index(cell) {
             self.terrain_blocked[i] = blocked;
         }
-        self.forget_regions();
+        self.regions_mut().forget_around(cell);
     }
 
-    fn forget_regions(&mut self) {
-        *self
-            .regions
+    fn regions_mut(&mut self) -> &mut Regions {
+        self.regions
             .get_mut()
-            .unwrap_or_else(PoisonError::into_inner) = None;
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Whether a unit at `from` could drive to the passable cell `to`. A unit stuck on a blocked cell, inside
@@ -451,8 +409,7 @@ impl GameMap {
             return true;
         }
         let mut regions = self.regions.lock().unwrap_or_else(PoisonError::into_inner);
-        let regions = regions.get_or_insert_with(|| Regions::label(self));
-        regions.of(from) == regions.of(to)
+        regions.of(self, from) == regions.of(self, to)
     }
 
     pub fn crystal_at(&self, cell: IVec2) -> u32 {

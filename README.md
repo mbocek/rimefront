@@ -58,6 +58,7 @@ make help          # every target
 | [Balance](docs/balance.md) | the balance tool and its latest results |
 | [Development](docs/development.md) | building, tests, packages and releases, the Blender model contract |
 | [Code layout](docs/architecture.md) | what each module is responsible for |
+| [Persistent world](docs/persistent-world.md) | the steps towards a permanent world far larger than a match map |
 | [Signing](docs/signing.md) | signing and notarizing release builds |
 
 ## Third-party assets

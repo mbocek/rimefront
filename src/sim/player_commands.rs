@@ -11,6 +11,7 @@ use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
 use crate::sim::engineers::{EngineerTask, job_for};
 use crate::sim::movement::order_move;
+use crate::sim::notifications::Notifications;
 use crate::sim::production::{
     BuildItem, Lane, Production, affordable_wall_line, construct_building, owned_building_kinds,
     placement_context,
@@ -18,7 +19,6 @@ use crate::sim::production::{
 use crate::sim::structures::{StructureOrder, StructureOrderKind};
 use crate::sim::support_powers::{SupportPower, SupportPowers, owned_kinds};
 use crate::sim::transport::{BoardingTask, Unloading};
-use crate::ui::notifications::Notifications;
 use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cells_by_distance, world_to_cell};
 

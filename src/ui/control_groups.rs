@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use crate::app::i18n::tr_fmt;
 use crate::sim::catalog::Team;
 use crate::sim::components::{Selected, Unit};
+use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
-use crate::ui::notifications::Notifications;
 use crate::ui::sidebar::{ACCENT, FRAME, PANEL, TEXT_DIM, TEXT_MAIN, UiFonts, set_field};
 use crate::view::camera::RtsCamera;
 
@@ -39,6 +39,10 @@ enum GroupCommand {
     Assign,
     AddToSelection,
     Recall,
+}
+
+pub fn start_without_groups(mut commands: Commands) {
+    commands.insert_resource(ControlGroups::default());
 }
 
 pub fn handle_group_keys(

@@ -15,6 +15,7 @@ pub mod match_stats;
 pub mod medical;
 pub mod movement;
 pub mod neutral_sites;
+pub mod notifications;
 pub mod outcome;
 pub mod player_commands;
 pub mod production;

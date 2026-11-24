@@ -2,18 +2,13 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
+use crate::sim::components::WallSegment;
+
 use crate::sim::catalog::Team;
 use crate::view::assets::ModelLibrary;
 
 /// The four neighbours a wall can join, as cell steps.
 const NEIGHBOURS: [IVec2; 4] = [IVec2::X, IVec2::Y, IVec2::NEG_X, IVec2::NEG_Y];
-
-/// A wall segment on the ground: a placed wall, or a wall in a replay.
-#[derive(Component, Clone, Copy, Debug)]
-pub struct WallSegment {
-    pub cell: IVec2,
-    pub team: Team,
-}
 
 /// Which neighbours a wall is joined to, one bit per entry of `NEIGHBOURS`.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default)]

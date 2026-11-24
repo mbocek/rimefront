@@ -24,13 +24,13 @@ use crate::sim::catalog::{BuildingKind, Faction, HARVESTER_CAPACITY, Team, UnitK
 use crate::sim::components::*;
 use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::economy::Economies;
+use crate::sim::notifications::Notifications;
 use crate::sim::outcome::{GameOutcome, objective_status};
 use crate::sim::production::{BuildItem, EnqueueRefusal, Lane, Production, owned_building_kinds};
 use crate::ui::control_groups::spawn_group_bar;
 use crate::ui::menu::{MenuPlace, MenuState, open_menu_from_button, spawn_menu};
 use crate::ui::minimap::{Minimap, jump_camera_on_drag, jump_camera_on_press, order_on_press};
 use crate::ui::network_hud::{spawn_chat_line, spawn_network_hud};
-use crate::ui::notifications::Notifications;
 use crate::ui::perf_overlay::spawn_performance_overlay;
 use crate::ui::placement::Placement;
 use crate::ui::queue_bar::spawn_queue_bar;

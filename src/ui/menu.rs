@@ -1,5 +1,5 @@
 use crate::net::network::NetSession;
-use crate::ui::notifications::Notifications;
+use crate::sim::notifications::Notifications;
 use crate::ui::structure_tools::StructureTool;
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;

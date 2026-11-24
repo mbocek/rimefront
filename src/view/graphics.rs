@@ -6,8 +6,8 @@ use bevy::prelude::*;
 
 use crate::app::i18n::{tr_fmt, tr_owned};
 use crate::app::settings::{GameSettings, QualityPreset, ShadowQuality};
+use crate::sim::notifications::Notifications;
 use crate::ui::key_bindings::Action;
-use crate::ui::notifications::Notifications;
 use crate::view::camera::RtsCamera;
 use crate::view::fog_view::Shrouded;
 

@@ -9,14 +9,12 @@ use crate::sim::determinism::{SimEntities, SimIds, SimulationRng};
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
 use crate::sim::match_stats::MatchStats;
+use crate::sim::notifications::{LastAlert, Notifications};
 use crate::sim::outcome::GameOutcome;
 use crate::sim::player_commands::{CommandQueue, SimulationTick};
 use crate::sim::production::{BuildItem, PlacementContext, Production, construct_building};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::sim::veterancy::LastHits;
-use crate::ui::control_groups::ControlGroups;
-use crate::ui::notifications::{LastAlert, Notifications};
-use crate::ui::placement::Placement;
 use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cell_center, in_far_half};
 
@@ -70,12 +68,10 @@ pub fn reset_match_state(mut commands: Commands, level: Res<ActiveLevel>) {
     commands.insert_resource(Targets::default());
     commands.insert_resource(Economies::default());
     commands.insert_resource(Production::default());
-    commands.insert_resource(Placement::default());
     commands.insert_resource(AiCommanders::default());
     commands.insert_resource(GameOutcome::default());
     commands.insert_resource(Notifications::default());
     commands.insert_resource(LastAlert::default());
-    commands.insert_resource(ControlGroups::default());
     commands.insert_resource(MatchClock::default());
     commands.insert_resource(crate::world::weather::WeatherForecast::for_level(&level.0));
     commands.insert_resource(crate::missions::level_events::EventsFired(vec![

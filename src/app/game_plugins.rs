@@ -21,7 +21,9 @@ pub struct InterpolationPlugin;
 
 impl Plugin for InterpolationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedFirst, interpolation::restore_simulated_transforms)
+        app.add_observer(interpolation::follow_new_unit)
+            .add_observer(interpolation::follow_new_projectile)
+            .add_systems(FixedFirst, interpolation::restore_simulated_transforms)
             .add_systems(FixedLast, interpolation::record_simulated_transforms)
             .add_systems(
                 RunFixedMainLoop,
@@ -43,6 +45,8 @@ impl Plugin for BattleViewPlugin {
             .init_resource::<minimap::MinimapOrder>()
             .init_resource::<crystal_models::CrystalModelLibrary>()
             .init_resource::<animation::AnimationLibrary>()
+            .init_resource::<placement::Placement>()
+            .init_resource::<control_groups::ControlGroups>()
             .init_gizmo_group::<overlay::HealthBarGizmos>()
             .add_systems(
                 Update,
@@ -97,6 +101,8 @@ impl Plugin for BattleViewPlugin {
             .add_systems(
                 OnEnter(match_flow::GameState::Playing),
                 (
+                    placement::start_without_placement,
+                    control_groups::start_without_groups,
                     local_view::prepare_spectator_view,
                     camera::focus_on_player_base,
                     map::spawn_terrain_visuals,

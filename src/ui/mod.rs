@@ -7,7 +7,6 @@ pub mod map_preview;
 pub mod menu;
 pub mod minimap;
 pub mod network_hud;
-pub mod notifications;
 pub mod orders;
 pub mod perf_overlay;
 pub mod placement;

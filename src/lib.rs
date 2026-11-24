@@ -14,10 +14,9 @@ use missions::{level_events, levels};
 use net::network;
 use sim::{
     abilities, ai, cadence, catalog, combat, cues, determinism, economy, engineers, intel,
-    match_stats, medical, movement, neutral_sites, outcome, player_commands, production, servicing,
-    sorties, structures, support_powers, transport, unit_orders, veterancy,
+    match_stats, medical, movement, neutral_sites, notifications, outcome, player_commands,
+    production, servicing, sorties, structures, support_powers, transport, unit_orders, veterancy,
 };
-use ui::{control_groups, notifications, placement};
 use world::{map, map_edits, scenery};
 
 use bevy::prelude::*;
@@ -118,12 +117,10 @@ impl Plugin for SimulationPlugin {
             .add_observer(determinism::number_new_projectile)
             .init_resource::<economy::Economies>()
             .init_resource::<production::Production>()
-            .init_resource::<placement::Placement>()
             .init_resource::<ai::AiCommanders>()
             .init_resource::<outcome::GameOutcome>()
             .init_resource::<notifications::Notifications>()
             .init_resource::<notifications::LastAlert>()
-            .init_resource::<control_groups::ControlGroups>()
             .init_resource::<match_flow::MatchClock>()
             .init_resource::<intel::Intel>()
             .init_resource::<support_powers::SupportPowers>()

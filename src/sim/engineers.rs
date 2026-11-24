@@ -8,9 +8,9 @@ use crate::sim::components::{Building, Health, Mobile, Orders};
 use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
+use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::spawn::spawn_building;
-use crate::ui::notifications::Notifications;
 use crate::view::assets::ModelLibrary;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_center};
 

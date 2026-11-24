@@ -5,7 +5,7 @@ use rand::{RngExt, SeedableRng};
 use crate::app::i18n::tr;
 use crate::app::match_flow::MatchClock;
 use crate::missions::levels::{ActiveLevel, LevelDefinition, Weather};
-use crate::ui::notifications::Notifications;
+use crate::sim::notifications::Notifications;
 use crate::view::terrain_material::{TerrainMaterial, TerrainMaterialHandle};
 use crate::world::season::Season;
 

@@ -10,6 +10,7 @@ use crate::app::settings::game_data_directory;
 use crate::missions::levels::{ActiveLevel, LevelDefinition};
 use crate::sim::catalog::{ArmorClass, BuildingKind, ProjectileStyle, Team, UnitKind};
 use crate::sim::combat::{Impact, Projectile};
+use crate::sim::components::WallSegment;
 use crate::sim::components::{Aircraft, Building, Health, Mobile, Unit};
 use crate::sim::cues::BlastSize;
 use crate::sim::movement::FLIGHT_ALTITUDE;
@@ -19,7 +20,6 @@ use crate::ui::sidebar::{ACCENT, TEXT_MAIN, UiFonts};
 use crate::view::animation::{ReplayMotion, animated_unit_model};
 use crate::view::assets::ModelLibrary;
 use crate::view::effects::{EffectAssets, spawn_blast};
-use crate::view::wall_joints::WallSegment;
 use crate::world::map::{footprint_center, world_to_cell};
 
 const REPLAY_VERSION: u32 = 1;

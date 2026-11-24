@@ -11,10 +11,10 @@ use crate::net::relay::Relay;
 use crate::sim::ai::AiCommanders;
 use crate::sim::catalog::Team;
 use crate::sim::determinism::simulation_checksum;
+use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::{
     CommandQueue, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
 };
-use crate::ui::notifications::Notifications;
 
 pub use crate::net::link::{Arrival, Dialling, JoinTarget, Link, Side};
 

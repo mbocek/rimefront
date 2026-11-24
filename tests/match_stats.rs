@@ -41,7 +41,7 @@ fn the_tally_counts_kills_losses_damage_and_new_units() {
 
 #[test]
 fn an_attack_on_a_harvester_is_announced_with_its_place() {
-    use iron_tide::ui::notifications::{LastAlert, Notifications};
+    use iron_tide::sim::notifications::{LastAlert, Notifications};
     let mut battle = Battle::sandbox();
     let field = IVec2::new(24, 45);
     battle.spawn_unit(UnitKind::Harvester, Team::Player, field);

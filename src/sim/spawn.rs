@@ -8,8 +8,6 @@ use crate::sim::medical::Healer;
 use crate::sim::sorties::Sortie;
 use crate::view::animation::{animated_building_model, animated_unit_model};
 use crate::view::assets::ModelLibrary;
-use crate::view::interpolation::TickTransforms;
-use crate::view::wall_joints::WallSegment;
 use crate::world::map::{
     CELL_SIZE, GameMap, footprint_center, in_far_half, opposite_cell, opposite_origin,
 };
@@ -37,7 +35,6 @@ pub fn spawn_unit(
         WorldAssetRoot(models.unit(kind, team)),
         animated_unit_model(kind, team),
         Transform::from_translation(position).with_rotation(Quat::from_rotation_y(facing)),
-        TickTransforms::default(),
     ));
     if let Some(weapon) = spec.weapon {
         unit.insert((

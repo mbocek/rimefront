@@ -22,7 +22,6 @@ use crate::sim::transport::Embarked;
 use crate::sim::veterancy::{Rank, Veterancy};
 use crate::view::animation::{animated_unit_model, spawn_corpse};
 use crate::view::assets::ModelLibrary;
-use crate::view::interpolation::TickTransforms;
 use crate::world::map::{CELL_SIZE, GameMap, world_to_cell};
 
 const SIGHT_BEYOND_RANGE: f32 = 6.0;
@@ -521,7 +520,6 @@ pub(crate) fn fire_projectile(
             weapon,
         },
         Transform::from_translation(muzzle),
-        TickTransforms::default(),
     ));
 }
 
@@ -545,7 +543,6 @@ pub(crate) fn drop_shell(commands: &mut Commands, team: Team, impact: Vec3, weap
             weapon,
         },
         Transform::from_translation(start),
-        TickTransforms::default(),
     ));
 }
 

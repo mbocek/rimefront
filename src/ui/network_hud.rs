@@ -3,9 +3,9 @@ use bevy::prelude::*;
 
 use crate::app::i18n::{tr, tr_fmt};
 use crate::net::network::{NetSession, SessionState};
+use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::player_commands::SimulationTick;
-use crate::ui::notifications::Notifications;
 use crate::ui::sidebar::{ACCENT, SIDEBAR_WIDTH, TEXT_DIM, UiFonts, set_field};
 
 /// A short stall is ordinary network jitter; only a longer one is worth telling the player about.

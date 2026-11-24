@@ -1,4 +1,4 @@
-use crate::ui::notifications::LastAlert;
+use crate::sim::notifications::LastAlert;
 use bevy::anti_alias::smaa::Smaa;
 use bevy::camera::Hdr;
 use bevy::input::mouse::{AccumulatedMouseMotion, MouseScrollUnit, MouseWheel};

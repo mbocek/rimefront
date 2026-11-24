@@ -1,11 +1,27 @@
 use bevy::prelude::*;
 
+use crate::sim::combat::Projectile;
+use crate::sim::components::Unit;
+
 /// Where something the simulation moves stood after the last two ticks. Frames between ticks draw it part
 /// way; before each tick its exact simulated transform comes back, so drawing never changes the battle.
 #[derive(Component, Default)]
 pub struct TickTransforms {
     previous: Option<Transform>,
     current: Option<Transform>,
+}
+
+/// Everything the simulation moves is drawn between ticks: units and projectiles.
+pub fn follow_new_unit(added: On<Add<Unit>>, mut commands: Commands) {
+    commands
+        .entity(added.entity)
+        .insert(TickTransforms::default());
+}
+
+pub fn follow_new_projectile(added: On<Add<Projectile>>, mut commands: Commands) {
+    commands
+        .entity(added.entity)
+        .insert(TickTransforms::default());
 }
 
 pub fn restore_simulated_transforms(mut moving: Query<(&mut Transform, &mut TickTransforms)>) {

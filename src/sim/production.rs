@@ -12,10 +12,10 @@ use crate::sim::determinism::SimulationRng;
 use crate::sim::economy::Economies;
 use crate::sim::fog::{CellSight, FogOfWar};
 use crate::sim::movement::{FLIGHT_ALTITUDE, order_move};
+use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::research::Upgrade;
 use crate::sim::spawn::{exit_cell, spawn_building, spawn_unit};
-use crate::ui::notifications::Notifications;
 use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cell_center, footprint_cells, footprint_center, world_to_cell};
 

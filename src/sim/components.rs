@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::sim::catalog::{ArmorClass, BuildingKind, UnitKind, WeaponSpec};
+use crate::sim::catalog::{ArmorClass, BuildingKind, Team, UnitKind, WeaponSpec};
 use crate::sim::sim_math;
 
 #[derive(Component)]
@@ -317,4 +317,11 @@ mod tests {
         health.current = 100.0;
         assert_eq!(health.fraction(), 0.5);
     }
+}
+
+/// A wall segment on the ground: a placed wall, or a wall in a replay.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct WallSegment {
+    pub cell: IVec2,
+    pub team: Team,
 }

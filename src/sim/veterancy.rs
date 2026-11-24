@@ -8,9 +8,9 @@ use crate::sim::catalog::{Team, UnitKind};
 use crate::sim::combat::{DamageDealt, DamageSource, Destroyed};
 use crate::sim::components::{Health, Unit};
 use crate::sim::cues::{Sound, SoundCue};
+use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::structures::structure_value;
-use crate::ui::notifications::Notifications;
 
 /// Experience is counted in credits destroyed; a rank is earned at this many times the unit's own price.
 const VETERAN_AT_OWN_PRICE: f32 = 1.0;

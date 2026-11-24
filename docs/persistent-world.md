@@ -179,14 +179,13 @@ for ordinary network matches.
     links the whole game today) and the compiler keeps drawing out of it. What it still reaches into, each
     to be turned into an event the view or sound answers:
     - `sim::combat`, `sim::spawn` and `sim::economy` attach models and corpses as they spawn things
-      (`view::assets`, `view::animation`, `view::interpolation`);
+      (`view::assets`, `view::animation`);
     - `world::map` spawns the ground and water and knows the fog texture (`view::terrain_chunks`,
       `view::terrain_material`, `view::fog_view`, `view::crystal_models`); `world::weather` and
       `world::scenery` reach into materials and graphics settings;
     - `sim::abilities` draws mines (`view::local_view`);
-    - `SimulationPlugin` schedules systems of `app::match_flow` (which reaches into `ui::control_groups` and
-      `ui::placement`), `app::savegame`, `net::network` and `ui::notifications`: the match states and
-      messages belong with the simulation, saving and the network session around it.
+    - `SimulationPlugin` schedules systems of `app::match_flow`, `app::savegame` and `net::network`: the
+      match states belong with the simulation, saving and the network session around it.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

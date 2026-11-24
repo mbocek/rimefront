@@ -33,6 +33,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `fog` | fog of war: what each side knows of the map, with the chunks it last changed in |
 | `intel` | what each side knows: the Syndicate's shared view and the enemy structures each side has spotted |
 | `outcome`, `match_stats` | mission objectives, victory and defeat; the tally shown at the end of a match |
+| `notifications` | status messages for the player, written by the simulation and shown by the sidebar |
 
 ## `world` — the map and its landscape
 
@@ -71,7 +72,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | --- | --- |
 | `camera` | the RTS camera and the ground it sees |
 | `local_view` | the battle as this machine's player sees it, for drawing, sound and the interface |
-| `interpolation` | drawing moving things between simulation ticks |
+| `interpolation` | drawing units and projectiles between simulation ticks |
 | `terrain_material`, `terrain_chunks` | texture layers and the WESL shader; the ground as one patch per chunk, kept only around the camera, built on background threads and rebuilt when its crystal soil changes |
 | `scenery_view`, `flat_scenery` | entities for the props around the camera, redone when a chunk's props change; scenery models merged into one mesh each |
 | `crystal_models`, `motion_material` | crystal deposits merged into one mesh per material; GPU vertex motion (wind, hovering shards) |
@@ -96,7 +97,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `sidebar/` | `mod.rs` fonts, colours and the sidebar's frame (tabs, tiles with icons); `build_menu` tabs, tiles and their tooltip; `resources` credits and power; `info_panel` the selection; `mission_status` objective, match time and notifications; `controls_help` the key overview; `outcome` the victory or defeat screen |
 | `main_menu/` | `mod.rs` the menu's state, hub and screens; `campaign_map` the operations map and briefings; `battle_setup` the battle editor and random battle options; `network_page` hosting and joining; `commands` what each button does; `widgets` its buttons and fields; `update_banner` the update notice |
 | `menu`, `perf_overlay` | in-game menu, performance overlay |
-| `minimap`, `notifications` | minimap, status messages |
+| `minimap` | minimap |
 | `orders` | selection and player orders |
 | `placement` | placing a structure or dragging a wall with the mouse: ghosts, previews and the resulting command |
 | `structure_tools`, `support_tools` | the repair / sell mouse modes, buttons and hint; the support power buttons and aiming |

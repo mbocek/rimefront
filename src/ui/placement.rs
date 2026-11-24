@@ -35,6 +35,10 @@ pub struct GhostMaterials {
     wall_segment: Handle<Mesh>,
 }
 
+pub fn start_without_placement(mut commands: Commands) {
+    commands.insert_resource(Placement::default());
+}
+
 pub fn create_ghost_materials(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,

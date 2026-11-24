@@ -10,6 +10,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | Module | Responsibility |
 | --- | --- |
 | `catalog` | unit and building statistics, weapons, armor |
+| `cues` | the sounds and blasts the simulation asks for; `audio` and `view` play and draw them |
 | `spawn` | spawning units and buildings from the glTF models |
 | `movement` | path following, unit separation |
 | `spatial_index` | finding the units and structures near a point without checking all of them |

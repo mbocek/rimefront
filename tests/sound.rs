@@ -3,9 +3,9 @@ use iron_tide::sim::structures::StructureOrderKind;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::audio::sound::Sound;
 use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
 use iron_tide::sim::components::Health;
+use iron_tide::sim::cues::Sound;
 use iron_tide::sim::production::BuildItem;
 
 const OPEN_FIELD: IVec2 = IVec2::new(30, 45);

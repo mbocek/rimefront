@@ -3,9 +3,9 @@ use bevy::prelude::*;
 
 use crate::app::i18n::{tr, tr_fmt};
 use crate::app::settings::GameSettings;
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::SimId;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::player_commands::{CommandIssuer, PlayerCommand};

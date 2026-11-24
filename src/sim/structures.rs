@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{BuildingKind, Team};
 use crate::sim::components::{AttackTarget, Building, Health, Weapon};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::economy::Economies;
 use crate::sim::player_commands::LocalTeam;

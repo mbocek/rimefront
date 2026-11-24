@@ -18,11 +18,11 @@ use bevy::text::{FontSize, FontSource};
 
 use crate::app::match_flow::{GameState, MatchClock};
 use crate::app::settings::GameSettings;
-use crate::audio::sound::{Sound, SoundCue};
 use crate::missions::levels::{ActiveLevel, LevelDefinition};
 use crate::net::network::NetSession;
 use crate::sim::catalog::{BuildingKind, Faction, HARVESTER_CAPACITY, Team, UnitKind};
 use crate::sim::components::*;
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::economy::Economies;
 use crate::sim::outcome::{GameOutcome, objective_status};
 use crate::sim::production::{BuildItem, EnqueueRefusal, Lane, Production, owned_building_kinds};

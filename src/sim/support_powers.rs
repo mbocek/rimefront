@@ -2,10 +2,10 @@ use bevy::prelude::*;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{BuildingKind, ProjectileStyle, Team, WeaponSpec};
 use crate::sim::combat::drop_shell;
 use crate::sim::components::Building;
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::SimulationRng;
 use crate::world::map::cell_center;
 

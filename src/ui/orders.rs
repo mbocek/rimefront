@@ -2,10 +2,10 @@ use bevy::prelude::*;
 
 use crate::app::i18n::{tr, tr_fmt};
 use crate::app::settings::GameSettings;
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{ArmorClass, BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::combat::{TargetInfo, Targets};
 use crate::sim::components::*;
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::SimId;
 use crate::sim::engineers::{EngineerJob, job_for};
 use crate::sim::neutral_sites::UnclaimedSite;

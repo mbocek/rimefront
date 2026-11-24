@@ -4,10 +4,10 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::app::i18n::{tr, tr_fmt};
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{Team, UnitKind};
 use crate::sim::combat::{DamageDealt, DamageSource, Destroyed};
 use crate::sim::components::{Health, Unit};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::structures::structure_value;
 use crate::ui::notifications::Notifications;

@@ -5,9 +5,9 @@ use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 use crate::app::i18n::{tr, tr_fmt};
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{BuildingKind, Faction, Team, UnitKind};
 use crate::sim::components::*;
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::SimulationRng;
 use crate::sim::economy::Economies;
 use crate::sim::fog::{CellSight, FogOfWar};

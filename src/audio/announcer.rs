@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 use crate::app::i18n::Language;
 use crate::app::settings::GameSettings;
-use crate::audio::sound::{Sound, SoundCue};
+use crate::sim::cues::{Sound, SoundCue};
 
 /// What the radio operator reports; the recordings live in `assets/audio/voice/<language>/`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

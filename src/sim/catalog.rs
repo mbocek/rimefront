@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::audio::sound::Sound;
+use crate::sim::cues::Sound;
 
 /// The player plus up to three computer opponents, who are allied with each other against the player.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]

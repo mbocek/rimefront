@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
 use crate::app::i18n::tr;
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::combat::DamageDealt;
 use crate::sim::components::{Building, Harvester};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::economy::Economies;
 use crate::sim::player_commands::LocalTeam;
 

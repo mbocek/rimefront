@@ -4,10 +4,11 @@ use rand::RngExt;
 use crate::app::settings::GameSettings;
 use crate::sim::combat::{DamageDealt, Targets};
 use crate::sim::components::{BodyRadius, Health};
+use crate::sim::cues::BlastSize;
 use crate::sim::player_commands::LocalTeam;
 use crate::ui::sidebar::UiFonts;
 use crate::view::camera::RtsCamera;
-use crate::view::effects::{BlastSize, EffectAssets, spawn_blast};
+use crate::view::effects::{EffectAssets, spawn_blast};
 
 const NUMBER_LIFETIME_SECS: f32 = 1.1;
 /// Rapid hits on the same target within this window add up into one number instead of a stream.

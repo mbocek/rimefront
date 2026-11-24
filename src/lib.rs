@@ -10,16 +10,14 @@ pub mod view;
 pub mod world;
 
 use app::{game_plugins, match_flow, savegame};
-use audio::sound;
 use missions::{level_events, levels};
 use net::network;
 use sim::{
-    abilities, ai, cadence, catalog, combat, determinism, economy, engineers, intel, match_stats,
-    medical, movement, neutral_sites, outcome, player_commands, production, servicing, sorties,
-    structures, support_powers, transport, unit_orders, veterancy,
+    abilities, ai, cadence, catalog, combat, cues, determinism, economy, engineers, intel,
+    match_stats, medical, movement, neutral_sites, outcome, player_commands, production, servicing,
+    sorties, structures, support_powers, transport, unit_orders, veterancy,
 };
 use ui::{control_groups, notifications, placement};
-use view::effects;
 use world::{map, map_edits, scenery};
 
 use bevy::prelude::*;
@@ -138,8 +136,8 @@ impl Plugin for SimulationPlugin {
             .add_message::<combat::DamageDealt>()
             .add_message::<combat::Destroyed>()
             .add_message::<combat::Impact>()
-            .add_message::<effects::BlastCue>()
-            .add_message::<sound::SoundCue>()
+            .add_message::<cues::BlastCue>()
+            .add_message::<cues::SoundCue>()
             .add_message::<structures::StructureOrder>()
             .add_message::<level_events::MissionMessage>()
             .init_resource::<level_events::EventsFired>()

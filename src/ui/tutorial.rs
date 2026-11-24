@@ -2,10 +2,10 @@ use bevy::prelude::*;
 
 use crate::app::i18n::{tr, tr_fmt};
 use crate::app::settings::GameSettings;
-use crate::audio::sound::{Sound, SoundCue};
 use crate::missions::levels::ActiveLevel;
 use crate::sim::catalog::{BuildingKind, Team, UnitKind};
 use crate::sim::components::{Building, Mobile, Order, Orders, Selected, Unit};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::ui::key_bindings::{Action, KeyBindings};
 use crate::ui::sidebar::{ACCENT, FRAME_BRIGHT, GOOD, PANEL, TEXT_DIM, TEXT_MAIN, UiFonts};
 

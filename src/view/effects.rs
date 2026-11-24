@@ -3,6 +3,7 @@ use rand::RngExt;
 
 use crate::sim::catalog::ProjectileStyle;
 use crate::sim::combat::Projectile;
+use crate::sim::cues::{BlastCue, BlastSize};
 use crate::view::local_view::LocalView;
 
 #[derive(Resource)]
@@ -41,30 +42,6 @@ pub struct FadingLight {
     age: f32,
     lifetime: f32,
     peak_intensity: f32,
-}
-
-/// A blast the simulation set off; presentation draws it.
-#[derive(Message, Clone, Copy)]
-pub struct BlastCue {
-    pub position: Vec3,
-    pub size: BlastSize,
-}
-
-impl BlastCue {
-    pub fn at(position: Vec3, size: BlastSize) -> Self {
-        Self { position, size }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum BlastSize {
-    MuzzleFlash,
-    BulletImpact,
-    ShellImpact,
-    VehicleWreck,
-    BuildingCollapse,
-    DamageSmoke,
-    DamageFire,
 }
 
 pub fn create_effect_assets(

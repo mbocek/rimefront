@@ -11,13 +11,14 @@ use crate::missions::levels::{ActiveLevel, LevelDefinition};
 use crate::sim::catalog::{ArmorClass, BuildingKind, ProjectileStyle, Team, UnitKind};
 use crate::sim::combat::{Impact, Projectile};
 use crate::sim::components::{Aircraft, Building, Health, Mobile, Unit};
+use crate::sim::cues::BlastSize;
 use crate::sim::movement::FLIGHT_ALTITUDE;
 use crate::sim::neutral_sites::UnclaimedSite;
 use crate::sim::outcome::GameOutcome;
 use crate::ui::sidebar::{ACCENT, TEXT_MAIN, UiFonts};
 use crate::view::animation::{ReplayMotion, animated_unit_model};
 use crate::view::assets::ModelLibrary;
-use crate::view::effects::{BlastSize, EffectAssets, spawn_blast};
+use crate::view::effects::{EffectAssets, spawn_blast};
 use crate::view::wall_joints::WallSegment;
 use crate::world::map::{footprint_center, world_to_cell};
 

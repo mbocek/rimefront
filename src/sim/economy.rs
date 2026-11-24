@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{BuildingKind, HARVESTER_CAPACITY, STARTING_CREDITS, Team};
 use crate::sim::components::*;
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
 use crate::sim::player_commands::LocalTeam;

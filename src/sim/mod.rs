@@ -5,6 +5,7 @@ pub mod cadence;
 pub mod catalog;
 pub mod combat;
 pub mod components;
+pub mod cues;
 pub mod determinism;
 pub mod economy;
 pub mod engineers;

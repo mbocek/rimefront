@@ -4,11 +4,12 @@ use crate::sim::abilities::Camouflage;
 use bevy::prelude::*;
 use rand::RngExt;
 
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{
     ArmorClass, BuildingKind, Diplomacy, ProjectileStyle, Team, UnitKind, WeaponSpec,
 };
 use crate::sim::components::*;
+use crate::sim::cues::{BlastCue, BlastSize};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, SimulationRng, in_simulation_order};
 use crate::sim::intel::Intel;
 use crate::sim::movement::order_move;
@@ -21,7 +22,6 @@ use crate::sim::transport::Embarked;
 use crate::sim::veterancy::{Rank, Veterancy};
 use crate::view::animation::{animated_unit_model, spawn_corpse};
 use crate::view::assets::ModelLibrary;
-use crate::view::effects::{BlastCue, BlastSize};
 use crate::view::interpolation::TickTransforms;
 use crate::world::map::{CELL_SIZE, GameMap, world_to_cell};
 

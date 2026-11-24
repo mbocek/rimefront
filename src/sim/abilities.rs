@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::audio::sound::Sound;
 use crate::sim::catalog::{ArmorClass, ProjectileStyle, Team, UnitKind, WeaponSpec};
 use crate::sim::combat::{DamageSource, Shot, Targets, fire_projectile, surface_distance};
 use crate::sim::components::Mobile;
+use crate::sim::cues::BlastCue;
+use crate::sim::cues::Sound;
 use crate::sim::determinism::SimulationRng;
-use crate::view::effects::BlastCue;
 use crate::world::map::cell_center;
 
 pub const MINE_COST: i32 = 100;

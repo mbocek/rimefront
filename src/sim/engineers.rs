@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 
 use crate::app::i18n::{tr, tr_fmt};
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team};
 use crate::sim::components::{Building, Health, Mobile, Orders};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
 use crate::sim::player_commands::LocalTeam;

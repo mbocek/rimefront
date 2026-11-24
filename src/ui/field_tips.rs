@@ -2,9 +2,9 @@ use bevy::prelude::*;
 
 use crate::app::i18n::{tr, tr_fmt};
 use crate::app::settings::GameSettings;
-use crate::audio::sound::{Sound, SoundCue};
 use crate::sim::catalog::{BuildingKind, Team, UnitKind};
 use crate::sim::components::{Building, Selected, Unit};
+use crate::sim::cues::{Sound, SoundCue};
 use crate::ui::key_bindings::{Action, KeyBindings};
 use crate::ui::sidebar::{ACCENT, FRAME_BRIGHT, PANEL, TEXT_DIM, TEXT_MAIN, UiFonts};
 use crate::view::local_view::LocalView;

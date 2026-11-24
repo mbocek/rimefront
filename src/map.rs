@@ -54,38 +54,126 @@ impl MapSize {
     }
 }
 
-// The size of the map being played. Cell maths runs everywhere, so it is ambient rather than passed
-// around; it is kept per thread because every schedule runs on the thread that updates the app, and tests
+/// The cells of the map being played: `size` cells along each axis, starting at `min`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct MapBounds {
+    pub min: IVec2,
+    pub size: IVec2,
+}
+
+impl MapBounds {
+    pub const fn square(cells: i32) -> Self {
+        Self {
+            min: IVec2::ZERO,
+            size: IVec2::splat(cells),
+        }
+    }
+
+    /// The last cell, inclusive.
+    pub fn max(self) -> IVec2 {
+        self.min + self.size - IVec2::ONE
+    }
+
+    pub fn contains(self, cell: IVec2) -> bool {
+        cell.cmpge(self.min).all() && cell.cmple(self.max()).all()
+    }
+
+    /// Where a cell's entry is in a grid of the whole map stored row by row.
+    pub fn index(self, cell: IVec2) -> Option<usize> {
+        self.contains(cell).then(|| {
+            let local = cell - self.min;
+            (local.y * self.size.x + local.x) as usize
+        })
+    }
+
+    pub fn cell_at(self, index: usize) -> IVec2 {
+        let index = index as i32;
+        self.min + IVec2::new(index % self.size.x, index / self.size.x)
+    }
+
+    pub fn area(self) -> usize {
+        (self.size.x * self.size.y) as usize
+    }
+
+    /// Every cell, row by row, in the order of `index`.
+    pub fn cells(self) -> impl Iterator<Item = IVec2> {
+        (self.min.y..=self.max().y)
+            .flat_map(move |y| (self.min.x..=self.max().x).map(move |x| IVec2::new(x, y)))
+    }
+
+    pub fn clamp(self, cell: IVec2) -> IVec2 {
+        cell.clamp(self.min, self.max())
+    }
+
+    pub fn longest_side(self) -> i32 {
+        self.size.max_element()
+    }
+
+    /// The middle in cell units, where a cell's centre is half a cell past its number.
+    pub fn center_cells(self) -> Vec2 {
+        self.min.as_vec2() + (self.size - IVec2::ONE).as_vec2() / 2.0
+    }
+
+    pub fn world_min(self) -> Vec2 {
+        self.min.as_vec2() * CELL_SIZE
+    }
+
+    pub fn world_max(self) -> Vec2 {
+        (self.min + self.size).as_vec2() * CELL_SIZE
+    }
+
+    pub fn world_size(self) -> Vec2 {
+        self.size.as_vec2() * CELL_SIZE
+    }
+
+    pub fn world_center(self) -> Vec2 {
+        self.world_min() + self.world_size() / 2.0
+    }
+
+    /// Whether a point on the ground, in metres, lies on the map.
+    pub fn contains_point(self, point: Vec2) -> bool {
+        point.cmpge(self.world_min()).all() && point.cmplt(self.world_max()).all()
+    }
+
+    /// How much farther apart things are than on the standard map, along each axis.
+    pub fn spread(self) -> Vec2 {
+        (self.size - IVec2::ONE).as_vec2() / (STANDARD_MAP_CELLS - 1) as f32
+    }
+}
+
+// The bounds of the map being played. Cell maths runs everywhere, so they are ambient rather than passed
+// around; they are kept per thread because every schedule runs on the thread that updates the app, and tests
 // that play several battles at once each run on their own thread.
 thread_local! {
-    static ACTIVE_MAP_CELLS: Cell<i32> = const { Cell::new(STANDARD_MAP_CELLS) };
+    static ACTIVE_MAP_BOUNDS: Cell<MapBounds> = const { Cell::new(MapBounds::square(STANDARD_MAP_CELLS)) };
 }
 
 pub fn set_map_size(size: MapSize) {
-    ACTIVE_MAP_CELLS.set(size.cells());
+    set_map_bounds(MapBounds::square(size.cells()));
 }
 
-pub fn map_cells() -> i32 {
-    ACTIVE_MAP_CELLS.get()
+pub fn set_map_bounds(bounds: MapBounds) {
+    ACTIVE_MAP_BOUNDS.set(bounds);
 }
 
-pub fn map_world_size() -> f32 {
-    map_cells() as f32 * CELL_SIZE
+pub fn map_bounds() -> MapBounds {
+    ACTIVE_MAP_BOUNDS.get()
 }
 
-/// How much farther apart things are than on the standard map.
+/// How much farther apart things are than on the standard map; for shapes that do not follow one axis.
 pub fn map_spread() -> f32 {
-    (map_cells() - 1) as f32 / (STANDARD_MAP_CELLS - 1) as f32
+    map_bounds().spread().min_element()
 }
 
 /// Command Center origins of the four corner base sites; levels decide who starts where.
 pub fn base_sites() -> [IVec2; 4] {
-    let far = map_cells();
+    let bounds = map_bounds();
+    let (near, far) = (bounds.min, bounds.min + bounds.size);
     [
-        IVec2::new(6, far - 12),
-        IVec2::new(far - 10, 8),
-        IVec2::new(6, 8),
-        IVec2::new(far - 10, far - 12),
+        IVec2::new(near.x + 6, far.y - 12),
+        IVec2::new(far.x - 10, near.y + 8),
+        IVec2::new(near.x + 6, near.y + 8),
+        IVec2::new(far.x - 10, far.y - 12),
     ]
 }
 
@@ -121,23 +209,35 @@ pub fn relocate(standard: Vec2) -> Vec2 {
     {
         return new + (standard - old);
     }
-    let old_middle = Vec2::splat((STANDARD_MAP_CELLS - 1) as f32 / 2.0);
-    let new_middle = Vec2::splat((map_cells() - 1) as f32 / 2.0);
-    new_middle + (standard - old_middle) * map_spread()
+    let old_middle = MapBounds::square(STANDARD_MAP_CELLS).center_cells();
+    let bounds = map_bounds();
+    bounds.center_cells() + (standard - old_middle) * bounds.spread()
 }
 
 /// A cell and its mirror image always add up to this, so the map plays the same from opposite corners.
-fn mirror_sum() -> i32 {
-    map_cells() - 2
+fn mirror_sum() -> IVec2 {
+    let bounds = map_bounds();
+    bounds.min * 2 + bounds.size - IVec2::splat(2)
 }
 
 pub fn opposite_cell(cell: IVec2) -> IVec2 {
-    IVec2::splat(mirror_sum()) - cell
+    mirror_sum() - cell
+}
+
+/// Whether a cell lies past the diagonal the map is mirrored across, nearer the far corner.
+fn beyond_mirror_diagonal(cell: IVec2) -> bool {
+    2 * (cell.x + cell.y) > mirror_sum().element_sum()
 }
 
 /// The point the map is mirrored around, half a cell off the middle of the world.
 pub fn mirror_centre() -> Vec3 {
-    (cell_center(IVec2::ZERO) + cell_center(opposite_cell(IVec2::ZERO))) / 2.0
+    let first = map_bounds().min;
+    (cell_center(first) + cell_center(opposite_cell(first))) / 2.0
+}
+
+/// The origin of a structure of `footprint` that is its own mirror image, in the middle of the map.
+pub fn self_mirrored_origin(footprint: IVec2) -> IVec2 {
+    (mirror_sum() - (footprint - IVec2::ONE)) / 2
 }
 
 /// Where a structure of `footprint` starting at `origin` lands when the map is mirrored.
@@ -175,12 +275,12 @@ impl Regions {
     const IMPASSABLE: u32 = 0;
 
     fn label(map: &GameMap) -> Self {
-        let size = map_cells();
-        let mut labels = vec![Self::IMPASSABLE; (size * size) as usize];
+        let bounds = map_bounds();
+        let mut labels = vec![Self::IMPASSABLE; bounds.area()];
         let mut next_label = Self::IMPASSABLE;
         let mut frontier = Vec::new();
         for index in 0..labels.len() {
-            let seed = IVec2::new(index as i32 % size, index as i32 / size);
+            let seed = bounds.cell_at(index);
             if labels[index] != Self::IMPASSABLE || !map.is_passable(seed) {
                 continue;
             }
@@ -217,7 +317,7 @@ pub struct CrystalVisual {
 
 impl GameMap {
     fn empty() -> Self {
-        let cells = (map_cells() * map_cells()) as usize;
+        let cells = map_bounds().area();
         Self {
             terrain_blocked: vec![false; cells],
             building: vec![None; cells],
@@ -234,9 +334,7 @@ impl GameMap {
     }
 
     pub(crate) fn index(cell: IVec2) -> Option<usize> {
-        let size = map_cells();
-        let inside = cell.x >= 0 && cell.y >= 0 && cell.x < size && cell.y < size;
-        inside.then(|| (cell.y * size + cell.x) as usize)
+        map_bounds().index(cell)
     }
 
     pub fn in_bounds(cell: IVec2) -> bool {
@@ -342,13 +440,13 @@ impl GameMap {
     }
 
     pub fn nearest_passable(&self, from: IVec2) -> Option<IVec2> {
-        cells_by_distance(from, map_cells()).find(|&cell| self.is_passable(cell))
+        cells_by_distance(from, map_bounds().longest_side()).find(|&cell| self.is_passable(cell))
     }
 
     /// Routes starting in the far half are planned in mirror image, so tie-breaks between equally short
     /// routes favour neither corner.
     pub fn find_path(&self, start: IVec2, goal: IVec2) -> Option<Vec<IVec2>> {
-        let starts_in_far_half = start.x + start.y > mirror_sum();
+        let starts_in_far_half = beyond_mirror_diagonal(start);
         if !starts_in_far_half {
             return self.find_path_in_frame(start, goal, |cell| cell);
         }
@@ -368,7 +466,7 @@ impl GameMap {
         let goal = if passable(goal) {
             goal
         } else {
-            cells_by_distance(goal, map_cells()).find(|&cell| passable(cell))?
+            cells_by_distance(goal, map_bounds().longest_side()).find(|&cell| passable(cell))?
         };
         if !self.may_reach(to_map(start), to_map(goal)) {
             return None;
@@ -422,7 +520,7 @@ fn walkable_neighbours(cell: IVec2, passable: impl Fn(IVec2) -> bool) -> Vec<(IV
 /// Ring by ring outward from `center`; around a centre in the far half each ring is walked in mirror
 /// image, so the first fitting cell (a crystal, a free site, an exit) is the twin of the near half's choice.
 pub fn cells_by_distance(center: IVec2, max_radius: i32) -> impl Iterator<Item = IVec2> {
-    let mirrored = center.x + center.y > mirror_sum();
+    let mirrored = beyond_mirror_diagonal(center);
     let direction = if mirrored { -1 } else { 1 };
     (0..=max_radius).flat_map(move |radius| {
         (-radius..=radius).flat_map(move |dy| {
@@ -541,13 +639,9 @@ pub fn is_water(landscape: Landscape, cell: IVec2) -> bool {
 }
 
 fn block_water(map: &mut GameMap, landscape: Landscape) {
-    let size = map_cells();
-    for row in 0..size {
-        for column in 0..size {
-            let cell = IVec2::new(column, row);
-            if is_water(landscape, cell) {
-                map.set_obstacle(cell, true);
-            }
+    for cell in map_bounds().cells() {
+        if is_water(landscape, cell) {
+            map.set_obstacle(cell, true);
         }
     }
 }
@@ -555,10 +649,13 @@ fn block_water(map: &mut GameMap, landscape: Landscape) {
 /// The last row and column would mirror to cells beyond the first ones, so leaving them open gives the
 /// north-east corner an extra lane behind its base.
 fn block_unmirrored_edge(map: &mut GameMap) {
-    let last = map_cells() - 1;
-    for along in 0..map_cells() {
-        map.set_obstacle(IVec2::new(last, along), true);
-        map.set_obstacle(IVec2::new(along, last), true);
+    let bounds = map_bounds();
+    let last = bounds.max();
+    for row in bounds.min.y..=last.y {
+        map.set_obstacle(IVec2::new(last.x, row), true);
+    }
+    for column in bounds.min.x..=last.x {
+        map.set_obstacle(IVec2::new(column, last.y), true);
     }
 }
 
@@ -604,10 +701,12 @@ pub fn spawn_terrain_visuals(
         Transform::IDENTITY,
     ));
 
-    let water_span = map_world_size() + 2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH);
+    let bounds = map_bounds();
+    let water_span = bounds.world_size() + Vec2::splat(2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH));
+    let water_middle = bounds.world_center();
     let water_mesh = Plane3d::default()
         .mesh()
-        .size(water_span, water_span)
+        .size(water_span.x, water_span.y)
         .build()
         .with_generated_tangents()
         .expect("plane mesh has normals and UVs");
@@ -615,7 +714,7 @@ pub fn spawn_terrain_visuals(
         WaterSurface,
         Mesh3d(meshes.add(water_mesh)),
         MeshMaterial3d(water_materials.add(water_material(&mut images, fog.0.clone()))),
-        Transform::from_xyz(map_world_size() * 0.5, WATER_LEVEL, map_world_size() * 0.5),
+        Transform::from_xyz(water_middle.x, WATER_LEVEL, water_middle.y),
     ));
 }
 
@@ -714,7 +813,7 @@ pub fn spawn_crystal_visual(
 }
 
 pub fn cell_of_index(index: usize) -> IVec2 {
-    IVec2::new(index as i32 % map_cells(), index as i32 / map_cells())
+    map_bounds().cell_at(index)
 }
 
 pub fn crystal_scale(amount: u32) -> f32 {
@@ -725,6 +824,51 @@ pub fn crystal_scale(amount: u32) -> f32 {
 mod tests {
     use super::*;
     use crate::terrain::river_centerline;
+
+    /// Off the origin and wider than tall, so nothing can lean on a square map starting at cell zero.
+    const SHIFTED_BOUNDS: MapBounds = MapBounds {
+        min: IVec2::new(-40, 12),
+        size: IVec2::new(70, 30),
+    };
+
+    #[test]
+    fn bounds_number_every_cell_once_row_by_row() {
+        let cells: Vec<IVec2> = SHIFTED_BOUNDS.cells().collect();
+        assert_eq!(cells.len(), SHIFTED_BOUNDS.area());
+        assert_eq!(cells[0], SHIFTED_BOUNDS.min);
+        assert_eq!(cells[cells.len() - 1], SHIFTED_BOUNDS.max());
+        for (index, &cell) in cells.iter().enumerate() {
+            assert_eq!(SHIFTED_BOUNDS.index(cell), Some(index));
+            assert_eq!(SHIFTED_BOUNDS.cell_at(index), cell);
+        }
+        for outside in [IVec2::new(-41, 12), IVec2::new(30, 20), IVec2::new(0, 42)] {
+            assert_eq!(SHIFTED_BOUNDS.index(outside), None);
+        }
+    }
+
+    #[test]
+    fn bounds_cover_the_same_ground_in_metres_as_in_cells() {
+        let bounds = SHIFTED_BOUNDS;
+        assert_eq!(bounds.world_min(), Vec2::new(-80.0, 24.0));
+        assert_eq!(bounds.world_max(), Vec2::new(60.0, 84.0));
+        assert!(bounds.contains_point(cell_center(bounds.min).xz()));
+        assert!(bounds.contains_point(cell_center(bounds.max()).xz()));
+        assert!(!bounds.contains_point(bounds.world_max()));
+    }
+
+    #[test]
+    fn a_shifted_map_mirrors_onto_itself_and_routes_across_it() {
+        set_map_bounds(SHIFTED_BOUNDS);
+        let map = GameMap::open_field();
+        for cell in [SHIFTED_BOUNDS.min, IVec2::new(-3, 20), IVec2::new(10, 30)] {
+            let twin = opposite_cell(cell);
+            assert!(SHIFTED_BOUNDS.contains(twin), "{cell} mirrors off the map");
+            assert_eq!(opposite_cell(twin), cell);
+        }
+        let route = map.find_path(SHIFTED_BOUNDS.min, SHIFTED_BOUNDS.max() - IVec2::ONE);
+        assert!(route.is_some_and(|route| route.iter().all(|&cell| map.is_passable(cell))));
+        assert!(cells_by_distance(SHIFTED_BOUNDS.min, 3).all(|cell| SHIFTED_BOUNDS.contains(cell)));
+    }
 
     fn map_with_river() -> GameMap {
         let mut map = GameMap::empty();
@@ -798,7 +942,7 @@ mod tests {
     #[test]
     fn the_river_and_crystal_fields_are_point_symmetric() {
         let map = map_with_river();
-        for cell in (0..map_cells()).flat_map(|y| (0..map_cells()).map(move |x| IVec2::new(x, y))) {
+        for cell in map_bounds().cells() {
             let mirror = opposite_cell(cell);
             if GameMap::in_bounds(mirror) {
                 assert_eq!(
@@ -828,9 +972,7 @@ mod tests {
                     "{landscape:?}: {from} cut off from {to}"
                 );
             }
-            for cell in
-                (0..map_cells()).flat_map(|y| (0..map_cells()).map(move |x| IVec2::new(x, y)))
-            {
+            for cell in map_bounds().cells() {
                 let mirror = opposite_cell(cell);
                 if GameMap::in_bounds(mirror) {
                     assert_eq!(
@@ -929,7 +1071,7 @@ mod tests {
     }
 
     fn every_ring_cell_scanned_row_by_row(center: IVec2, max_radius: i32) -> Vec<IVec2> {
-        let direction = if center.x + center.y > mirror_sum() {
+        let direction = if beyond_mirror_diagonal(center) {
             -1
         } else {
             1
@@ -949,7 +1091,7 @@ mod tests {
 
     #[test]
     fn walking_only_the_ring_visits_the_same_cells_in_the_same_order() {
-        let far = map_cells() - 3;
+        let far = map_bounds().max().x - 2;
         for center in [
             IVec2::new(0, 0),
             IVec2::new(10, 30),
@@ -974,11 +1116,7 @@ mod tests {
 
     #[test]
     fn world_and_cell_coordinates_round_trip() {
-        for cell in [
-            IVec2::ZERO,
-            IVec2::new(17, 42),
-            IVec2::splat(map_cells() - 1),
-        ] {
+        for cell in [IVec2::ZERO, IVec2::new(17, 42), map_bounds().max()] {
             assert_eq!(world_to_cell(cell_center(cell)), cell);
             assert_eq!(cell_of_index(GameMap::index(cell).unwrap()), cell);
         }

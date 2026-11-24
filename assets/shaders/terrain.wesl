@@ -6,12 +6,12 @@ import bevy_pbr::render::mesh_view_bindings::globals;
 struct TerrainSettings {
     grass_tint: vec4<f32>,
     layer_tile_sizes: vec4<f32>,
+    map_area: vec4<f32>,
     pad_tile_size: f32,
     normal_strength: f32,
     macro_variation: f32,
     water_level: f32,
     snow_cover: f32,
-    map_world_size: f32,
     wet_ground: f32,
     cloud_cover: f32,
 };
@@ -177,7 +177,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     out.color = apply_pbr_lighting(pbr_input);
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
 
-    let map_uv = world_xz / terrain.map_world_size;
+    let map_uv = (world_xz - terrain.map_area.xy) / terrain.map_area.zw;
     // The sampler clamps to the edge, so ground beyond the map takes the fog of the nearest edge.
     let fog = textureSampleLevel(fog_texture, fog_sampler, map_uv, 0.0).r;
     out.color = vec4<f32>(out.color.rgb * pow(fog, FOG_GAMMA), out.color.a);

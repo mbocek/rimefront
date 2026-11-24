@@ -4,7 +4,8 @@ use crate::catalog::{BuildingKind, HARVESTER_CAPACITY, STARTING_CREDITS, Team};
 use crate::components::*;
 use crate::determinism::{SimId, in_simulation_order};
 use crate::map::{
-    CrystalVisual, GameMap, cell_center, cells_by_distance, crystal_scale, map_cells, world_to_cell,
+    CrystalVisual, GameMap, cell_center, cells_by_distance, crystal_scale, map_bounds,
+    world_to_cell,
 };
 use crate::movement::order_move;
 use crate::player_commands::LocalTeam;
@@ -281,7 +282,7 @@ fn claimed_crystal(state: HarvestState) -> Option<IVec2> {
 /// rather than idling beside its refinery.
 fn distant_field(map: &GameMap, from: IVec2) -> Option<IVec2> {
     map.has_crystal_left()
-        .then(|| map.nearest_crystal(from, map_cells()))
+        .then(|| map.nearest_crystal(from, map_bounds().longest_side()))
         .flatten()
 }
 

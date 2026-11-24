@@ -6,7 +6,7 @@ use iron_tide::catalog::{BuildingKind, Diplomacy, STARTING_CREDITS, Team, UnitKi
 use iron_tide::components::*;
 use iron_tide::levels::{LevelDefinition, campaign};
 use iron_tide::map::{
-    GameMap, cell_center, footprint_cells, map_cells, opposite_cell, world_to_cell,
+    GameMap, cell_center, footprint_cells, map_bounds, opposite_cell, world_to_cell,
 };
 use iron_tide::movement::order_move;
 use iron_tide::outcome::GameOutcome;
@@ -330,8 +330,7 @@ fn opposite_corners_get_the_same_ground() {
             level: Some(level),
         });
         let map = battle.world().resource::<GameMap>();
-        let cells = (0..map_cells()).flat_map(|y| (0..map_cells()).map(move |x| IVec2::new(x, y)));
-        for cell in cells {
+        for cell in map_bounds().cells() {
             let mirror = opposite_cell(cell);
             if !GameMap::in_bounds(mirror) {
                 continue;

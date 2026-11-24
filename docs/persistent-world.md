@@ -7,8 +7,8 @@ step is one commit and is worth having on its own, for ordinary matches too.
 ## Where we start
 
 - The map is a dense grid sized once per match: `MapSize` (64, 96, 128 or 256 cells of 2 m) sets the
-  thread-local `map_cells()`, and `GameMap`, the fog of war, the minimap and the fog texture are each one
-  `Vec` of `map_cells()²` entries.
+  thread-local map bounds, and `GameMap`, the fog of war, the minimap and the fog texture are each one `Vec`
+  covering the whole map.
 - The terrain is one mesh with a vertex every 0.5 m (about 470 thousand vertices on a Huge map, 1.4 million on
   a Vast one); forests, rocks and crystals are merged into one mesh per model.
 - Pathfinding is A* over cells across the whole map, after a region check that floods the whole map again
@@ -64,9 +64,12 @@ for ordinary network matches.
    answers "who may be near" in simulation order. Target choice, splash damage, mines, spotting camouflage
    and unit separation ask it instead of checking every unit. It works without map bounds, and results are
    identical: the balance report matches byte for byte and the fingerprints are unchanged.
-3. **Map bounds instead of a size.** Replace `map_cells()` with a `MapBounds` (minimum and maximum cell) that
-   code asks for its extent, and stop assuming the map starts at cell zero or is square. The prerequisite for a
-   world that can grow.
+3. **Map bounds instead of a size.** Done: the thread-local `map_bounds()` gives the first cell and the size
+   along each axis (`MapBounds`), and grids, fog, terrain and scenery placement, the minimap, the fog texture,
+   the terrain and water shaders (`map_area`) and the camera all work from it, so a map need not start at cell
+   zero nor be square. Unit tests play a shifted, oblong map. Levels still pick a square `MapSize` at the
+   origin, and the landscapes are still authored for a square: generation by chunk (step 8) replaces that.
+   Results are identical: same fingerprints, same balance report.
 4. **Chunked grids.** `GameMap`, `FogOfWar` and the crystal amounts are stored in chunks of 32 × 32 cells
    behind the same per-cell API; the fog recomputes only chunks a viewer's sight touches, and remembers which
    chunks changed so the fog texture uploads only those.

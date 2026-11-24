@@ -10,8 +10,7 @@ use crate::assets::ModelLibrary;
 use crate::components::Building;
 use crate::graphics::FineDecor;
 use crate::map::{
-    CELL_SIZE, GameMap, cell_center, map_cells, map_spread, map_world_size, near_base,
-    near_crystal_field, opposite_cell,
+    CELL_SIZE, GameMap, cell_center, map_bounds, near_base, near_crystal_field, opposite_cell,
 };
 use crate::terrain::{GroundLayers, Landscape, OUTLANDS_WIDTH};
 
@@ -40,12 +39,14 @@ const MAX_MEADOW_DIRT: f32 = 0.35;
 
 /// Counts are authored for the standard map; a bigger map gets as much per square meter.
 fn by_area(standard_count: usize) -> usize {
-    (standard_count as f32 * map_spread() * map_spread()).round() as usize
+    let spread = map_bounds().spread();
+    (standard_count as f32 * spread.x * spread.y).round() as usize
 }
 
 /// The outlands ring around the map grows with its edge, not its area.
 fn by_border(standard_count: usize) -> usize {
-    (standard_count as f32 * map_spread()).round() as usize
+    let spread = map_bounds().spread();
+    (standard_count as f32 * (spread.x + spread.y) / 2.0).round() as usize
 }
 
 /// Any static piece of landscape: trees, rocks and decoration.
@@ -108,10 +109,12 @@ fn plant_forests(
     map: &mut GameMap,
     rng: &mut StdRng,
 ) {
+    let bounds = map_bounds();
     for _ in 0..by_area(FOREST_PAIRS) {
+        let (first, past_last) = (bounds.min, bounds.min + bounds.size);
         let center = IVec2::new(
-            rng.random_range(2..map_cells() - 2),
-            rng.random_range(2..map_cells() - 2),
+            rng.random_range(first.x + 2..past_last.x - 2),
+            rng.random_range(first.y + 2..past_last.y - 2),
         );
         let species: &[&str] = match rng.random_range(0..3) {
             0 => &CONIFER_FOREST,
@@ -171,10 +174,11 @@ fn place_rocks(
     map: &mut GameMap,
     rng: &mut StdRng,
 ) {
+    let bounds = map_bounds();
     for _ in 0..by_area(ROCK_PAIRS) {
         let cell = IVec2::new(
-            rng.random_range(0..map_cells()),
-            rng.random_range(0..map_cells()),
+            rng.random_range(bounds.min.x..bounds.min.x + bounds.size.x),
+            rng.random_range(bounds.min.y..bounds.min.y + bounds.size.y),
         );
         let model = pick(rng, &ROCKS);
         block_with_prop(commands, models, landscape, map, rng, cell, model, 0.6..1.3);
@@ -189,11 +193,12 @@ fn dress_meadows(
     rng: &mut StdRng,
     ground: &GroundLayers,
 ) {
+    let bounds = map_bounds();
     for _ in 0..by_area(MEADOW_ATTEMPTS) {
         let position = Vec3::new(
-            rng.random_range(0.0..map_world_size()),
+            rng.random_range(bounds.world_min().x..bounds.world_max().x),
             0.0,
-            rng.random_range(0.0..map_world_size()),
+            rng.random_range(bounds.world_min().y..bounds.world_max().y),
         );
         let weights = ground.weights(position.xz(), 0.0);
         let grassy =
@@ -239,15 +244,19 @@ fn line_shores(
     map: &GameMap,
     rng: &mut StdRng,
 ) {
-    let span = -OUTLANDS_WIDTH / CELL_SIZE..map_cells() as f32 + OUTLANDS_WIDTH / CELL_SIZE;
+    let bounds = map_bounds();
+    let beyond_map = OUTLANDS_WIDTH / CELL_SIZE;
+    let columns =
+        bounds.min.x as f32 - beyond_map..(bounds.min.x + bounds.size.x) as f32 + beyond_map;
+    let rows = bounds.min.y as f32 - beyond_map..(bounds.min.y + bounds.size.y) as f32 + beyond_map;
     let mut planted = 0;
     for _ in 0..by_area(SHORE_SAMPLES) {
         if planted == by_area(SHORE_REEDS) {
             break;
         }
         let (column, row) = (
-            rng.random_range(span.clone()),
-            rng.random_range(span.clone()),
+            rng.random_range(columns.clone()),
+            rng.random_range(rows.clone()),
         );
         if !landscape.is_shore(column, row) {
             continue;
@@ -277,16 +286,18 @@ fn cover_mountains(
     landscape: Landscape,
     rng: &mut StdRng,
 ) {
-    let span = -OUTLANDS_WIDTH..map_world_size() + OUTLANDS_WIDTH;
+    let bounds = map_bounds();
+    let (low, high) = (
+        bounds.world_min() - OUTLANDS_WIDTH,
+        bounds.world_max() + OUTLANDS_WIDTH,
+    );
     let random_outland_point = |rng: &mut StdRng| loop {
         let position = Vec3::new(
-            rng.random_range(span.clone()),
+            rng.random_range(low.x..high.x),
             0.0,
-            rng.random_range(span.clone()),
+            rng.random_range(low.y..high.y),
         );
-        let inside = (0.0..map_world_size()).contains(&position.x)
-            && (0.0..map_world_size()).contains(&position.z);
-        if !inside {
+        if !bounds.contains_point(position.xz()) {
             return position;
         }
     };

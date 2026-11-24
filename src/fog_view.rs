@@ -9,21 +9,21 @@ use crate::combat::Projectile;
 use crate::components::{Building, Unit};
 use crate::fog::{CellSight, FogOfWar};
 use crate::local_view::LocalView;
-use crate::map::{CrystalVisual, footprint_cells, map_cells};
+use crate::map::{CrystalVisual, footprint_cells, map_bounds};
 use crate::neutral_sites::UnclaimedSite;
 use crate::scenery::Scenery;
 use crate::transport::Embarked;
 
 const TEXELS_PER_CELL: i32 = 4;
 const BLUR_RADIUS: i32 = 3;
-fn resolution() -> u32 {
-    (map_cells() * TEXELS_PER_CELL) as u32
+fn resolution() -> UVec2 {
+    (map_bounds().size * TEXELS_PER_CELL).as_uvec2()
 }
 
 fn texture_extent() -> Extent3d {
     Extent3d {
-        width: resolution(),
-        height: resolution(),
+        width: resolution().x,
+        height: resolution().y,
         depth_or_array_layers: 1,
     }
 }
@@ -72,38 +72,41 @@ fn shade(sight: CellSight) -> u8 {
 
 /// Softens the blocky cell grid with a separable box blur so the fog edge reads as a gradient.
 fn blurred_shades(fog: &FogOfWar) -> Vec<u8> {
-    let size = resolution() as usize;
-    let raw: Vec<u32> = (0..size * size)
+    let size = resolution().as_ivec2();
+    let first_cell = map_bounds().min;
+    let raw: Vec<u32> = (0..size.element_product())
         .map(|i| {
-            let texel = IVec2::new((i % size) as i32, (i / size) as i32);
-            shade(fog.sight_at(texel / TEXELS_PER_CELL)) as u32
+            let texel = IVec2::new(i % size.x, i / size.x);
+            shade(fog.sight_at(first_cell + texel / TEXELS_PER_CELL)) as u32
         })
         .collect();
-    box_blur(&raw, size)
+    box_blur(&raw, size.as_uvec2())
 }
 
 /// Each output averages the `2 * BLUR_RADIUS + 1` inputs around it along a row, then along a column, the edge
 /// repeating beyond the border. A running sum makes each texel cost the same whatever the radius.
-fn box_blur(raw: &[u32], size: usize) -> Vec<u8> {
+fn box_blur(raw: &[u32], size: UVec2) -> Vec<u8> {
+    let (width, height) = (size.x as usize, size.y as usize);
     let taps = (2 * BLUR_RADIUS + 1) as u32;
     let mut horizontal = vec![0u32; raw.len()];
-    let mut line = vec![0u32; size];
-    for row in 0..size {
-        let start = row * size;
-        sliding_sums(&raw[start..start + size], &mut line);
-        for (column, sum) in line.iter().enumerate() {
+    let mut row_sums = vec![0u32; width];
+    for row in 0..height {
+        let start = row * width;
+        sliding_sums(&raw[start..start + width], &mut row_sums);
+        for (column, sum) in row_sums.iter().enumerate() {
             horizontal[start + column] = sum / taps;
         }
     }
     let mut blurred = vec![0u8; raw.len()];
-    let mut column_values = vec![0u32; size];
-    for column in 0..size {
+    let mut column_values = vec![0u32; height];
+    let mut column_sums = vec![0u32; height];
+    for column in 0..width {
         for (row, value) in column_values.iter_mut().enumerate() {
-            *value = horizontal[row * size + column];
+            *value = horizontal[row * width + column];
         }
-        sliding_sums(&column_values, &mut line);
-        for (row, sum) in line.iter().enumerate() {
-            blurred[row * size + column] = (sum / taps) as u8;
+        sliding_sums(&column_values, &mut column_sums);
+        for (row, sum) in column_sums.iter().enumerate() {
+            blurred[row * width + column] = (sum / taps) as u8;
         }
     }
     blurred
@@ -252,24 +255,24 @@ pub fn show_seen_enemies(
 mod tests {
     use super::*;
 
-    fn box_blur_tap_by_tap(raw: &[u32], size: usize) -> Vec<u8> {
-        let size = size as i32;
+    fn box_blur_tap_by_tap(raw: &[u32], size: UVec2) -> Vec<u8> {
+        let size = size.as_ivec2();
         let at = |values: &[u32], x: i32, y: i32| {
-            values[(y.clamp(0, size - 1) * size + x.clamp(0, size - 1)) as usize]
+            values[(y.clamp(0, size.y - 1) * size.x + x.clamp(0, size.x - 1)) as usize]
         };
         let taps = (2 * BLUR_RADIUS + 1) as u32;
-        let horizontal: Vec<u32> = (0..size * size)
+        let horizontal: Vec<u32> = (0..size.element_product())
             .map(|i| {
                 (-BLUR_RADIUS..=BLUR_RADIUS)
-                    .map(|d| at(raw, i % size + d, i / size))
+                    .map(|d| at(raw, i % size.x + d, i / size.x))
                     .sum::<u32>()
                     / taps
             })
             .collect();
-        (0..size * size)
+        (0..size.element_product())
             .map(|i| {
                 ((-BLUR_RADIUS..=BLUR_RADIUS)
-                    .map(|d| at(&horizontal, i % size, i / size + d))
+                    .map(|d| at(&horizontal, i % size.x, i / size.x + d))
                     .sum::<u32>()
                     / taps) as u8
             })
@@ -278,9 +281,9 @@ mod tests {
 
     #[test]
     fn the_running_blur_matches_summing_every_tap() {
-        let size = 37;
+        let size = UVec2::new(37, 23);
         let shades = [UNEXPLORED_SHADE, EXPLORED_SHADE, VISIBLE_SHADE];
-        let raw: Vec<u32> = (0..size * size)
+        let raw: Vec<u32> = (0..(size.x * size.y) as usize)
             .map(|i| shades[(i * 7 + i / 5) % shades.len()] as u32)
             .collect();
         assert_eq!(box_blur(&raw, size), box_blur_tap_by_tap(&raw, size));

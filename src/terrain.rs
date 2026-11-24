@@ -4,7 +4,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 
 use serde::{Deserialize, Serialize};
 
-use crate::map::{CELL_SIZE, base_sites, map_cells, map_spread, map_world_size, relocate};
+use crate::map::{CELL_SIZE, base_sites, map_bounds, map_spread, relocate};
 use crate::sim_math;
 
 pub const WATER_LEVEL: f32 = -0.45;
@@ -142,14 +142,11 @@ fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-fn map_center_cells() -> f32 {
-    (map_cells() - 1) as f32 / 2.0
-}
-
 pub fn river_centerline(column: f32) -> f32 {
-    let offset = column - map_center_cells();
+    let middle = map_bounds().center_cells();
+    let offset = column - middle.x;
     let [(first, first_frequency), (second, second_frequency)] = shape().river_waves;
-    map_center_cells()
+    middle.y
         + first * sim_math::sin(offset * first_frequency)
         + second * sim_math::sin(offset * second_frequency)
 }
@@ -160,7 +157,8 @@ fn ford_column(standard_column: f32) -> f32 {
     let authored = standard_column - STANDARD_MAP_CENTER_CELLS;
     let classic_side_offset = CLASSIC_SHAPE.side_ford_offset;
     let offset = authored * shape().side_ford_offset / classic_side_offset;
-    map_center_cells() + offset * map_spread()
+    let bounds = map_bounds();
+    bounds.center_cells().x + offset * bounds.spread().x
 }
 
 fn ford_columns() -> [f32; 3] {
@@ -176,7 +174,8 @@ fn is_ford(column: f32) -> bool {
 
 /// Depth of the riverbed below the surrounding ground at a point in cell units; zero away from the river.
 pub fn river_depth(column: f32, row: f32) -> f32 {
-    let inside_map = (0.0..map_cells() as f32).contains(&column);
+    let bounds = map_bounds();
+    let inside_map = (bounds.min.x as f32..(bounds.min.x + bounds.size.x) as f32).contains(&column);
     if inside_map && is_ford(column) {
         return 0.0;
     }
@@ -190,8 +189,9 @@ fn distance_to_river_cells(column: f32, row: f32) -> f32 {
 }
 
 fn distance_outside_map(position: Vec2) -> f32 {
-    let outside = (Vec2::ZERO - position)
-        .max(position - Vec2::splat(map_world_size()))
+    let bounds = map_bounds();
+    let outside = (bounds.world_min() - position)
+        .max(position - bounds.world_max())
         .max(Vec2::ZERO);
     outside.length()
 }
@@ -234,13 +234,14 @@ pub fn approximate_ground(position: Vec3) -> Vec3 {
 /// Signed distance in cells from the nearest pond's shore, negative inside; `f32::MAX` without ponds.
 fn distance_to_pond_shore(column: f32, row: f32) -> f32 {
     let point = Vec2::new(column, row);
-    let center = Vec2::splat(map_center_cells());
+    let bounds = map_bounds();
+    let center = bounds.center_cells();
     shape()
         .ponds
         .iter()
         .flatten()
         .flat_map(|&(offset, radius)| {
-            let offset = offset * map_spread();
+            let offset = offset * bounds.spread();
             [(center + offset, radius), (center - offset, radius)]
         })
         .map(|(middle, radius)| point.distance(middle) - radius)
@@ -249,7 +250,7 @@ fn distance_to_pond_shore(column: f32, row: f32) -> f32 {
 
 /// Where the lake sits: `along` runs from the north-west to the south-east site, `across` from base to base.
 fn lake_coordinates(column: f32, row: f32) -> (f32, f32) {
-    let offset = Vec2::new(column, row) - Vec2::splat(map_center_cells());
+    let offset = Vec2::new(column, row) - map_bounds().center_cells();
     let along = (offset.x + offset.y) * std::f32::consts::FRAC_1_SQRT_2;
     let across = (offset.x - offset.y) * std::f32::consts::FRAC_1_SQRT_2;
     (along, across)
@@ -410,7 +411,7 @@ fn river_roads() -> Vec<Vec<Vec2>> {
 /// One road straight across the middle (over the causeway where there is a lake) and two along the edges.
 fn open_roads() -> Vec<Vec<Vec2>> {
     let ([south_west, north_east, north_west, south_east], west_gate, east_gate) = base_gates();
-    let middle = Vec2::splat(map_center_cells() + 0.5);
+    let middle = map_bounds().center_cells() + 0.5;
     vec![
         in_world(&[west_gate(south_west), middle, east_gate(north_east)]),
         in_world(&[
@@ -543,45 +544,47 @@ fn layer_weights(
 
 /// Builds the visible ground including the mountain rim, with layer weights stored as vertex colors.
 pub fn build_terrain_mesh(landscape: Landscape, crystal_soil: impl Fn(IVec2) -> bool) -> Mesh {
-    let start = -OUTLANDS_WIDTH;
-    let span = map_world_size() + 2.0 * OUTLANDS_WIDTH;
-    build_terrain_grid(landscape, start, span, MESH_SPACING, None, crystal_soil)
+    let bounds = map_bounds();
+    let area = Rect::from_corners(
+        bounds.world_min() - OUTLANDS_WIDTH,
+        bounds.world_max() + OUTLANDS_WIDTH,
+    );
+    build_terrain_grid(landscape, area, MESH_SPACING, None, crystal_soil)
 }
 
 /// Coarse mountains beyond the rim, so the farthest zoom never looks past the edge of the world; it leaves
 /// out the area the detailed mesh already covers.
 pub fn build_far_terrain_mesh(landscape: Landscape) -> Mesh {
-    let start = -OUTLANDS_WIDTH - FAR_RING_WIDTH;
-    let span = map_world_size() + 2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH);
-    let covered =
-        -OUTLANDS_WIDTH + FAR_MESH_SPACING..map_world_size() + OUTLANDS_WIDTH - FAR_MESH_SPACING;
-    build_terrain_grid(
-        landscape,
-        start,
-        span,
-        FAR_MESH_SPACING,
-        Some(covered),
-        |_| false,
-    )
+    let bounds = map_bounds();
+    let beyond_map = OUTLANDS_WIDTH + FAR_RING_WIDTH;
+    let area = Rect::from_corners(
+        bounds.world_min() - beyond_map,
+        bounds.world_max() + beyond_map,
+    );
+    let covered = Rect::from_corners(
+        bounds.world_min() - OUTLANDS_WIDTH + FAR_MESH_SPACING,
+        bounds.world_max() + OUTLANDS_WIDTH - FAR_MESH_SPACING,
+    );
+    build_terrain_grid(landscape, area, FAR_MESH_SPACING, Some(covered), |_| false)
 }
 
 fn build_terrain_grid(
     landscape: Landscape,
-    start: f32,
-    span: f32,
+    area: Rect,
     spacing: f32,
-    hole: Option<std::ops::Range<f32>>,
+    hole: Option<Rect>,
     crystal_soil: impl Fn(IVec2) -> bool,
 ) -> Mesh {
-    let vertices_per_side = (span / spacing) as u32 + 1;
+    let start = area.min;
+    let vertices = (area.size() / spacing).as_uvec2() + UVec2::ONE;
     let ground = GroundLayers::new(landscape);
-    let mut positions = Vec::with_capacity((vertices_per_side * vertices_per_side) as usize);
+    let mut positions = Vec::with_capacity(vertices.element_product() as usize);
     let mut colors = Vec::with_capacity(positions.capacity());
     let mut uvs = Vec::with_capacity(positions.capacity());
 
-    for zi in 0..vertices_per_side {
-        for xi in 0..vertices_per_side {
-            let position = Vec2::new(start + xi as f32 * spacing, start + zi as f32 * spacing);
+    for zi in 0..vertices.y {
+        for xi in 0..vertices.x {
+            let position = start + Vec2::new(xi as f32, zi as f32) * spacing;
             let cell = (position / CELL_SIZE).floor().as_ivec2();
             let soil = if crystal_soil(cell) { 1.0 } else { 0.0 };
             positions.push([
@@ -594,22 +597,21 @@ fn build_terrain_grid(
         }
     }
 
-    let mut indices = Vec::with_capacity(((vertices_per_side - 1).pow(2) * 6) as usize);
-    for zi in 0..vertices_per_side - 1 {
-        for xi in 0..vertices_per_side - 1 {
-            let corner =
-                |x: u32, z: u32| Vec2::new(start + x as f32 * spacing, start + z as f32 * spacing);
-            let inside_hole = hole.as_ref().is_some_and(|hole| {
+    let mut indices = Vec::with_capacity(((vertices - UVec2::ONE).element_product() * 6) as usize);
+    for zi in 0..vertices.y - 1 {
+        for xi in 0..vertices.x - 1 {
+            let corner = |x: u32, z: u32| start + Vec2::new(x as f32, z as f32) * spacing;
+            let inside_hole = hole.is_some_and(|hole| {
                 [corner(xi, zi), corner(xi + 1, zi + 1)]
                     .iter()
-                    .all(|point| hole.contains(&point.x) && hole.contains(&point.y))
+                    .all(|&point| point.cmpge(hole.min).all() && point.cmplt(hole.max).all())
             });
             if inside_hole {
                 continue;
             }
-            let top_left = zi * vertices_per_side + xi;
+            let top_left = zi * vertices.x + xi;
             let top_right = top_left + 1;
-            let bottom_left = top_left + vertices_per_side;
+            let bottom_left = top_left + vertices.x;
             let bottom_right = bottom_left + 1;
             indices.extend_from_slice(&[
                 top_left,
@@ -650,7 +652,7 @@ mod tests {
 
     #[test]
     fn every_rolled_terrain_keeps_dry_fords_and_its_point_symmetry() {
-        let mirror = |value: f32| 2.0 * map_center_cells() - value;
+        let mirror = |value: f32| 2.0 * map_bounds().center_cells().x - value;
         for seed in 0..40 {
             set_terrain_seed(Some(seed));
             for middle in ford_columns() {
@@ -678,10 +680,11 @@ mod tests {
     #[test]
     fn playable_ground_is_gentle_and_finite() {
         let step = CELL_SIZE * 1.5;
-        let mut x = 0.0;
-        while x < map_world_size() {
-            let mut z = 0.0;
-            while z < map_world_size() {
+        let bounds = map_bounds();
+        let mut x = bounds.world_min().x;
+        while x < bounds.world_max().x {
+            let mut z = bounds.world_min().y;
+            while z < bounds.world_max().y {
                 let height = Landscape::River.height(x, z);
                 assert!(height.is_finite());
                 assert!(
@@ -709,7 +712,8 @@ mod tests {
 
     #[test]
     fn mountains_rise_around_the_map() {
-        let outside = Landscape::River.height(-OUTLANDS_WIDTH * 0.8, map_world_size() * 0.2);
+        let outside =
+            Landscape::River.height(-OUTLANDS_WIDTH * 0.8, map_bounds().world_size().y * 0.2);
         assert!(outside > 4.0, "rim only {outside} m high");
     }
 

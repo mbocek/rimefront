@@ -6,7 +6,7 @@ use crate::catalog::{BuildingKind, Team, UnitKind};
 use crate::components::{Building, Order, Orders, Unit};
 use crate::economy::Economies;
 use crate::levels::{ActiveLevel, BaseSite};
-use crate::map::{GameMap, cell_center, map_cells};
+use crate::map::{GameMap, cell_center, map_bounds};
 use crate::match_flow::MatchClock;
 use crate::spawn::spawn_unit;
 
@@ -140,19 +140,25 @@ fn triggered(
     }
 }
 
+fn map_middle_cell() -> IVec2 {
+    let bounds = map_bounds();
+    bounds.min + bounds.size / 2
+}
+
 /// The cell a few steps in from the map corner nearest to a base site.
 fn corner_of(site: BaseSite) -> IVec2 {
-    let last = map_cells() - 1 - ARRIVAL_INSET_CELLS;
-    let middle = map_cells() / 2;
+    let bounds = map_bounds();
+    let first = bounds.min + IVec2::splat(ARRIVAL_INSET_CELLS);
+    let last = bounds.max() - IVec2::splat(ARRIVAL_INSET_CELLS);
+    let middle = map_middle_cell();
     let origin = site.origin();
-    let pick = |coordinate: i32| {
-        if coordinate < middle {
-            ARRIVAL_INSET_CELLS
-        } else {
-            last
-        }
+    let pick = |coordinate: i32, middle: i32, first: i32, last: i32| {
+        if coordinate < middle { first } else { last }
     };
-    IVec2::new(pick(origin.x), pick(origin.y))
+    IVec2::new(
+        pick(origin.x, middle.x, first.x, last.x),
+        pick(origin.y, middle.y, first.y, last.y),
+    )
 }
 
 fn bring_reinforcements(
@@ -165,7 +171,7 @@ fn bring_reinforcements(
     player_base: IVec2,
 ) {
     let corner = corner_of(from);
-    let inward = (IVec2::splat(map_cells() / 2) - corner).signum();
+    let inward = (map_middle_cell() - corner).signum();
     let facing = crate::components::yaw_towards(cell_center(corner), cell_center(player_base));
     let order = if team == Team::Player {
         Order::Move(player_base)

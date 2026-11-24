@@ -5,7 +5,7 @@ use common::*;
 use iron_tide::catalog::Team;
 use iron_tide::components::{Building, Unit};
 use iron_tide::levels::{BaseSite, Difficulty, LevelDefinition};
-use iron_tide::map::{GameMap, map_cells, mirror_centre, opposite_cell, opposite_origin};
+use iron_tide::map::{GameMap, map_bounds, mirror_centre, opposite_cell, opposite_origin};
 
 /// Long enough for both commanders to build and move, short enough that their dice have not yet differed.
 const SAME_DICE_SECS: f32 = 15.0;
@@ -33,28 +33,25 @@ fn every_open_cell_has_a_twin_with_the_same_ground_and_crystal() {
         let mut battle = mirrored_duel(map_seed);
         battle.run_for(0.1);
         let map = battle.world().resource::<GameMap>();
-        for row in 0..map_cells() {
-            for column in 0..map_cells() {
-                let cell = IVec2::new(column, row);
-                let twin = opposite_cell(cell);
-                if !GameMap::in_bounds(twin) {
-                    assert!(
-                        !map.is_passable(cell),
-                        "{cell} has no twin, so no one may use it"
-                    );
-                    continue;
-                }
-                assert_eq!(
-                    map.is_passable(cell),
-                    map.is_passable(twin),
-                    "map {map_seed}, {cell}"
+        for cell in map_bounds().cells() {
+            let twin = opposite_cell(cell);
+            if !GameMap::in_bounds(twin) {
+                assert!(
+                    !map.is_passable(cell),
+                    "{cell} has no twin, so no one may use it"
                 );
-                assert_eq!(
-                    map.crystal_at(cell),
-                    map.crystal_at(twin),
-                    "map {map_seed}, {cell}"
-                );
+                continue;
             }
+            assert_eq!(
+                map.is_passable(cell),
+                map.is_passable(twin),
+                "map {map_seed}, {cell}"
+            );
+            assert_eq!(
+                map.crystal_at(cell),
+                map.crystal_at(twin),
+                "map {map_seed}, {cell}"
+            );
         }
     }
 }

@@ -15,7 +15,7 @@ use bevy::window::PrimaryWindow;
 use crate::catalog::{BuildingKind, Team};
 use crate::key_bindings::{Action, KeyBindings};
 use crate::levels::ActiveLevel;
-use crate::map::{footprint_center, map_world_size};
+use crate::map::{footprint_center, map_bounds};
 use crate::match_flow::Persistent;
 use crate::player_commands::LocalTeam;
 use crate::settings::GameSettings;
@@ -85,7 +85,8 @@ impl RtsCamera {
 }
 
 pub fn setup_scene(mut commands: Commands) {
-    let start_focus = Vec3::new(map_world_size() * 0.5, 0.0, map_world_size() * 0.5);
+    let middle = map_bounds().world_center();
+    let start_focus = Vec3::new(middle.x, 0.0, middle.y);
     commands.spawn((
         Persistent,
         Camera3d::default(),
@@ -260,14 +261,13 @@ pub fn control_camera(
         camera.focus -= yaw_rotation * Vec3::new(drag.x, 0.0, drag.y);
     }
 
-    camera.focus.x = camera
-        .focus
-        .x
-        .clamp(-FOCUS_MARGIN, map_world_size() + FOCUS_MARGIN);
-    camera.focus.z = camera
-        .focus
-        .z
-        .clamp(-FOCUS_MARGIN, map_world_size() + FOCUS_MARGIN);
+    let bounds = map_bounds();
+    let reachable = camera.focus.xz().clamp(
+        bounds.world_min() - FOCUS_MARGIN,
+        bounds.world_max() + FOCUS_MARGIN,
+    );
+    camera.focus.x = reachable.x;
+    camera.focus.z = reachable.y;
     let ground_under_focus = level
         .0
         .landscape

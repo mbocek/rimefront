@@ -7,9 +7,7 @@ use crate::i18n::{tr, tr_fmt};
 use crate::levels::{
     BaseSite, Difficulty, EnemySetup, ForceSetup, LevelDefinition, Objective, Personality, Weather,
 };
-use crate::map::{
-    MapSize, map_cells, map_spread, near_base, near_crystal_field, opposite_cell, set_map_size,
-};
+use crate::map::{MapSize, map_bounds, near_base, near_crystal_field, opposite_cell, set_map_size};
 use crate::map_edits::{Brush, MapEdit};
 use crate::season::Season;
 use crate::terrain::{Landscape, set_terrain_seed};
@@ -159,7 +157,9 @@ fn shuffle<T>(items: &mut [T], rng: &mut StdRng) {
 fn scatter_clumps(rng: &mut StdRng, map_size: MapSize, terrain_seed: u64) -> Vec<MapEdit> {
     set_map_size(map_size);
     set_terrain_seed(Some(terrain_seed));
-    let by_area = |count: usize| (count as f32 * map_spread() * map_spread()).round() as usize;
+    let bounds = map_bounds();
+    let spread = bounds.spread();
+    let by_area = |count: usize| (count as f32 * spread.x * spread.y).round() as usize;
     let mut edits = Vec::new();
     for (brush, clumps, radius) in [
         (Brush::Forest, by_area(FOREST_CLUMPS), 1..4),
@@ -168,8 +168,14 @@ fn scatter_clumps(rng: &mut StdRng, map_size: MapSize, terrain_seed: u64) -> Vec
     ] {
         for _ in 0..clumps {
             let center = IVec2::new(
-                rng.random_range(EDGE_MARGIN_CELLS..map_cells() - EDGE_MARGIN_CELLS),
-                rng.random_range(EDGE_MARGIN_CELLS..map_cells() - EDGE_MARGIN_CELLS),
+                rng.random_range(
+                    bounds.min.x + EDGE_MARGIN_CELLS
+                        ..bounds.min.x + bounds.size.x - EDGE_MARGIN_CELLS,
+                ),
+                rng.random_range(
+                    bounds.min.y + EDGE_MARGIN_CELLS
+                        ..bounds.min.y + bounds.size.y - EDGE_MARGIN_CELLS,
+                ),
             );
             let radius = rng.random_range(radius.clone());
             for dy in -radius..=radius {

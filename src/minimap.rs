@@ -12,14 +12,18 @@ use crate::fog::{CellSight, FogOfWar};
 use crate::fog_view::Discovered;
 use crate::levels::{ActiveLevel, LevelDefinition};
 use crate::local_view::LocalView;
-use crate::map::{CELL_SIZE, GameMap, footprint_cells, map_cells, map_world_size};
+use crate::map::{CELL_SIZE, GameMap, footprint_cells, map_bounds};
 use crate::neutral_sites::UnclaimedSite;
 use crate::terrain::GroundLayers;
 use crate::ui::SIDEBAR_WIDTH;
 
 pub const PIXELS_PER_CELL: i32 = 3;
-fn resolution() -> u32 {
-    (map_cells() * PIXELS_PER_CELL) as u32
+pub fn resolution() -> UVec2 {
+    (map_bounds().size * PIXELS_PER_CELL).as_uvec2()
+}
+
+pub fn cell_pixel(cell: IVec2) -> IVec2 {
+    (cell - map_bounds().min) * PIXELS_PER_CELL
 }
 const REFRESH_SECS: f32 = 0.2;
 const WATER: [u8; 3] = [38, 78, 104];
@@ -51,12 +55,12 @@ pub fn create_minimap(
     });
 }
 
-/// The square picture of a map's ground, water, obstacles and crystal, `PIXELS_PER_CELL` per cell.
+/// The picture of a map's ground, water, obstacles and crystal, `PIXELS_PER_CELL` per cell.
 pub fn pixel_image(pixels: Vec<u8>) -> Image {
     let mut image = Image::new(
         Extent3d {
-            width: resolution(),
-            height: resolution(),
+            width: resolution().x,
+            height: resolution().y,
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
@@ -72,11 +76,12 @@ pub fn terrain_pixels(map: &GameMap, level: &LevelDefinition) -> Vec<u8> {
     let landscape = level.landscape;
     let ground = GroundLayers::new(landscape);
     let grass = level.season.minimap_grass();
-    let mut terrain = Vec::with_capacity((resolution() * resolution() * 4) as usize);
-    for py in 0..resolution() {
-        for px in 0..resolution() {
-            let world =
-                (Vec2::new(px as f32, py as f32) + 0.5) * (CELL_SIZE / PIXELS_PER_CELL as f32);
+    let map_corner = map_bounds().world_min();
+    let mut terrain = Vec::with_capacity((resolution().element_product() * 4) as usize);
+    for py in 0..resolution().y {
+        for px in 0..resolution().x {
+            let world = map_corner
+                + (Vec2::new(px as f32, py as f32) + 0.5) * (CELL_SIZE / PIXELS_PER_CELL as f32);
             let cell = (world / CELL_SIZE).floor().as_ivec2();
             let rgb = if landscape.water_depth(world.x / CELL_SIZE, world.y / CELL_SIZE) > 0.25 {
                 WATER
@@ -99,12 +104,10 @@ struct Canvas<'a> {
 
 impl Canvas<'_> {
     fn put(&mut self, pixel: IVec2, rgb: [u8; 3]) {
-        let inside = pixel.x >= 0
-            && pixel.y >= 0
-            && pixel.x < resolution() as i32
-            && pixel.y < resolution() as i32;
+        let size = resolution().as_ivec2();
+        let inside = pixel.cmpge(IVec2::ZERO).all() && pixel.cmplt(size).all();
         if inside {
-            let at = ((pixel.y as u32 * resolution() + pixel.x as u32) * 4) as usize;
+            let at = ((pixel.y * size.x + pixel.x) * 4) as usize;
             self.pixels[at..at + 3].copy_from_slice(&rgb);
         }
     }
@@ -129,7 +132,7 @@ impl Canvas<'_> {
 }
 
 fn to_minimap(world: Vec3) -> Vec2 {
-    world.xz() / CELL_SIZE * PIXELS_PER_CELL as f32
+    (world.xz() - map_bounds().world_min()) / CELL_SIZE * PIXELS_PER_CELL as f32
 }
 
 fn team_rgb(team: Team) -> [u8; 3] {
@@ -144,11 +147,9 @@ fn team_rgb(team: Team) -> [u8; 3] {
 /// Black for unexplored ground, dimmed for explored ground the player cannot currently see.
 fn darken_by_fog(pixels: &mut [u8], fog: &FogOfWar) {
     for (index, texel) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-        let pixel = IVec2::new(
-            index as i32 % resolution() as i32,
-            index as i32 / resolution() as i32,
-        );
-        let factor = match fog.sight_at(pixel / PIXELS_PER_CELL) {
+        let width = resolution().x as i32;
+        let pixel = IVec2::new(index as i32 % width, index as i32 / width);
+        let factor = match fog.sight_at(map_bounds().min + pixel / PIXELS_PER_CELL) {
             CellSight::Unexplored => 0.0,
             CellSight::Explored => EXPLORED_BRIGHTNESS,
             CellSight::Visible => continue,
@@ -188,12 +189,9 @@ pub fn redraw_minimap(
     darken_by_fog(pixels, fog);
     let mut canvas = Canvas { pixels };
 
-    for cell_y in 0..map_cells() {
-        for cell_x in 0..map_cells() {
-            let cell = IVec2::new(cell_x, cell_y);
-            if map.crystal_at(cell) > 0 && fog.sight_at(cell) != CellSight::Unexplored {
-                canvas.fill(cell * PIXELS_PER_CELL + 1, IVec2::ONE, CRYSTAL);
-            }
+    for cell in map_bounds().cells() {
+        if map.crystal_at(cell) > 0 && fog.sight_at(cell) != CellSight::Unexplored {
+            canvas.fill(cell_pixel(cell) + 1, IVec2::ONE, CRYSTAL);
         }
     }
     for site in &unclaimed_sites {
@@ -202,11 +200,7 @@ pub fn redraw_minimap(
             continue;
         }
         for cell in footprint_cells(site.origin, footprint) {
-            canvas.fill(
-                cell * PIXELS_PER_CELL,
-                IVec2::splat(PIXELS_PER_CELL),
-                UNCLAIMED,
-            );
+            canvas.fill(cell_pixel(cell), IVec2::splat(PIXELS_PER_CELL), UNCLAIMED);
         }
     }
     for (building, &team, discovered) in &buildings {
@@ -215,7 +209,7 @@ pub fn redraw_minimap(
         }
         for cell in footprint_cells(building.origin, building.kind.spec().footprint) {
             canvas.fill(
-                cell * PIXELS_PER_CELL,
+                cell_pixel(cell),
                 IVec2::splat(PIXELS_PER_CELL),
                 team_rgb(team),
             );
@@ -243,8 +237,11 @@ pub fn redraw_minimap(
         .iter()
         .map(|&screen| {
             let ray = camera.viewport_to_world(camera_transform, screen).ok()?;
-            let hit = ray_hit_on_terrain(ray, level.0.landscape)
-                .clamp(Vec3::ZERO, Vec3::splat(map_world_size()).with_y(f32::MAX));
+            let bounds = map_bounds();
+            let hit = ray_hit_on_terrain(ray, level.0.landscape).clamp(
+                bounds.world_min().extend(f32::MIN).xzy(),
+                bounds.world_max().extend(f32::MAX).xzy(),
+            );
             Some(to_minimap(hit))
         })
         .collect();
@@ -293,7 +290,8 @@ pub fn jump_camera_on_drag(
 fn map_spot(hit: &HitData) -> Option<Vec2> {
     let position = hit.position?;
     let normalized = (position.truncate() + Vec2::splat(0.5)).clamp(Vec2::ZERO, Vec2::ONE);
-    Some(normalized * map_world_size())
+    let bounds = map_bounds();
+    Some(bounds.world_min() + normalized * bounds.world_size())
 }
 
 fn jump_camera_to(hit: &HitData, cameras: &mut Query<&mut RtsCamera>) {
@@ -313,9 +311,10 @@ mod tests {
         let hit = |x: f32, y: f32| {
             HitData::new(Entity::PLACEHOLDER, 0.0, Some(Vec3::new(x, y, 0.0)), None)
         };
-        let size = map_world_size();
-        assert_eq!(map_spot(&hit(0.0, 0.0)), Some(Vec2::splat(size * 0.5)));
-        assert_eq!(map_spot(&hit(-0.5, 0.5)), Some(Vec2::new(0.0, size)));
-        assert_eq!(map_spot(&hit(0.9, -0.9)), Some(Vec2::new(size, 0.0)));
+        let bounds = map_bounds();
+        let (low, high) = (bounds.world_min(), bounds.world_max());
+        assert_eq!(map_spot(&hit(0.0, 0.0)), Some(bounds.world_center()));
+        assert_eq!(map_spot(&hit(-0.5, 0.5)), Some(Vec2::new(low.x, high.y)));
+        assert_eq!(map_spot(&hit(0.9, -0.9)), Some(Vec2::new(high.x, low.y)));
     }
 }

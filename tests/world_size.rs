@@ -4,12 +4,11 @@ use bevy::prelude::*;
 use common::{Battle, BattleSetup};
 use iron_tide::catalog::{BuildingKind, Team};
 use iron_tide::levels::LevelDefinition;
-use iron_tide::map::{GameMap, MapSize, base_sites, map_cells, opposite_cell};
+use iron_tide::map::{GameMap, MapBounds, MapSize, base_sites, map_bounds, opposite_cell};
 
 fn crystal_cells(map: &GameMap) -> Vec<IVec2> {
-    let size = map_cells();
-    (0..size)
-        .flat_map(|y| (0..size).map(move |x| IVec2::new(x, y)))
+    map_bounds()
+        .cells()
         .filter(|&cell| map.crystal_at(cell) > 0)
         .collect()
 }
@@ -24,7 +23,7 @@ fn check_battlefield(size: MapSize) {
         starting_forces: true,
         level: Some(level),
     });
-    assert_eq!(map_cells(), size.cells());
+    assert_eq!(map_bounds(), MapBounds::square(size.cells()));
     let map = battle.world().resource::<GameMap>();
     let [player, enemy, ..] = base_sites();
     assert!(

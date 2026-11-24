@@ -4,9 +4,9 @@ use bevy::prelude::*;
 use crate::assets::ModelLibrary;
 use crate::catalog::{BuildingKind, Team};
 use crate::levels::{ActiveLevel, LevelDefinition};
-use crate::map::{GameMap, generate_map, map_cells};
+use crate::map::{GameMap, generate_map};
 use crate::map_edits::apply_map_edits;
-use crate::minimap::{PIXELS_PER_CELL, pixel_image, terrain_pixels};
+use crate::minimap::{PIXELS_PER_CELL, cell_pixel, pixel_image, resolution, terrain_pixels};
 
 const BASE_OUTLINE: [u8; 3] = [15, 15, 15];
 
@@ -26,7 +26,7 @@ pub fn map_preview(level: &LevelDefinition) -> Image {
     let mut pixels = world
         .get_resource::<GameMap>()
         .map(|map| terrain_pixels(map, level))
-        .unwrap_or_else(|| vec![0; (map_cells() * PIXELS_PER_CELL).pow(2) as usize * 4]);
+        .unwrap_or_else(|| vec![0; resolution().element_product() as usize * 4]);
     let sides = std::iter::once((Team::Player, level.player.site)).chain(
         level
             .opponents()
@@ -42,17 +42,17 @@ fn mark_base(pixels: &mut [u8], origin: IVec2, team: Team) {
     let color = team.ui_color().to_srgba();
     let fill = [color.red, color.green, color.blue].map(|channel| (channel * 255.0) as u8);
     let footprint = BuildingKind::CommandCenter.spec().footprint * PIXELS_PER_CELL;
-    let corner = origin * PIXELS_PER_CELL;
-    let side = map_cells() * PIXELS_PER_CELL;
+    let corner = cell_pixel(origin);
+    let size = resolution().as_ivec2();
     let margin = 2;
     for y in -margin..footprint.y + margin {
         for x in -margin..footprint.x + margin {
             let pixel = corner + IVec2::new(x, y);
-            if pixel.x < 0 || pixel.y < 0 || pixel.x >= side || pixel.y >= side {
+            if pixel.cmplt(IVec2::ZERO).any() || pixel.cmpge(size).any() {
                 continue;
             }
             let edge = x < 0 || y < 0 || x >= footprint.x || y >= footprint.y;
-            let at = ((pixel.y * side + pixel.x) * 4) as usize;
+            let at = ((pixel.y * size.x + pixel.x) * 4) as usize;
             pixels[at..at + 3].copy_from_slice(if edge { &BASE_OUTLINE } else { &fill });
         }
     }
@@ -66,12 +66,10 @@ mod tests {
     fn a_preview_covers_the_whole_map_and_marks_the_bases() {
         let level = LevelDefinition::default();
         let preview = map_preview(&level);
-        let side = (map_cells() * PIXELS_PER_CELL) as u32;
-        assert_eq!(preview.size(), UVec2::splat(side));
+        assert_eq!(preview.size(), resolution());
         let pixels = preview.data.as_ref().unwrap();
-        let player_base =
-            level.player.site.origin() * PIXELS_PER_CELL + IVec2::splat(PIXELS_PER_CELL);
-        let at = ((player_base.y * side as i32 + player_base.x) * 4) as usize;
+        let player_base = cell_pixel(level.player.site.origin()) + IVec2::splat(PIXELS_PER_CELL);
+        let at = ((player_base.y * resolution().x as i32 + player_base.x) * 4) as usize;
         let blue = Team::Player.ui_color().to_srgba();
         assert_eq!(pixels[at + 2], (blue.blue * 255.0) as u8);
     }

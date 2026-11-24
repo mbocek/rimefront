@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::map::{CELL_SIZE, GameMap, map_cells, world_to_cell};
+use crate::map::{CELL_SIZE, map_bounds, world_to_cell};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub enum CellSight {
@@ -33,7 +33,7 @@ impl FogOfWar {
         };
         Self {
             enabled,
-            cells: vec![state; (map_cells() * map_cells()) as usize],
+            cells: vec![state; map_bounds().area()],
             revision: 1,
         }
     }
@@ -43,12 +43,12 @@ impl FogOfWar {
     }
 
     fn index(cell: IVec2) -> Option<usize> {
-        GameMap::in_bounds(cell).then(|| (cell.y * map_cells() + cell.x) as usize)
+        map_bounds().index(cell)
     }
 
     /// Ground outside the playable map shares the sight of the nearest map edge, so the fog runs on past it.
     pub fn sight_at(&self, cell: IVec2) -> CellSight {
-        let nearest_map_cell = cell.clamp(IVec2::ZERO, IVec2::splat(map_cells() - 1));
+        let nearest_map_cell = map_bounds().clamp(cell);
         Self::index(nearest_map_cell).map_or(CellSight::Explored, |i| self.cells[i])
     }
 
@@ -125,7 +125,26 @@ impl Default for FogOfWar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map::cell_center;
+    use crate::map::{MapBounds, cell_center, set_map_bounds};
+
+    #[test]
+    fn sight_on_a_shifted_map_lands_on_the_cells_seen() {
+        let bounds = MapBounds {
+            min: IVec2::new(-30, 5),
+            size: IVec2::new(40, 20),
+        };
+        set_map_bounds(bounds);
+        let mut fog = FogOfWar::new(true);
+        let center = bounds.min + IVec2::new(0, 3);
+        fog.reveal_around([(cell_center(center), 3.0)]);
+        assert_eq!(fog.sight_at(center), CellSight::Visible);
+        assert_eq!(fog.sight_at(bounds.max()), CellSight::Unexplored);
+        assert_eq!(
+            fog.sight_at(center - IVec2::new(20, 0)),
+            CellSight::Visible,
+            "beyond the edge takes the nearest edge cell's sight"
+        );
+    }
 
     #[test]
     fn sight_reveals_a_circle_and_remembers_it() {

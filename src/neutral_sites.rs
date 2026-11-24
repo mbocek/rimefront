@@ -6,8 +6,8 @@ use crate::catalog::{ArmorClass, BuildingKind, Team};
 use crate::components::{Armor, BodyRadius, Building, Health, Unit};
 use crate::economy::Economies;
 use crate::map::{
-    CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, map_cells, near_base,
-    opposite_origin,
+    CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, map_bounds,
+    near_base, opposite_origin, self_mirrored_origin,
 };
 use crate::spawn::building_yaw;
 
@@ -52,10 +52,11 @@ pub fn spawn_unclaimed_site(
 /// where the middle is a ford, and mirrored pairs of Supply Depots between the corners and Field Hospitals
 /// on the road from each corner to the middle. Mirroring keeps the map as fair as the rest of it.
 pub fn place_neutral_sites(commands: &mut Commands, models: &ModelLibrary, map: &mut GameMap) {
-    let size = map_cells();
-    let at_share = |x: f32, y: f32| IVec2::new((size as f32 * x) as i32, (size as f32 * y) as i32);
+    let bounds = map_bounds();
+    let at_share =
+        |x: f32, y: f32| bounds.min + (bounds.size.as_vec2() * Vec2::new(x, y)).as_ivec2();
     let post = BuildingKind::ObservationPost;
-    let middle = IVec2::splat((size - 2 - (post.spec().footprint.x - 1)) / 2);
+    let middle = self_mirrored_origin(post.spec().footprint);
     let mut pairs = Vec::new();
     if footprint_is_free(map, post, middle) {
         spawn_unclaimed_site(commands, models, map, post, middle);
@@ -148,8 +149,7 @@ mod tests {
     #[test]
     fn the_middle_post_is_its_own_mirror_image() {
         let post = BuildingKind::ObservationPost;
-        let size = map_cells();
-        let middle = IVec2::splat((size - 2 - (post.spec().footprint.x - 1)) / 2);
+        let middle = self_mirrored_origin(post.spec().footprint);
         assert_eq!(opposite_origin(middle, post.spec().footprint), middle);
         assert_eq!(
             opposite_cell(middle),

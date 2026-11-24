@@ -6,13 +6,10 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
-use crate::assets::ModelLibrary;
 use crate::catalog::CRYSTAL_PER_CELL;
 use crate::levels::ActiveLevel;
-use crate::map::{
-    CrystalVisual, GameMap, is_water, near_base, spawn_crystal_visual, world_to_cell,
-};
-use crate::scenery::{Obstacle, Scenery, spawn_obstacle};
+use crate::map::{CrystalVisual, GameMap, is_water, near_base, spawn_crystal_visual};
+use crate::scenery::{Obstacle, SceneryLayout, place_obstacle};
 use crate::terrain::Landscape;
 
 /// What the map editor paints onto one cell.
@@ -93,9 +90,8 @@ impl Ground {
 #[derive(SystemParam)]
 pub struct MapPainter<'w, 's> {
     commands: Commands<'w, 's>,
-    models: Res<'w, ModelLibrary>,
     map: ResMut<'w, GameMap>,
-    scenery: Query<'w, 's, (Entity, &'static Transform), With<Scenery>>,
+    scenery: ResMut<'w, SceneryLayout>,
     crystals: Query<'w, 's, (Entity, &'static CrystalVisual)>,
 }
 
@@ -124,9 +120,8 @@ impl MapPainter<'_, '_> {
                     Obstacle::Rock
                 };
                 self.map.set_obstacle(cell, true);
-                spawn_obstacle(
-                    &mut self.commands,
-                    &self.models,
+                place_obstacle(
+                    &mut self.scenery,
                     ground.landscape,
                     &mut rng,
                     cell,
@@ -140,17 +135,13 @@ impl MapPainter<'_, '_> {
     fn clear(&mut self, cell: IVec2) {
         self.map.set_crystal(cell, 0);
         self.map.set_obstacle(cell, false);
-        let scenery_here = self
-            .scenery
-            .iter()
-            .filter(|(_, transform)| world_to_cell(transform.translation) == cell)
-            .map(|(entity, _)| entity);
+        self.scenery.clear_cell(cell);
         let crystals_here = self
             .crystals
             .iter()
             .filter(|(_, visual)| visual.cell == cell)
             .map(|(entity, _)| entity);
-        for entity in scenery_here.chain(crystals_here) {
+        for entity in crystals_here {
             self.commands.entity(entity).despawn();
         }
     }

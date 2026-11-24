@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::ops::Range;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use bevy::prelude::*;
 use rand::RngExt;
@@ -10,7 +12,8 @@ use crate::assets::ModelLibrary;
 use crate::components::Building;
 use crate::graphics::FineDecor;
 use crate::map::{
-    CELL_SIZE, GameMap, cell_center, map_bounds, near_base, near_crystal_field, opposite_cell,
+    CELL_SIZE, GameMap, cell_center, chunk_of, map_bounds, near_base, near_crystal_field,
+    opposite_cell, world_to_cell,
 };
 use crate::terrain::{GroundLayers, Landscape, OUTLANDS_WIDTH};
 
@@ -79,23 +82,18 @@ pub const FLAT_SCENERY_MODELS: [&str; 19] = [
     "tree_pine_young",
 ];
 
-/// Walk-through decoration that is cleared away when a structure is built on top of it.
-#[derive(Component)]
-pub struct Decor;
-
 pub fn scatter(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     map: &mut GameMap,
     rng: &mut StdRng,
 ) {
     let ground = GroundLayers::new(landscape);
-    plant_forests(commands, models, landscape, map, rng);
-    place_rocks(commands, models, landscape, map, rng);
-    dress_meadows(commands, models, landscape, map, rng, &ground);
-    line_shores(commands, models, landscape, map, rng);
-    cover_mountains(commands, models, landscape, rng);
+    plant_forests(layout, landscape, map, rng);
+    place_rocks(layout, landscape, map, rng);
+    dress_meadows(layout, landscape, map, rng, &ground);
+    line_shores(layout, landscape, map, rng);
+    cover_mountains(layout, landscape, rng);
 }
 
 fn pick<'a>(rng: &mut StdRng, models: &[&'a str]) -> &'a str {
@@ -103,8 +101,7 @@ fn pick<'a>(rng: &mut StdRng, models: &[&'a str]) -> &'a str {
 }
 
 fn plant_forests(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     map: &mut GameMap,
     rng: &mut StdRng,
@@ -128,16 +125,7 @@ fn plant_forests(
             } else {
                 pick(rng, species)
             };
-            block_with_prop(
-                commands,
-                models,
-                landscape,
-                map,
-                rng,
-                cell,
-                model,
-                0.8..1.25,
-            );
+            block_with_prop(layout, landscape, map, rng, cell, model, 0.8..1.25);
         }
         for _ in 0..rng.random_range(4..9) {
             let offset = Vec3::new(
@@ -153,8 +141,7 @@ fn plant_forests(
             };
             if is_open_ground(map, position) {
                 place_decor(
-                    commands,
-                    models,
+                    layout,
                     landscape,
                     rng,
                     undergrowth,
@@ -168,8 +155,7 @@ fn plant_forests(
 }
 
 fn place_rocks(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     map: &mut GameMap,
     rng: &mut StdRng,
@@ -181,13 +167,12 @@ fn place_rocks(
             rng.random_range(bounds.min.y..bounds.min.y + bounds.size.y),
         );
         let model = pick(rng, &ROCKS);
-        block_with_prop(commands, models, landscape, map, rng, cell, model, 0.6..1.3);
+        block_with_prop(layout, landscape, map, rng, cell, model, 0.6..1.3);
     }
 }
 
 fn dress_meadows(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     map: &GameMap,
     rng: &mut StdRng,
@@ -224,8 +209,7 @@ fn dress_meadows(
                 rng.random_range(-CLUMP_SPREAD..CLUMP_SPREAD),
             );
             place_decor(
-                commands,
-                models,
+                layout,
                 landscape,
                 rng,
                 model,
@@ -237,13 +221,7 @@ fn dress_meadows(
     }
 }
 
-fn line_shores(
-    commands: &mut Commands,
-    models: &ModelLibrary,
-    landscape: Landscape,
-    map: &GameMap,
-    rng: &mut StdRng,
-) {
+fn line_shores(layout: &mut SceneryLayout, landscape: Landscape, map: &GameMap, rng: &mut StdRng) {
     let bounds = map_bounds();
     let beyond_map = OUTLANDS_WIDTH / CELL_SIZE;
     let columns =
@@ -266,26 +244,12 @@ fn line_shores(
         if inside_map && !is_open_ground(map, position) {
             continue;
         }
-        place_decor(
-            commands,
-            models,
-            landscape,
-            rng,
-            "reeds",
-            position,
-            0.8..1.3,
-            false,
-        );
+        place_decor(layout, landscape, rng, "reeds", position, 0.8..1.3, false);
         planted += 1;
     }
 }
 
-fn cover_mountains(
-    commands: &mut Commands,
-    models: &ModelLibrary,
-    landscape: Landscape,
-    rng: &mut StdRng,
-) {
+fn cover_mountains(layout: &mut SceneryLayout, landscape: Landscape, rng: &mut StdRng) {
     let bounds = map_bounds();
     let (low, high) = (
         bounds.world_min() - OUTLANDS_WIDTH,
@@ -315,22 +279,12 @@ fn cover_mountains(
         } else {
             pick(rng, &MIXED_FOREST)
         };
-        place_decor(
-            commands,
-            models,
-            landscape,
-            rng,
-            model,
-            position,
-            0.9..1.5,
-            false,
-        );
+        place_decor(layout, landscape, rng, model, position, 0.9..1.5, false);
     }
     for _ in 0..by_border(OUTLAND_BOULDER_COUNT) {
         let position = random_outland_point(rng);
         place_decor(
-            commands,
-            models,
+            layout,
             landscape,
             rng,
             "boulder_large",
@@ -347,13 +301,12 @@ fn is_open_ground(map: &GameMap, position: Vec3) -> bool {
 }
 
 fn block_with_prop(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     map: &mut GameMap,
     rng: &mut StdRng,
     cell: IVec2,
-    model_id: &str,
+    model_id: &'static str,
     scale: Range<f32>,
 ) {
     let free =
@@ -369,23 +322,20 @@ fn block_with_prop(
             0.0,
             rng.random_range(-0.3..0.3),
         );
-        spawn_scenery(
-            commands,
-            models,
+        place_scenery(
+            layout,
             landscape,
             rng,
             model_id,
             cell_center(cell) + jitter,
             scale.clone(),
-            false,
         );
     }
 }
 
 /// A blocking tree or rock standing on one cell, as the map editor places them.
-pub fn spawn_obstacle(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+pub fn place_obstacle(
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     rng: &mut StdRng,
     cell: IVec2,
@@ -400,15 +350,13 @@ pub fn spawn_obstacle(
         0.0,
         rng.random_range(-0.3..0.3),
     );
-    spawn_scenery(
-        commands,
-        models,
+    place_scenery(
+        layout,
         landscape,
         rng,
         model_id,
         cell_center(cell) + jitter,
         scale,
-        false,
     );
 }
 
@@ -419,38 +367,45 @@ pub enum Obstacle {
 }
 
 fn place_decor(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     rng: &mut StdRng,
-    model_id: &str,
+    model_id: &'static str,
     position: Vec3,
     scale: Range<f32>,
     follow_slope: bool,
 ) {
-    let entity = spawn_scenery(
-        commands,
-        models,
-        landscape,
-        rng,
-        model_id,
-        position,
-        scale,
-        follow_slope,
-    );
-    commands.entity(entity).insert(Decor);
+    let transform = scenery_transform(landscape, rng, position, scale, follow_slope);
+    layout.place(SceneryProp {
+        model: model_id,
+        transform,
+        decor: true,
+    });
 }
 
-fn spawn_scenery(
-    commands: &mut Commands,
-    models: &ModelLibrary,
+fn place_scenery(
+    layout: &mut SceneryLayout,
     landscape: Landscape,
     rng: &mut StdRng,
-    model_id: &str,
+    model_id: &'static str,
+    position: Vec3,
+    scale: Range<f32>,
+) {
+    let transform = scenery_transform(landscape, rng, position, scale, false);
+    layout.place(SceneryProp {
+        model: model_id,
+        transform,
+        decor: false,
+    });
+}
+
+fn scenery_transform(
+    landscape: Landscape,
+    rng: &mut StdRng,
     position: Vec3,
     scale: Range<f32>,
     follow_slope: bool,
-) -> Entity {
+) -> Transform {
     let ground = landscape.on_ground(position);
     let heading = Quat::from_rotation_y(rng.random_range(0.0..TAU));
     let rotation = if follow_slope {
@@ -458,20 +413,111 @@ fn spawn_scenery(
     } else {
         heading
     };
-    let mut scenery = commands.spawn((
-        Scenery,
-        Transform::from_translation(ground)
-            .with_rotation(rotation)
-            .with_scale(Vec3::splat(rng.random_range(scale))),
-    ));
-    match FLAT_SCENERY_MODELS.iter().find(|&&flat| flat == model_id) {
+    Transform::from_translation(ground)
+        .with_rotation(rotation)
+        .with_scale(Vec3::splat(rng.random_range(scale)))
+}
+
+/// One tree, rock or tuft of grass, kept whether or not it is near enough to the camera to be shown.
+#[derive(Clone, Copy, Debug)]
+pub struct SceneryProp {
+    pub model: &'static str,
+    pub transform: Transform,
+    /// Walk-through decoration, cleared away when a structure is built on top of it.
+    pub decor: bool,
+}
+
+/// Every prop of the map by the chunk it stands in, so only the chunks near the camera need entities and an
+/// edit touches only its chunk. Props beyond the map's edge belong to chunks outside its bounds.
+#[derive(Resource)]
+pub struct SceneryLayout {
+    chunks: HashMap<IVec2, SceneryChunk>,
+    /// Tells one map's scenery from the next, so whatever shows it starts afresh on a new map.
+    lineage: u64,
+}
+
+static NEXT_LAYOUT_LINEAGE: AtomicU64 = AtomicU64::new(1);
+
+impl Default for SceneryLayout {
+    fn default() -> Self {
+        Self {
+            chunks: HashMap::new(),
+            lineage: NEXT_LAYOUT_LINEAGE.fetch_add(1, Ordering::Relaxed),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct SceneryChunk {
+    pub props: Vec<SceneryProp>,
+    /// Bumped whenever a prop comes or goes, so whatever shows the chunk knows to redo it.
+    pub revision: u64,
+}
+
+impl SceneryLayout {
+    pub fn lineage(&self) -> u64 {
+        self.lineage
+    }
+
+    pub fn place(&mut self, prop: SceneryProp) {
+        let chunk = self.chunks.entry(chunk_of_prop(&prop)).or_default();
+        chunk.props.push(prop);
+        chunk.revision += 1;
+    }
+
+    pub fn chunk(&self, chunk: IVec2) -> Option<&SceneryChunk> {
+        self.chunks.get(&chunk)
+    }
+
+    /// Removes the props standing in `area` that `doomed` picks.
+    fn remove_in(&mut self, area: Rect, doomed: impl Fn(&SceneryProp) -> bool) {
+        let first = chunk_of(world_to_cell(area.min.extend(0.0).xzy()));
+        let last = chunk_of(world_to_cell(area.max.extend(0.0).xzy()));
+        for y in first.y..=last.y {
+            for x in first.x..=last.x {
+                let Some(chunk) = self.chunks.get_mut(&IVec2::new(x, y)) else {
+                    continue;
+                };
+                let before = chunk.props.len();
+                chunk.props.retain(|prop| {
+                    let point = prop.transform.translation.xz();
+                    let inside = point.cmpge(area.min).all() && point.cmple(area.max).all();
+                    !(inside && doomed(prop))
+                });
+                if chunk.props.len() != before {
+                    chunk.revision += 1;
+                }
+            }
+        }
+    }
+
+    /// Removes everything standing on `cell`, as the map editor's brush does before painting it.
+    pub fn clear_cell(&mut self, cell: IVec2) {
+        let corner = cell.as_vec2() * CELL_SIZE;
+        let on_cell = |prop: &SceneryProp| world_to_cell(prop.transform.translation) == cell;
+        self.remove_in(Rect::from_corners(corner, corner + CELL_SIZE), on_cell);
+    }
+}
+
+fn chunk_of_prop(prop: &SceneryProp) -> IVec2 {
+    chunk_of(world_to_cell(prop.transform.translation))
+}
+
+/// The entity showing a prop near the camera; `scenery_view` spawns and drops them.
+pub fn spawn_scenery_entity(
+    commands: &mut Commands,
+    models: &ModelLibrary,
+    prop: &SceneryProp,
+) -> Entity {
+    let mut scenery = commands.spawn((Scenery, prop.transform));
+    match FLAT_SCENERY_MODELS.iter().find(|&&flat| flat == prop.model) {
         Some(&flat) => scenery.insert(FlatScenery(flat)),
-        None => scenery.insert(WorldAssetRoot(models.neutral(model_id))),
+        None => scenery.insert(WorldAssetRoot(models.neutral(prop.model))),
     };
-    if matches!(model_id, "grass_tuft" | "flowers" | "pebbles") {
+    if matches!(prop.model, "grass_tuft" | "flowers" | "pebbles") {
         scenery.insert(FineDecor);
     }
-    if is_trampleable(model_id) {
+    if is_trampleable(prop.model) {
         scenery.insert(Trampleable::default());
     }
     scenery.id()
@@ -496,20 +542,70 @@ pub fn sway_amplitude(model_id: &str) -> Option<f32> {
 }
 
 pub fn clear_decor_under_new_buildings(
-    mut commands: Commands,
+    layout: Option<ResMut<SceneryLayout>>,
     new_buildings: Query<&Building, Added<Building>>,
-    decor: Query<(Entity, &Transform), With<Decor>>,
 ) {
+    let Some(mut layout) = layout else { return };
     let clearing_margin = 0.6;
     for building in &new_buildings {
         let min = building.origin.as_vec2() * CELL_SIZE - Vec2::splat(clearing_margin);
         let max = (building.origin + building.kind.spec().footprint).as_vec2() * CELL_SIZE
             + Vec2::splat(clearing_margin);
-        for (entity, transform) in &decor {
-            let point = transform.translation.xz();
-            if point.cmpge(min).all() && point.cmple(max).all() {
-                commands.entity(entity).despawn();
-            }
+        layout.remove_in(Rect::from_corners(min, max), |prop| prop.decor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prop(model: &'static str, cell: IVec2, decor: bool) -> SceneryProp {
+        SceneryProp {
+            model,
+            transform: Transform::from_translation(cell_center(cell)),
+            decor,
         }
+    }
+
+    #[test]
+    fn props_are_kept_by_chunk_and_an_edit_marks_only_its_chunk() {
+        let mut layout = SceneryLayout::default();
+        let here = IVec2::new(5, 5);
+        let elsewhere = IVec2::new(40, 5);
+        layout.place(prop("tree", here, false));
+        layout.place(prop("grass_tuft", here, true));
+        layout.place(prop("rock", elsewhere, false));
+        let before_here = layout.chunk(chunk_of(here)).unwrap().revision;
+        let before_elsewhere = layout.chunk(chunk_of(elsewhere)).unwrap().revision;
+
+        layout.clear_cell(here);
+
+        let edited = layout.chunk(chunk_of(here)).unwrap();
+        assert!(edited.props.is_empty());
+        assert_ne!(edited.revision, before_here);
+        let untouched = layout.chunk(chunk_of(elsewhere)).unwrap();
+        assert_eq!(untouched.props.len(), 1);
+        assert_eq!(untouched.revision, before_elsewhere);
+    }
+
+    #[test]
+    fn a_structure_clears_only_decoration_under_it() {
+        let mut layout = SceneryLayout::default();
+        let site = IVec2::new(31, 31);
+        layout.place(prop("grass_tuft", site, true));
+        layout.place(prop("tree", site + IVec2::X, false));
+        layout.place(prop("flowers", site + IVec2::new(8, 0), true));
+        let footprint = Rect::from_corners(
+            site.as_vec2() * CELL_SIZE,
+            (site + IVec2::splat(2)).as_vec2() * CELL_SIZE,
+        );
+
+        layout.remove_in(footprint, |prop| prop.decor);
+
+        let left: Vec<&str> = [chunk_of(site), chunk_of(site + IVec2::new(8, 0))]
+            .iter()
+            .flat_map(|&chunk| layout.chunk(chunk).unwrap().props.iter().map(|p| p.model))
+            .collect();
+        assert_eq!(left, vec!["tree", "flowers"]);
     }
 }

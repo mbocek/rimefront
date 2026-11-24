@@ -337,7 +337,7 @@ pub fn shroud_unexplored_scenery(
     view: LocalView,
     scenery: Query<
         (Entity, &Transform),
-        Or<(With<Scenery>, With<CrystalVisual>, With<UnclaimedSite>)>,
+        Or<(Added<Scenery>, Added<CrystalVisual>, Added<UnclaimedSite>)>,
     >,
 ) {
     for (entity, transform) in &scenery {

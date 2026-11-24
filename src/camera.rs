@@ -331,6 +331,25 @@ fn yaw_change(left: f32, right: f32, dt: f32) -> f32 {
     (right - left) * ROTATE_SPEED * dt
 }
 
+/// The ground the corners of the view look at, flattened to sea level; the camera always looks down
+/// steeply enough for every corner to reach the ground.
+pub fn ground_in_view(camera: &Camera, transform: &GlobalTransform) -> Option<Rect> {
+    let size = camera.logical_viewport_size()?;
+    let corners = [
+        Vec2::ZERO,
+        Vec2::new(size.x, 0.0),
+        size,
+        Vec2::new(0.0, size.y),
+    ];
+    let mut seen = Rect::EMPTY;
+    for corner in corners {
+        let ray = camera.viewport_to_world(transform, corner).ok()?;
+        let distance = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))?;
+        seen = seen.union_point(ray.get_point(distance).xz());
+    }
+    Some(seen)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

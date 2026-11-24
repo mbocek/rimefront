@@ -75,6 +75,7 @@ pub mod replay;
 pub mod research;
 pub mod savegame;
 pub mod scenery;
+pub mod scenery_view;
 pub mod season;
 pub mod self_update;
 pub mod server;

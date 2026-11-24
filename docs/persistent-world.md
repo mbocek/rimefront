@@ -107,9 +107,13 @@ for ordinary network matches.
    - Done: the fog texture's changed chunks go to the GPU as regions written straight into the texture
      (`FogUploadPlugin`), about 72 KB a chunk, instead of re-uploading the whole image asset (4 MB on a
      Vast map, 64 MB on 1024 × 1024 cells); a new map or a switch to another side's fog still uploads it all.
-   - Still to do: stream scenery the same way. Every prop is its own entity sharing a merged mesh, culled
-     one by one, but a Vast map has about 123,000 of them and each is looked at every frame, so their cost
-     grows with the area.
+   - Done: scenery is data first. Map generation fills a `SceneryLayout` of props by chunk, drawing the same
+     random numbers as before, so maps and fingerprints are unchanged; `stream_scenery` gives the props
+     around the view an entity each and drops them as the view moves on, and a chunk whose props changed
+     (decoration cleared under a new structure, an editor brush) is shown afresh. A Vast map went from about
+     123,000 entities to 10,000 at the usual zoom and 33,000 fully zoomed out. Over 40 s captures (two runs
+     each, rotating order) a Vast map now costs what a Huge one does, 33.7 s of CPU against 33.4 s, where
+     it cost 37.1 s before, and peaks at 1.52 GB instead of 1.87 GB.
 6. **Hierarchical pathfinding.** Regions labelled per chunk, chunks joined by portals on their borders; a route
    is planned over portals and refined by A* only inside the chunks it passes. A structure relabels only its own
    chunk.

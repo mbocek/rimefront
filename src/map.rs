@@ -8,12 +8,11 @@ use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 
-use crate::assets::ModelLibrary;
 use crate::catalog::CRYSTAL_PER_CELL;
 use crate::crystal_models::{CRYSTAL_MODELS, CrystalModel};
 use crate::fog_view::FogTexture;
 use crate::levels::ActiveLevel;
-use crate::scenery;
+use crate::scenery::{self, SceneryLayout};
 use crate::sim_math;
 use crate::terrain::{FAR_RING_WIDTH, Landscape, OUTLANDS_WIDTH, WATER_LEVEL, approximate_ground};
 use crate::terrain_chunks::plan_terrain;
@@ -662,15 +661,17 @@ pub fn near_crystal_field(cell: IVec2) -> bool {
     })
 }
 
-pub fn generate_map(mut commands: Commands, models: Res<ModelLibrary>, level: Res<ActiveLevel>) {
+pub fn generate_map(mut commands: Commands, level: Res<ActiveLevel>) {
     let mut rng = StdRng::seed_from_u64(level.0.map_seed);
     let mut map = GameMap::empty();
     let landscape = level.0.landscape;
     block_water(&mut map, landscape);
     block_unmirrored_edge(&mut map);
     seed_crystal_fields(&mut commands, &mut map, &mut rng);
-    scenery::scatter(&mut commands, &models, landscape, &mut map, &mut rng);
+    let mut scenery = SceneryLayout::default();
+    scenery::scatter(&mut scenery, landscape, &mut map, &mut rng);
     commands.insert_resource(map);
+    commands.insert_resource(scenery);
 }
 
 pub fn is_water(landscape: Landscape, cell: IVec2) -> bool {

@@ -8,9 +8,9 @@ use crate::{
     damage_feedback, economy, effects, field_tips, flat_scenery, fog_view, frame_pacing, graphics,
     interpolation, lobby, local_view, main_menu, map, map_editor, map_edits, match_flow, menu,
     minimap, motion_material, network, network_hud, orders, overlay, perf_overlay, placement,
-    queue_bar, replay, savegame, settings, sorties, sound, structure_tools, support_tools,
-    terrain_chunks, terrain_material, transport, tutorial, ui, unit_voices, updates, wall_joints,
-    weather,
+    queue_bar, replay, savegame, scenery_view, settings, sorties, sound, structure_tools,
+    support_tools, terrain_chunks, terrain_material, transport, tutorial, ui, unit_voices, updates,
+    wall_joints, weather,
 };
 
 /// Draws what the simulation moves part way between ticks.
@@ -89,6 +89,7 @@ impl Plugin for BattleViewPlugin {
                     .in_set(FramePhase::Presentation),
             )
             .init_resource::<structure_tools::StructureTool>()
+            .init_resource::<scenery_view::SceneryShown>()
             .init_resource::<support_tools::SupportTool>()
             .add_systems(
                 OnEnter(match_flow::GameState::Playing),
@@ -96,7 +97,6 @@ impl Plugin for BattleViewPlugin {
                     local_view::prepare_spectator_view,
                     camera::focus_on_player_base,
                     map::spawn_terrain_visuals,
-                    fog_view::shroud_unexplored_scenery,
                     minimap::create_minimap,
                     ui::build_interface,
                     structure_tools::prepare_structure_tools,
@@ -217,6 +217,8 @@ impl Plugin for BattleViewPlugin {
                         (ui::refresh_objective, ui::refresh_match_time),
                         (
                             terrain_chunks::stream_terrain,
+                            scenery_view::stream_scenery,
+                            fog_view::shroud_unexplored_scenery,
                             terrain_chunks::finish_terrain_chunks,
                             terrain_material::dress_terrain_surfaces,
                         )
@@ -507,6 +509,7 @@ fn world_view() -> ScheduleConfigs<ScheduleSystem> {
         terrain_material::assemble_terrain_material,
         terrain_material::fit_terrain_to_level,
         terrain_chunks::stream_terrain,
+        scenery_view::stream_scenery,
         terrain_chunks::finish_terrain_chunks,
         terrain_material::dress_terrain_surfaces,
         terrain_material::animate_water,

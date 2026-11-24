@@ -12,7 +12,7 @@ use crate::net::network::{
     Dialling, JoinTarget, Link, LobbyNews, MOST_SPECTATORS, NetSession, Offer,
 };
 use crate::sim::catalog::{Alliance, Team};
-use crate::sim::player_commands::LocalTeam;
+use crate::sim::player_commands::{CommandTiming, LocalTeam};
 
 pub const DEFAULT_PORT: u16 = 47_300;
 pub const MOST_PLAYERS: usize = 4;
@@ -863,6 +863,7 @@ pub fn run_lobby(
         return;
     };
     commands.insert_resource(ActiveLevel(start.level));
+    commands.insert_resource(start.session.command_timing());
     commands.insert_resource(start.session);
     commands.insert_resource(LocalTeam(start.local_team));
     next_state.set(GameState::Playing);
@@ -871,5 +872,6 @@ pub fn run_lobby(
 /// Back in the main menu every battle is local again.
 pub fn end_network_battle(mut commands: Commands) {
     commands.remove_resource::<NetSession>();
+    commands.insert_resource(CommandTiming::default());
     commands.insert_resource(LocalTeam::default());
 }

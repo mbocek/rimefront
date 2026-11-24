@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-use crate::app::savegame::PendingLoad;
 use crate::missions::levels::{ActiveLevel, ForceSetup};
 use crate::sim::ai::{AiCommander, AiCommanders, find_building_site};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
@@ -42,6 +41,10 @@ pub struct MatchRules {
     pub enemy_ai: bool,
     pub starting_forces: bool,
 }
+
+/// A saved game is about to replace the level's starting forces, so they are not deployed.
+#[derive(Resource)]
+pub struct RestoringSave;
 
 /// Game time elapsed in the current match; pauses with the game.
 #[derive(Resource, Default)]
@@ -168,7 +171,7 @@ pub fn deploy_level_forces(
     mut commands: Commands,
     level: Res<ActiveLevel>,
     rules: Res<MatchRules>,
-    pending_load: Option<Res<PendingLoad>>,
+    restoring: Option<Res<RestoringSave>>,
     mut map: ResMut<GameMap>,
     mut economies: ResMut<Economies>,
     mut production: ResMut<Production>,
@@ -180,7 +183,7 @@ pub fn deploy_level_forces(
         production.forbid(team, forbidden.clone());
     }
     production.set_player_faction(level.player_faction);
-    if pending_load.is_some() {
+    if restoring.is_some() {
         return;
     }
 

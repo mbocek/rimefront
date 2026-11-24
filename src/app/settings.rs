@@ -9,6 +9,7 @@ use crate::missions::levels::Difficulty;
 use crate::ui::key_bindings::KeyBindings;
 
 const GAME_DIRECTORY: &str = "iron_tide";
+const CUSTOM_LEVELS_DIRECTORY: &str = "levels";
 const SETTINGS_FILE: &str = "settings.json";
 const QUALITY_VAR: &str = "IRON_TIDE_QUALITY";
 
@@ -242,6 +243,10 @@ pub fn game_data_directory() -> PathBuf {
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
         .unwrap_or_else(|| PathBuf::from("."));
     base.join(GAME_DIRECTORY)
+}
+
+pub fn custom_levels_directory() -> PathBuf {
+    game_data_directory().join(CUSTOM_LEVELS_DIRECTORY)
 }
 
 fn settings_path() -> PathBuf {

@@ -23,10 +23,11 @@ use crate::app::replay::{
 };
 use crate::app::savegame::{QUICK_SAVE_SLOT, SaveDirectory, SaveRequests, slot_summary};
 use crate::app::settings::GameSettings;
+use crate::app::settings::custom_levels_directory;
 use crate::app::updates::{UpdateState, Updates, download_update};
 use crate::missions::levels::{
     ActiveLevel, BaseSite, Difficulty, LevelDefinition, LevelEntry, LevelSource, ObjectiveKind,
-    SkirmishOptions, TechLevel, Weather, custom_levels, custom_levels_directory, save_custom_level,
+    SkirmishOptions, TechLevel, Weather, custom_levels, save_custom_level,
 };
 use crate::net::lobby::{MOST_PLAYERS, NetLobby, network_level};
 use crate::sim::catalog::Team;

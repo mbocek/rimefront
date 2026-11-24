@@ -4,7 +4,6 @@ use crate::sim::intel::Intel;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::net::network::{NETWORK_COMMAND_DELAY_TICKS, NetSession};
 use crate::sim::catalog::{ArmorClass, BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::components::*;
 use crate::sim::determinism::{SimEntities, SimId};
@@ -172,31 +171,40 @@ impl CommandQueue {
     }
 }
 
+/// How this machine's orders are timed: how many ticks they wait, long enough in a network battle to reach
+/// every other machine before they run, and whether this machine gives orders at all.
+#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+pub struct CommandTiming {
+    pub delay_ticks: u64,
+    pub spectating: bool,
+}
+
+impl Default for CommandTiming {
+    fn default() -> Self {
+        Self {
+            delay_ticks: COMMAND_DELAY_TICKS,
+            spectating: false,
+        }
+    }
+}
+
 /// What the interface uses to give orders on behalf of this machine's player.
 #[derive(bevy::ecs::system::SystemParam)]
 pub struct CommandIssuer<'w> {
     queue: ResMut<'w, CommandQueue>,
     tick: Res<'w, SimulationTick>,
     local: Res<'w, LocalTeam>,
-    session: Option<Res<'w, NetSession>>,
+    timing: Res<'w, CommandTiming>,
 }
 
 impl CommandIssuer<'_> {
     pub fn issue(&mut self, command: PlayerCommand) {
-        if self
-            .session
-            .as_ref()
-            .is_some_and(|session| session.is_spectating())
-        {
+        if self.timing.spectating {
             return;
         }
         let (tick, team) = (*self.tick, self.local.0);
-        let delay = if self.session.is_some() {
-            NETWORK_COMMAND_DELAY_TICKS
-        } else {
-            COMMAND_DELAY_TICKS
-        };
-        self.queue.issue_after(tick, delay, team, command);
+        self.queue
+            .issue_after(tick, self.timing.delay_ticks, team, command);
     }
 
     pub fn team(&self) -> Team {

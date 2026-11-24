@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::missions::levels::{Difficulty, LevelDefinition, campaign, custom_levels_directory};
+use crate::app::settings::custom_levels_directory;
+use crate::missions::levels::{Difficulty, LevelDefinition, campaign};
 use crate::sim::catalog::Faction;
 
 /// Custom campaigns live in this folder inside the custom levels folder, one JSON file each.

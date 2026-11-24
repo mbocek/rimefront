@@ -8,13 +8,11 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::app::i18n::{tr, tr_fmt};
-use crate::app::settings::game_data_directory;
 use crate::sim::catalog::{Alliance, BuildingKind, Faction, Team, UnitKind};
 use crate::world::map::{MapSize, base_sites};
 use crate::world::season::Season;
 use crate::world::terrain::Landscape;
 
-const CUSTOM_LEVELS_DIRECTORY: &str = "levels";
 const CAMPAIGN_SOURCES: [&str; 20] = [
     include_str!("../../assets/levels/01_bridgehead.json"),
     include_str!("../../assets/levels/02_hold_the_ford.json"),
@@ -425,10 +423,6 @@ pub fn campaign() -> Vec<LevelEntry> {
                 .unwrap_or_else(|error| panic!("campaign level {index} is invalid: {error}")),
         })
         .collect()
-}
-
-pub fn custom_levels_directory() -> PathBuf {
-    game_data_directory().join(CUSTOM_LEVELS_DIRECTORY)
 }
 
 /// Every readable, playable level in the custom levels directory, sorted by file name.

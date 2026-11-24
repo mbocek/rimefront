@@ -181,7 +181,6 @@ for ordinary network matches.
     answered by `view` and `audio`. What ties remain:
     - it uses `app::i18n` for its messages, `app::match_flow` for the match clock and states and
       `missions::levels` for the level being played, all three to go into the crate with it;
-    - `sim::player_commands` delays commands by the network session's lead (`net::network`);
     - `SimulationPlugin` schedules systems of `app::savegame` and `net::network` inside its tick: saving and
       the lockstep session are to be added around the simulation by the game instead.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full

@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::app::i18n::{tr, tr_fmt};
-use crate::app::match_flow::{GameState, MatchClock};
+use crate::app::match_flow::{GameState, MatchClock, RestoringSave};
 use crate::app::settings::{GameSettings, game_data_directory};
 use crate::missions::levels::{ActiveLevel, LevelDefinition};
 use crate::net::network::NetSession;
@@ -382,6 +382,7 @@ pub fn begin_requested_load(
         Ok(save) => {
             commands.insert_resource(ActiveLevel(save.level.clone()));
             commands.insert_resource(PendingLoad(save));
+            commands.insert_resource(RestoringSave);
             next_state.set(GameState::Restarting);
         }
         Err(reason) => {
@@ -409,6 +410,7 @@ pub fn restore_pending_load(
     let Some(pending) = pending else { return };
     let save = pending.0.clone();
     commands.remove_resource::<PendingLoad>();
+    commands.remove_resource::<RestoringSave>();
     restore_explored_ground(&mut intel, &save);
 
     map.reset_for_load(save.crystal);

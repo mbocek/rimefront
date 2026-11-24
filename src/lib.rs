@@ -111,6 +111,7 @@ impl Plugin for SimulationPlugin {
             .init_resource::<player_commands::CommandQueue>()
             .init_resource::<player_commands::SimulationTick>()
             .init_resource::<player_commands::LocalTeam>()
+            .init_resource::<player_commands::CommandTiming>()
             .add_observer(determinism::forget_removed_entity)
             .add_observer(determinism::number_new_unit)
             .add_observer(determinism::number_new_building)

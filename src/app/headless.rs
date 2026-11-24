@@ -386,6 +386,7 @@ impl Battle {
             NetSession::with_one_player(stream, side, remote_team).expect("a working connection");
         let world = self.world();
         world.insert_resource(LocalTeam(local_team));
+        world.insert_resource(session.command_timing());
         world.insert_resource(session);
         world
             .resource_mut::<AiCommanders>()
@@ -398,6 +399,7 @@ impl Battle {
         let humans: Vec<Team> = session.remote_teams().to_vec();
         let world = self.world();
         world.insert_resource(LocalTeam(local_team));
+        world.insert_resource(session.command_timing());
         world.insert_resource(session);
         world
             .resource_mut::<AiCommanders>()

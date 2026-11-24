@@ -5,13 +5,15 @@ use bevy::camera::RenderTarget;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::input::InputSystems;
 use bevy::prelude::*;
+
+use crate::app::settings::custom_levels_directory;
 use bevy::render::render_resource::TextureFormat;
 use bevy::window::{CursorOptions, PrimaryWindow};
 
 use crate::app::match_flow::GameState;
 use crate::app::savegame::SaveRequests;
 use crate::missions::levels::{
-    ActiveLevel, LevelDefinition, SkirmishOptions, campaign, custom_levels, custom_levels_directory,
+    ActiveLevel, LevelDefinition, SkirmishOptions, campaign, custom_levels,
 };
 use crate::sim::catalog::Team;
 use crate::sim::components::{Selected, Unit};

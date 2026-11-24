@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
+use crate::app::settings::custom_levels_directory;
+
 use crate::app::i18n::{tr, tr_fmt, tr_owned};
 use crate::app::match_flow::GameState;
 use crate::missions::event_editing::{
@@ -15,9 +17,7 @@ use crate::missions::level_editing::{
     type_into,
 };
 use crate::missions::level_events::{EventAction, Trigger};
-use crate::missions::levels::{
-    ActiveLevel, LevelDefinition, custom_levels_directory, save_custom_level,
-};
+use crate::missions::levels::{ActiveLevel, LevelDefinition, save_custom_level};
 use crate::sim::catalog::{BuildingKind, Team};
 use crate::ui::sidebar::{ACCENT, FRAME, GOOD, PANEL, SIDEBAR_WIDTH, TEXT_DIM, TEXT_MAIN, UiFonts};
 use crate::view::camera::Cursor;

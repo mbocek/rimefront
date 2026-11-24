@@ -13,7 +13,7 @@ use crate::sim::catalog::Team;
 use crate::sim::determinism::simulation_checksum;
 use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::{
-    CommandQueue, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
+    CommandQueue, CommandTiming, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
 };
 
 pub use crate::net::link::{Arrival, Dialling, JoinTarget, Link, Side};
@@ -303,6 +303,13 @@ impl NetSession {
 
     pub fn is_spectating(&self) -> bool {
         self.spectating
+    }
+
+    pub fn command_timing(&self) -> CommandTiming {
+        CommandTiming {
+            delay_ticks: NETWORK_COMMAND_DELAY_TICKS,
+            spectating: self.spectating,
+        }
     }
 
     pub fn remote_teams(&self) -> &[Team] {

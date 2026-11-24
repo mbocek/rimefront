@@ -114,9 +114,27 @@ for ordinary network matches.
      123,000 entities to 10,000 at the usual zoom and 33,000 fully zoomed out. Over 40 s captures (two runs
      each, rotating order) a Vast map now costs what a Huge one does, 33.7 s of CPU against 33.4 s, where
      it cost 37.1 s before, and peaks at 1.52 GB instead of 1.87 GB.
-6. **Hierarchical pathfinding.** Regions labelled per chunk, chunks joined by portals on their borders; a route
-   is planned over portals and refined by A* only inside the chunks it passes. A structure relabels only its own
-   chunk.
+6. **Pathfinding.** Measured, and left as it is for now. On River maps with their forests and rocks, one A*
+   route cell by cell (Apple M5 Pro):
+
+   | Map | Across the river away from a ford | Base to base |
+   | --- | --- | --- |
+   | 256 × 256 (Vast) | 0.2 ms | 0.3 ms |
+   | 512 × 512 | 0.4 ms | 2.1 ms |
+   | 1024 × 1024 | 1.9 ms | 9.3 ms |
+
+   About 60 ns per cell searched: the time is the number of cells, not the bookkeeping. Two attempts made
+   nothing better and were dropped. Portals between chunks (HPA*) cost 155 ms the first time across a
+   1024-cell map, working out the chunks on the way, and gave routes 10 % longer. An A* with flat arrays
+   instead of the `pathfinding` crate's hash map, popping cells in the crate's exact order so routes stay the
+   same, ran at the same speed. Searching fewer cells means another algorithm (jump points, portals worked out
+   ahead), and that changes routes and so the fingerprints; it becomes worth it when orders across a world
+   larger than 1024 cells are common.
+
+   What does grow with the area is labelling the map's connected regions, which the route search uses to
+   refuse unreachable goals at once: the whole map again after every structure placed or removed, 0.5 ms on
+   a Vast map, 1.8 ms on 512 cells, 5.7 ms on 1024. A persistent world where many players build needs it
+   per chunk.
 7. **Minimap for a world.** The minimap shows the surroundings of the camera at a fixed scale, with a separate
    overview downsampled from the chunks.
 

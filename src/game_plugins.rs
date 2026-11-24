@@ -216,6 +216,7 @@ impl Plugin for BattleViewPlugin {
                         (ui::announce_mission_messages, ui::refresh_notifications).chain(),
                         (ui::refresh_objective, ui::refresh_match_time),
                         (
+                            terrain_chunks::stream_terrain,
                             terrain_chunks::finish_terrain_chunks,
                             terrain_material::dress_terrain_surfaces,
                         )
@@ -504,6 +505,7 @@ fn world_view() -> ScheduleConfigs<ScheduleSystem> {
         fog_view::paint_fog_texture,
         terrain_material::assemble_terrain_material,
         terrain_material::fit_terrain_to_level,
+        terrain_chunks::stream_terrain,
         terrain_chunks::finish_terrain_chunks,
         terrain_material::dress_terrain_surfaces,
         terrain_material::animate_water,

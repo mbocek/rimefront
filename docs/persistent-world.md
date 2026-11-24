@@ -100,9 +100,13 @@ for ordinary network matches.
      1.6 million in the two meshes before (detailed patches run to the edge of their chunk) and take the same
      0.6 s of CPU to build, now off the main thread; CPU time over a 50 s capture is unchanged within noise
      (47.1 s against 46.8 s, three runs each in rotating order).
-   - Still to do: keep only the patches around the camera, so a world larger than memory allows can be
-     drawn, and upload only the changed chunks of the fog texture. Scenery needs nothing here: every prop
-     is its own entity sharing a merged mesh, already culled one by one.
+   - Done: only the patches around what the camera sees exist (`stream_terrain`): the ground in view plus
+     one patch, kept until the view is two patches away. On a Vast map that is 15 of the 196 patches at the
+     usual zoom and 43 fully zoomed out, and the same on any larger map. Jumping across the map through the
+     minimap shows complete ground in the first captured frame.
+   - Still to do: upload only the changed chunks of the fog texture, and stream scenery the same way. Every
+     prop is its own entity sharing a merged mesh, culled one by one, but a Vast map has about 123,000 of
+     them and each is looked at every frame, so their cost grows with the area.
 6. **Hierarchical pathfinding.** Regions labelled per chunk, chunks joined by portals on their borders; a route
    is planned over portals and refined by A* only inside the chunks it passes. A structure relabels only its own
    chunk.

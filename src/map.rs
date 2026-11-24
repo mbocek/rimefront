@@ -16,7 +16,7 @@ use crate::levels::ActiveLevel;
 use crate::scenery;
 use crate::sim_math;
 use crate::terrain::{FAR_RING_WIDTH, Landscape, OUTLANDS_WIDTH, WATER_LEVEL, approximate_ground};
-use crate::terrain_chunks::spawn_terrain_chunks;
+use crate::terrain_chunks::plan_terrain;
 use crate::terrain_material::{WaterMaterial, WaterSurface, water_material};
 
 pub const CELL_SIZE: f32 = 2.0;
@@ -701,7 +701,6 @@ fn block_unmirrored_edge(map: &mut GameMap) {
 /// The rendered ground and water; the simulation itself only needs the grid from `generate_map`.
 pub fn spawn_terrain_visuals(
     mut commands: Commands,
-    map: Res<GameMap>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
@@ -714,7 +713,7 @@ pub fn spawn_terrain_visuals(
         perceptual_roughness: 0.95,
         ..default()
     });
-    spawn_terrain_chunks(&mut commands, &map, &level, placeholder);
+    plan_terrain(&mut commands, &level, placeholder);
 
     let bounds = map_bounds();
     let water_span = bounds.world_size() + Vec2::splat(2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH));

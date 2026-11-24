@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on};
 
+use crate::camera::RtsCamera;
 use crate::levels::ActiveLevel;
 use crate::map::{CELL_SIZE, CHUNK_CELLS, GameMap, map_bounds};
 use crate::terrain::{
@@ -91,28 +92,105 @@ fn start_building(
     GroundUnderConstruction(task)
 }
 
-pub fn spawn_terrain_chunks(
+/// Every patch of ground the level has, and the entity showing it while it is near the camera.
+#[derive(Resource)]
+pub struct GroundPlan {
+    ground: Arc<GroundLayers>,
+    patches: Vec<(Rect, f32)>,
+    shown: Vec<Option<Entity>>,
+    placeholder: Handle<StandardMaterial>,
+}
+
+pub fn plan_terrain(
     commands: &mut Commands,
-    map: &GameMap,
     level: &ActiveLevel,
     placeholder: Handle<StandardMaterial>,
 ) {
-    let ground = Arc::new(GroundLayers::new(level.0.landscape));
-    for (area, spacing) in ground_patches() {
-        let crystal_soil = crystal_soil_under(map, area, spacing);
-        let building = start_building(&ground, area, spacing, crystal_soil.clone());
-        commands.spawn((
-            TerrainSurface,
-            TerrainChunk {
-                area,
-                spacing,
-                crystal_soil,
-            },
-            building,
-            MeshMaterial3d(placeholder.clone()),
-            Transform::IDENTITY,
-        ));
+    let patches = ground_patches();
+    commands.insert_resource(GroundPlan {
+        ground: Arc::new(GroundLayers::new(level.0.landscape)),
+        shown: vec![None; patches.len()],
+        patches,
+        placeholder,
+    });
+}
+
+/// Ground beyond the view this far is built ahead, so panning does not reveal a patch still being built.
+const BUILD_AHEAD: f32 = PATCH_METRES;
+/// Ground stays this much farther than it is built, so a camera rocking on a patch's edge does not rebuild it.
+const KEEP_BEYOND_BUILD: f32 = PATCH_METRES;
+
+/// Shows the patches around what the camera sees and drops the ones it has left far behind.
+pub fn stream_terrain(
+    mut commands: Commands,
+    plan: Option<ResMut<GroundPlan>>,
+    map: Option<Res<GameMap>>,
+    cameras: Query<(&Camera, &GlobalTransform), With<RtsCamera>>,
+    chunks: Query<(), With<TerrainChunk>>,
+) {
+    let (Some(mut plan), Some(map)) = (plan, map) else {
+        return;
+    };
+    let Ok((camera, transform)) = cameras.single() else {
+        return;
+    };
+    let Some(view) = ground_in_view(camera, transform) else {
+        return;
+    };
+    let wanted = view.inflate(BUILD_AHEAD);
+    let kept = wanted.inflate(KEEP_BEYOND_BUILD);
+    let plan = &mut *plan;
+    for (index, &(area, spacing)) in plan.patches.iter().enumerate() {
+        let shown = plan.shown[index].filter(|&entity| chunks.contains(entity));
+        plan.shown[index] = match shown {
+            None if overlaps(area, wanted) => {
+                let crystal_soil = crystal_soil_under(&map, area, spacing);
+                let building = start_building(&plan.ground, area, spacing, crystal_soil.clone());
+                let entity = commands
+                    .spawn((
+                        TerrainSurface,
+                        TerrainChunk {
+                            area,
+                            spacing,
+                            crystal_soil,
+                        },
+                        building,
+                        MeshMaterial3d(plan.placeholder.clone()),
+                        Transform::IDENTITY,
+                    ))
+                    .id();
+                Some(entity)
+            }
+            Some(entity) if !overlaps(area, kept) => {
+                commands.entity(entity).despawn();
+                None
+            }
+            unchanged => unchanged,
+        };
     }
+}
+
+fn overlaps(a: Rect, b: Rect) -> bool {
+    !a.intersect(b).is_empty()
+}
+
+/// The ground the corners of the view look at, flattened to sea level; the camera always looks down
+/// steeply enough for every corner to reach the ground.
+fn ground_in_view(camera: &Camera, transform: &GlobalTransform) -> Option<Rect> {
+    let size = camera.logical_viewport_size()?;
+    let corners = [
+        Vec2::ZERO,
+        Vec2::new(size.x, 0.0),
+        size,
+        Vec2::new(0.0, size.y),
+    ];
+    let mut seen = Rect::EMPTY;
+    for corner in corners {
+        let ray = camera.viewport_to_world(transform, corner).ok()?;
+        let distance = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))?;
+        seen = seen.union_point(ray.get_point(distance).xz());
+    }
+    Some(seen)
 }
 
 pub fn finish_terrain_chunks(
@@ -136,16 +214,21 @@ pub fn finish_terrain_chunks(
 pub fn resoil_terrain_chunks(
     commands: &mut Commands,
     map: &GameMap,
-    level: &ActiveLevel,
+    plan: Option<&GroundPlan>,
     chunks: &mut Query<(Entity, &mut TerrainChunk)>,
 ) {
-    let ground = Arc::new(GroundLayers::new(level.0.landscape));
+    let Some(plan) = plan else { return };
     for (entity, mut chunk) in chunks.iter_mut() {
         let crystal_soil = crystal_soil_under(map, chunk.area, chunk.spacing);
         if crystal_soil == chunk.crystal_soil {
             continue;
         }
-        let building = start_building(&ground, chunk.area, chunk.spacing, crystal_soil.clone());
+        let building = start_building(
+            &plan.ground,
+            chunk.area,
+            chunk.spacing,
+            crystal_soil.clone(),
+        );
         chunk.crystal_soil = crystal_soil;
         commands.entity(entity).insert(building);
     }

@@ -22,7 +22,7 @@ use crate::map::{
 };
 use crate::map_edits::{Brush, Ground, MapEdit, MapPainter};
 use crate::match_flow::GameState;
-use crate::terrain_chunks::{TerrainChunk, resoil_terrain_chunks};
+use crate::terrain_chunks::{GroundPlan, TerrainChunk, resoil_terrain_chunks};
 use crate::ui::{ACCENT, FRAME, GOOD, PANEL, SIDEBAR_WIDTH, TEXT_DIM, TEXT_MAIN, UiFonts};
 
 const BRUSH_SIZES: [i32; 3] = [0, 1, 2];
@@ -648,6 +648,7 @@ pub fn resoil_after_stroke(
     mouse: Res<ButtonInput<MouseButton>>,
     level: Res<ActiveLevel>,
     map: Res<GameMap>,
+    plan: Option<Res<GroundPlan>>,
     mut chunks: Query<(Entity, &mut TerrainChunk)>,
 ) {
     *painted |= level.is_changed();
@@ -656,7 +657,7 @@ pub fn resoil_after_stroke(
         return;
     }
     *painted = false;
-    resoil_terrain_chunks(&mut commands, &map, &level, &mut chunks);
+    resoil_terrain_chunks(&mut commands, &map, plan.as_deref(), &mut chunks);
 }
 
 pub fn draw_brush_outline(cursor: Res<Cursor>, editor: Res<MapEditor>, mut gizmos: Gizmos) {

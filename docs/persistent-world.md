@@ -155,35 +155,45 @@ for ordinary network matches.
    camera's surroundings at a fixed scale is still worth having once the world is large enough that a
    pixel covers several units' worth of ground.
 
-### B. A world rather than a stretched map
+### B. A world that grows
 
 8. **Generation by chunk.** The landscape (height, water, forests, crystal fields, roads) comes from a function
-   of the world seed and the chunk coordinate, so any chunk can be generated on its own, in any order, with the
-   same result. Replaces stretching the 64-cell landscapes for big maps; the authored ones stay for the campaign.
-   Changes map generation, so the fingerprints and old replays.
-9. **Starting sites across the world.** Generated sites, each with a crystal field and buildable ground nearby,
-   spaced out; no mirror symmetry in world mode (duels keep it).
-10. **Sides as data.** Replace the four fixed teams with a side id: name, colour, allies; the interface,
+   of the world seed and the chunk coordinate alone, so any chunk can be generated on its own, in any order,
+   at any distance from the origin, with the same result. Replaces stretching the 64-cell landscapes for big
+   maps; the authored ones stay for the campaign and duels. Changes map generation, so the fingerprints and
+   old replays.
+9. **Grids stored by chunk.** `GameMap`, the fog of war and the scenery layout keep a chunk only once it is
+   generated, and `MapBounds` grows to cover new chunks, so the world can widen while it runs. Dense grids
+   were enough for a fixed world (step 4); a growing one needs this.
+10. **Starting sites across the world.** Generated sites, each with a crystal field and buildable ground
+    nearby, spaced out; a new player gets the nearest free one, and the world generates a new ring of chunks
+    when the free sites run low. No mirror symmetry in world mode (duels keep it).
+11. **Sides as data.** Replace the four fixed teams with a side id: name, colour, allies; the interface,
     intel, fog and AI keep one entry per side present.
 
 ### C. A world on a server
 
-11. **The world runs on the server.** `iron-tide-server` gains a world mode that runs `SimulationPlugin`
+12. **The world runs on the server.** `iron-tide-server` gains a world mode that runs `SimulationPlugin`
     headless (as the tests already do) and takes player commands from the network instead of relaying them.
-12. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
+13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.
-13. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
-    gets their side back wherever it stands.
-14. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
+14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
+    gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
+    long absence its structures decay and its site is freed.
+15. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
     the JSON save format gives way to a compact binary one.
-15. **The world's own inhabitants.** Computer sides and neutral sites that keep the world alive between
-    players.
+16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing
+    empty between players.
 
-## Open questions
+## Decisions
 
-- What happens to a base while its player is offline: protected, slowly decaying, or fair game?
-- A large but fixed world (for example 2048 × 2048 cells, 4 km a side), or one that grows as players arrive?
-  Steps 3, 4 and 8 make both possible; the fixed one is far simpler to balance.
-- Competitive, cooperative against computer sides, or both, and how many players at once? That sets the
-  server's tick budget and whether the world must later be split across several simulations.
+Taken on 2026-11-24:
+
+- **The world grows** as players arrive, rather than having a fixed size (steps 8 to 10).
+- **An absent player's base is protected and slowly decays**: no one can attack it while its player is away,
+  and after a long absence it falls apart and frees its site (step 14).
+- **Players fight each other**, alone or in alliances; computer sides are only there to fill the world.
+
+Still open: how many players at once, which sets the server's tick budget and whether the world must later
+be split across several simulations, and how long an absence is before a base starts to decay.

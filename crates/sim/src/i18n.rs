@@ -38,8 +38,8 @@ pub fn language() -> Language {
 }
 
 /// Every translation maps the English text to its own; placeholders `{}` keep their count and order.
-const SLOVAK: &str = include_str!("../../assets/i18n/sk.json");
-const CZECH: &str = include_str!("../../assets/i18n/cs.json");
+const SLOVAK: &str = include_str!("../../../assets/i18n/sk.json");
+const CZECH: &str = include_str!("../../../assets/i18n/cs.json");
 
 struct Translations {
     slovak: HashMap<String, String>,

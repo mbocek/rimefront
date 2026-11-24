@@ -1,4 +1,4 @@
-use crate::missions::level_events::LevelEvent;
+use crate::level_events::LevelEvent;
 use std::path::{Path, PathBuf};
 
 use crate::world::map::set_map_size;
@@ -7,33 +7,33 @@ use crate::world::terrain::set_terrain_seed;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app::i18n::{tr, tr_fmt};
+use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{Alliance, BuildingKind, Faction, Team, UnitKind};
 use crate::world::map::{MapSize, base_sites};
 use crate::world::season::Season;
 use crate::world::terrain::Landscape;
 
 const CAMPAIGN_SOURCES: [&str; 20] = [
-    include_str!("../../assets/levels/01_bridgehead.json"),
-    include_str!("../../assets/levels/02_hold_the_ford.json"),
-    include_str!("../../assets/levels/03_iron_hammer.json"),
-    include_str!("../../assets/levels/04_three_fronts.json"),
-    include_str!("../../assets/levels/05_silent_takeover.json"),
-    include_str!("../../assets/levels/06_every_man_for_himself.json"),
-    include_str!("../../assets/levels/07_rotor_storm.json"),
-    include_str!("../../assets/levels/08_white_silence.json"),
-    include_str!("../../assets/levels/09_marksmen.json"),
-    include_str!("../../assets/levels/10_the_iron_tide.json"),
-    include_str!("../../assets/levels/11_red_ledger.json"),
-    include_str!("../../assets/levels/12_bunker_line.json"),
-    include_str!("../../assets/levels/13_rocket_rain.json"),
-    include_str!("../../assets/levels/14_salted_earth.json"),
-    include_str!("../../assets/levels/15_ghosts_in_the_pines.json"),
-    include_str!("../../assets/levels/16_laboratory_war.json"),
-    include_str!("../../assets/levels/17_thunder_run.json"),
-    include_str!("../../assets/levels/18_iron_lifeline.json"),
-    include_str!("../../assets/levels/19_hunting_season.json"),
-    include_str!("../../assets/levels/20_ghost_armour.json"),
+    include_str!("../../../assets/levels/01_bridgehead.json"),
+    include_str!("../../../assets/levels/02_hold_the_ford.json"),
+    include_str!("../../../assets/levels/03_iron_hammer.json"),
+    include_str!("../../../assets/levels/04_three_fronts.json"),
+    include_str!("../../../assets/levels/05_silent_takeover.json"),
+    include_str!("../../../assets/levels/06_every_man_for_himself.json"),
+    include_str!("../../../assets/levels/07_rotor_storm.json"),
+    include_str!("../../../assets/levels/08_white_silence.json"),
+    include_str!("../../../assets/levels/09_marksmen.json"),
+    include_str!("../../../assets/levels/10_the_iron_tide.json"),
+    include_str!("../../../assets/levels/11_red_ledger.json"),
+    include_str!("../../../assets/levels/12_bunker_line.json"),
+    include_str!("../../../assets/levels/13_rocket_rain.json"),
+    include_str!("../../../assets/levels/14_salted_earth.json"),
+    include_str!("../../../assets/levels/15_ghosts_in_the_pines.json"),
+    include_str!("../../../assets/levels/16_laboratory_war.json"),
+    include_str!("../../../assets/levels/17_thunder_run.json"),
+    include_str!("../../../assets/levels/18_iron_lifeline.json"),
+    include_str!("../../../assets/levels/19_hunting_season.json"),
+    include_str!("../../../assets/levels/20_ghost_armour.json"),
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -166,11 +166,11 @@ impl Personality {
 
     pub fn name(self) -> &'static str {
         match self {
-            Personality::Balanced => crate::app::i18n::tr("Balanced"),
-            Personality::Rusher => crate::app::i18n::tr("Rusher"),
-            Personality::Fortress => crate::app::i18n::tr("Fortress"),
-            Personality::Armoured => crate::app::i18n::tr("Armoured"),
-            Personality::AirPower => crate::app::i18n::tr("Air power"),
+            Personality::Balanced => crate::i18n::tr("Balanced"),
+            Personality::Rusher => crate::i18n::tr("Rusher"),
+            Personality::Fortress => crate::i18n::tr("Fortress"),
+            Personality::Armoured => crate::i18n::tr("Armoured"),
+            Personality::AirPower => crate::i18n::tr("Air power"),
         }
     }
 }

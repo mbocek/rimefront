@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app::i18n::{tr, tr_fmt};
+use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{Team, UnitKind};
 use crate::sim::combat::{DamageDealt, DamageSource, Destroyed};
 use crate::sim::components::{Health, Unit};

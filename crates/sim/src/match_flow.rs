@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::missions::levels::{ActiveLevel, ForceSetup};
+use crate::levels::{ActiveLevel, ForceSetup};
 use crate::sim::ai::{AiCommander, AiCommanders, find_building_site};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::combat::Targets;
@@ -76,12 +76,9 @@ pub fn reset_match_state(mut commands: Commands, level: Res<ActiveLevel>) {
     commands.insert_resource(LastAlert::default());
     commands.insert_resource(MatchClock::default());
     commands.insert_resource(crate::world::weather::WeatherForecast::for_level(&level.0));
-    commands.insert_resource(crate::missions::level_events::EventsFired(vec![
+    commands.insert_resource(crate::level_events::EventsFired(vec![
         false;
-        level
-            .0
-            .events
-            .len()
+        level.0.events.len()
     ]));
 }
 
@@ -123,7 +120,7 @@ pub fn scope_match_entities(
     }
 }
 
-fn forbidden_items(level: &crate::missions::levels::LevelDefinition) -> Vec<BuildItem> {
+fn forbidden_items(level: &crate::levels::LevelDefinition) -> Vec<BuildItem> {
     let units = UnitKind::ALL
         .into_iter()
         .filter(|&k| !level.allows_unit(k))

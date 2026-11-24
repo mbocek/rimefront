@@ -134,9 +134,9 @@ impl Stance {
 
     pub fn name(self) -> &'static str {
         match self {
-            Stance::Aggressive => crate::app::i18n::tr("Aggressive"),
-            Stance::HoldPosition => crate::app::i18n::tr("Hold position"),
-            Stance::HoldFire => crate::app::i18n::tr("Hold fire"),
+            Stance::Aggressive => crate::i18n::tr("Aggressive"),
+            Stance::HoldPosition => crate::i18n::tr("Hold position"),
+            Stance::HoldFire => crate::i18n::tr("Hold fire"),
         }
     }
 }

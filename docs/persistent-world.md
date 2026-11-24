@@ -175,15 +175,14 @@ for ordinary network matches.
 
 12. **The world runs on the server.** `iron-tide-server` gains a world mode that runs `SimulationPlugin`
     headless (as the tests already do) and takes player commands from the network instead of relaying them.
-    First the simulation (`src/sim`, `src/world`) becomes a crate of its own, so the server links only it (it
-    links the whole game today) and the compiler keeps drawing out of it. It no longer reaches into drawing,
-    sound or the interface: cues, models, corpses, terrain, crystals, scenery entities, the sky and mines are
-    answered by `view` and `audio`. What ties remain:
-    - it uses `app::i18n` for its messages, `app::match_flow` for the match clock and states and
-      `missions::levels` for the level being played, all three to go into the crate with it;
-    That is all: the network session and saving add their systems through the steps of a tick and of a
-    match's start (`TickStep`, `MatchStart`) from plugins of their own, so the crate can be cut along
-    `src/sim`, `src/world`, `missions::levels`, `missions::level_events`, `app::i18n` and `app::match_flow`.
+    The simulation is a crate of its own (`crates/sim`, see [architecture.md](architecture.md)): it reaches
+    into nothing of drawing, sound, the interface or the network, and the network session and saving add
+    their systems through the steps of a tick and of a match's start. Still to do before the server is small:
+    - the server binary still lives in the game crate and links all of it (59 MB): `net::network`,
+      `link`, `relay` and `server` go into a crate of their own that depends on the simulation only;
+    - the simulation crate still depends on Bevy with rendering, for the ground patch mesh
+      (`world::terrain::build_terrain_patch`, which belongs in `view`) and the `Visibility` crystals and
+      mines are spawned with.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

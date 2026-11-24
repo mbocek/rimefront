@@ -1,4 +1,4 @@
-use crate::app::i18n::tr;
+use crate::i18n::tr;
 use crate::sim::abilities::{Mine, lay_mine};
 use crate::sim::intel::Intel;
 use bevy::prelude::*;

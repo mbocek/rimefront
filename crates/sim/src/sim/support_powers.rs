@@ -52,8 +52,8 @@ impl SupportPower {
 
     pub fn name(self) -> &'static str {
         match self {
-            SupportPower::ReconSweep => crate::app::i18n::tr("Recon flight"),
-            SupportPower::Barrage => crate::app::i18n::tr("Artillery barrage"),
+            SupportPower::ReconSweep => crate::i18n::tr("Recon flight"),
+            SupportPower::Barrage => crate::i18n::tr("Artillery barrage"),
         }
     }
 

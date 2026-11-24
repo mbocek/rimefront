@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
-use crate::app::match_flow::MatchClock;
+use crate::match_flow::MatchClock;
 use crate::sim::catalog::Team;
 use crate::sim::combat::{DamageDealt, DamageSource, Destroyed};
 use crate::sim::components::{Building, Unit};

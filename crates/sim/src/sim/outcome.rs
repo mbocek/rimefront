@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
-use crate::app::i18n::tr_fmt;
-use crate::app::match_flow::MatchClock;
-use crate::missions::levels::{ActiveLevel, Objective};
+use crate::i18n::tr_fmt;
+use crate::levels::{ActiveLevel, Objective};
+use crate::match_flow::MatchClock;
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team};
 use crate::sim::components::{Building, Unit};
 use crate::sim::economy::Economies;

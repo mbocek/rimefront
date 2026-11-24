@@ -88,7 +88,7 @@ pub fn update_intel(
     mut cadences: ResMut<crate::sim::cadence::SimulationCadences>,
     mut intel: ResMut<Intel>,
     diplomacy: Res<Diplomacy>,
-    clock: Res<crate::app::match_flow::MatchClock>,
+    clock: Res<crate::match_flow::MatchClock>,
     forecast: Res<crate::world::weather::WeatherForecast>,
     support: Res<crate::sim::support_powers::SupportPowers>,
     viewers: Query<(&Team, &Transform, &Sight), Or<(With<Unit>, With<Building>)>>,

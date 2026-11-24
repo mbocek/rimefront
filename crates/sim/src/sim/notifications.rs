@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::app::i18n::tr;
+use crate::i18n::tr;
 use crate::sim::combat::DamageDealt;
 use crate::sim::components::{Building, Harvester};
 use crate::sim::cues::{Sound, SoundCue};

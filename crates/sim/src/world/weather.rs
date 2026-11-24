@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 
-use crate::missions::levels::{LevelDefinition, Weather};
+use crate::levels::{LevelDefinition, Weather};
 
 /// How long one kind of sky takes to turn into the next.
 const TRANSITION_SECS: f32 = 30.0;

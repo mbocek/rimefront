@@ -1,0 +1,15 @@
+[package]
+name = "iron_tide_sim"
+version = "1.6.0"
+edition = "2024"
+rust-version = "1.100"
+description = "The battle simulation of Iron Tide: rules, map and levels, without drawing, sound or interface"
+repository = "https://github.com/mbocek/iron-tide"
+
+[dependencies]
+bevy = { version = "0.20.1", features = ["jpeg"] }
+libm = "0.2"
+pathfinding = "4.16"
+rand = "0.10.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

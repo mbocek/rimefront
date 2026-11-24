@@ -15,7 +15,11 @@ path = "src/main.rs"
 name = "iron-tide-server"
 path = "src/bin/server.rs"
 
+[workspace]
+members = [".", "crates/sim"]
+
 [dependencies]
+iron_tide_sim = { path = "crates/sim" }
 bevy = { version = "0.20.1", features = ["jpeg"] }
 libm = "0.2"
 pathfinding = "4.16"

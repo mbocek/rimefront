@@ -8,7 +8,7 @@ use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 
-use crate::missions::levels::ActiveLevel;
+use crate::levels::ActiveLevel;
 use crate::sim::catalog::CRYSTAL_PER_CELL;
 use crate::sim::sim_math;
 use crate::world::map_regions::Regions;
@@ -323,8 +323,7 @@ impl GameMap {
     }
 
     /// A map with no river, crystals or obstacles, for tests.
-    #[cfg(test)]
-    pub(crate) fn open_field() -> Self {
+    pub fn open_field() -> Self {
         Self::empty()
     }
 

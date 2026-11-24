@@ -43,10 +43,10 @@ capture: release ## Save one screenshot and quit (CAPTURE=, CAPTURE_AFTER=secs, 
 		$(if $(CAPTURE_FOCUS),IRON_TIDE_CAPTURE_FOCUS_CELL=$(CAPTURE_FOCUS)) ./$(RELEASE_BIN)
 
 test: ## All tests: logic unit tests and headless playability scenarios
-	cargo test --release
+	cargo test --release --workspace
 
 test-unit: ## Unit tests of the game logic only
-	cargo test --release --lib
+	cargo test --release --workspace --lib
 
 test-playability: ## Headless matches: movement, economy, production, combat, AI, missions, objectives, save/load
 	cargo test --release --test playability --test missions --test fog --test sound --test orders
@@ -63,13 +63,13 @@ balance: ## AI-against-AI balance report: unit duels and difficulty tournaments 
 check: fmt-check lint test ## Formatting, lints and tests
 
 lint: ## Clippy
-	cargo clippy --all-targets -- -D warnings
+	cargo clippy --workspace --all-targets -- -D warnings
 
 fmt: ## Format the code
-	cargo fmt
+	cargo fmt --all
 
 fmt-check: ## Check formatting
-	cargo fmt -- --check
+	cargo fmt --all -- --check
 
 clean: ## Remove build artifacts
 	cargo clean

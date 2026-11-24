@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
-use crate::missions::levels::{Difficulty, Personality};
+use crate::levels::{Difficulty, Personality};
 use crate::sim::abilities::{MINE_COST, Mine, lay_mine};
 use crate::sim::army_mix::{Sightings, counter_weight};
 use crate::sim::catalog::{ArmorClass, BuildingKind, Team, UnitKind};

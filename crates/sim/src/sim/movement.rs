@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::missions::levels::ActiveLevel;
+use crate::levels::ActiveLevel;
 use crate::sim::catalog::ArmorClass;
 use crate::sim::components::*;
 use crate::sim::determinism::SimId;

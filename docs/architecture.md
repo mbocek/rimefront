@@ -1,11 +1,15 @@
 # Code layout
 
-`src/lib.rs` holds `SimulationPlugin` (battle logic, also used headless by the tests), the steps of a tick
-(`TickStep`) and of starting a match (`MatchStart`) that the lockstep session (`net::network::LockstepPlugin`)
-and saving (`app::savegame::SavePlugin`) slot into, and `GamePlugin` (the full game); everything else lives
-in one directory per domain. A domain may use another's types, but the
-simulation (`sim`, `world`) is meant not to reach into drawing, sound or the interface: where it still does,
-it is listed in [persistent-world.md](persistent-world.md) as the work before it becomes a crate of its own.
+The code is a Cargo workspace of two crates:
+
+- **`crates/sim` (`iron_tide_sim`)** — the battle simulation: `sim`, `world`, `levels`, `level_events`,
+  `i18n`, `match_flow`, and in its `lib.rs` `SimulationPlugin` (battle logic, also used headless by the
+  tests) with the steps of a tick (`TickStep`) and of starting a match (`MatchStart`). It knows nothing of
+  drawing, sound, the interface or the network; the compiler keeps it so.
+- **the game (`iron_tide`, `src/`)** — everything around it, one directory per domain, and `GamePlugin`. It
+  re-exports the simulation's modules where they always were (`crate::sim`, `crate::world`,
+  `missions::levels`, `app::i18n`, …), and the lockstep session (`net::network::LockstepPlugin`) and saving
+  (`app::savegame::SavePlugin`) slot their systems into the simulation's steps.
 
 ## `sim` — the rules of the battle
 
@@ -49,7 +53,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `season` | summer, autumn and winter: terrain tint, snow, foliage colours, light |
 | `weather` | the forecast of a match: clouds and showers, and the sight they cost |
 
-## `missions` — levels and campaigns
+## `missions` — levels and campaigns (`levels` and `level_events` live in the simulation crate)
 
 | Module | Responsibility |
 | --- | --- |
@@ -110,7 +114,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `map_editor`, `map_preview` | the map editor; the small picture of a level's map in the menus |
 | `network_hud` | the ping and the banner shown while waiting for the other player |
 
-## `app` — the game around the battle
+## `app` — the game around the battle (`i18n` and `match_flow` live in the simulation crate)
 
 | Module | Responsibility |
 | --- | --- |

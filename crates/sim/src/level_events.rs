@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app::match_flow::MatchClock;
-use crate::missions::levels::{ActiveLevel, BaseSite};
+use crate::levels::{ActiveLevel, BaseSite};
+use crate::match_flow::MatchClock;
 use crate::sim::catalog::{BuildingKind, Team, UnitKind};
 use crate::sim::components::{Building, Order, Orders, Unit};
 use crate::sim::economy::Economies;
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn a_level_refuses_events_for_sides_it_does_not_have() {
-        let mut level = crate::missions::levels::LevelDefinition::default();
+        let mut level = crate::levels::LevelDefinition::default();
         level.events.push(LevelEvent {
             when: Trigger::AfterMinutes { minutes: 1.0 },
             then: vec![EventAction::Credits {

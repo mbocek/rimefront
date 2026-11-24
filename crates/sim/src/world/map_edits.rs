@@ -6,7 +6,7 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
-use crate::missions::levels::ActiveLevel;
+use crate::levels::ActiveLevel;
 use crate::sim::catalog::CRYSTAL_PER_CELL;
 use crate::world::map::{CrystalVisual, GameMap, is_water, near_base, spawn_crystal_visual};
 use crate::world::scenery::{Obstacle, SceneryLayout, place_obstacle};

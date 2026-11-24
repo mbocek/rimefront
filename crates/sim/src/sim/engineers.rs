@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use bevy::prelude::*;
 
-use crate::app::i18n::{tr, tr_fmt};
+use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team};
 use crate::sim::components::{Building, Health, Mobile, Orders};
 use crate::sim::cues::{Sound, SoundCue};

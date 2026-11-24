@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::net::TcpListener;
 
-use crate::missions::levels::LevelDefinition;
-use crate::net::lobby::MOST_PLAYERS;
-use crate::net::network::{Arrival, Link, MOST_SPECTATORS, Message};
-use crate::net::relay::Relay;
-use crate::sim::catalog::Team;
+use crate::lobby::MOST_PLAYERS;
+use crate::network::{Arrival, Link, MOST_SPECTATORS, Message};
+use crate::relay::Relay;
+use iron_tide_sim::levels::LevelDefinition;
+use iron_tide_sim::sim::catalog::Team;
 
 const ROOM_PATH: &str = "/room/";
 

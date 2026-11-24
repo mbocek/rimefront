@@ -1,5 +1,1 @@
-pub mod link;
-pub mod lobby;
-pub mod network;
-pub mod relay;
-pub mod server;
+pub use iron_tide_net::{link, lobby, network, relay, server};

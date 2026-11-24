@@ -1,0 +1,28 @@
+[package]
+name = "iron_tide_net"
+version = "1.6.0"
+edition = "2024"
+rust-version = "1.100"
+description = "Network battles of Iron Tide: the lockstep session, its links, the relay and the dedicated server"
+repository = "https://github.com/mbocek/iron-tide"
+
+[[bin]]
+name = "iron-tide-server"
+path = "src/bin/server.rs"
+
+[dependencies]
+iron_tide_sim = { path = "../sim" }
+bevy = { version = "0.20.1", default-features = false, features = [
+    "std",
+    "async_executor",
+    "bevy_state",
+    "bevy_color",
+    "bevy_log",
+    "multi_threaded",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+webpki-roots = "1"
+ring = "0.17"

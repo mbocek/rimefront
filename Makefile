@@ -36,7 +36,7 @@ models-fast: ## Export the models without rendering previews (works without a GP
 	$(BLENDER_RUN) --no-previews $(if $(ONLY),--only $(ONLY))
 
 server: ## Build and run the dedicated network battle server (PORT=47300)
-	cargo run --release --bin iron-tide-server -- --port $(or $(PORT),47300)
+	cargo run --release -p iron_tide_net --bin iron-tide-server -- --port $(or $(PORT),47300)
 
 capture: release ## Save one screenshot and quit (CAPTURE=, CAPTURE_AFTER=secs, CAPTURE_FOCUS=x,y)
 	BEVY_ASSET_ROOT=$(CURDIR) IRON_TIDE_CAPTURE=$(abspath $(CAPTURE)) IRON_TIDE_CAPTURE_AFTER_SECS=$(CAPTURE_AFTER) \

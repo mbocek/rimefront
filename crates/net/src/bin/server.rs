@@ -3,8 +3,8 @@
 use std::net::TcpListener;
 use std::time::Duration;
 
-use iron_tide::net::lobby::DEFAULT_PORT;
-use iron_tide::net::server::Server;
+use iron_tide_net::lobby::DEFAULT_PORT;
+use iron_tide_net::server::Server;
 
 /// Short enough that relaying adds no noticeable delay to a turn, long enough to leave the processor idle.
 const POLL_INTERVAL: Duration = Duration::from_millis(2);

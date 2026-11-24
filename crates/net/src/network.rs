@@ -4,21 +4,21 @@ use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 
-use crate::app::match_flow::GameState;
+use iron_tide_sim::match_flow::GameState;
 use serde::{Deserialize, Serialize};
 
-use crate::app::i18n::{tr, tr_fmt};
-use crate::missions::levels::LevelDefinition;
-use crate::net::relay::Relay;
-use crate::sim::ai::AiCommanders;
-use crate::sim::catalog::Team;
-use crate::sim::determinism::simulation_checksum;
-use crate::sim::notifications::Notifications;
-use crate::sim::player_commands::{
+use crate::relay::Relay;
+use iron_tide_sim::i18n::{tr, tr_fmt};
+use iron_tide_sim::levels::LevelDefinition;
+use iron_tide_sim::sim::ai::AiCommanders;
+use iron_tide_sim::sim::catalog::Team;
+use iron_tide_sim::sim::determinism::simulation_checksum;
+use iron_tide_sim::sim::notifications::Notifications;
+use iron_tide_sim::sim::player_commands::{
     CommandQueue, CommandTiming, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
 };
 
-pub use crate::net::link::{Arrival, Dialling, JoinTarget, Link, Side};
+pub use crate::link::{Arrival, Dialling, JoinTarget, Link, Side};
 
 /// Commands wait this many ticks (200 ms) before they run, so they reach every other machine in time.
 pub const NETWORK_COMMAND_DELAY_TICKS: u64 = 4;
@@ -27,13 +27,6 @@ const CHECKSUM_EVERY_TICKS: u64 = 20;
 pub(crate) const LARGEST_MESSAGE_BYTES: usize = 1 << 24;
 /// At most this many people watch one battle.
 pub const MOST_SPECTATORS: usize = 4;
-/// A spectator further behind than this (two seconds) runs the battle fast until it has caught up.
-const CATCH_UP_FROM_TICKS: u64 = 40;
-const CATCH_UP_SPEED: f32 = 40.0;
-/// Bevy clamps each frame's scaled game time to `max_delta`, 250 ms by default, which would hold catching up
-/// to 5 ticks a frame whatever the speed.
-const CATCH_UP_LONGEST_FRAME: Duration = Duration::from_secs(2);
-const REGULAR_LONGEST_FRAME: Duration = Duration::from_millis(250);
 const PING_INTERVAL: Duration = Duration::from_secs(1);
 const PINGS_REMEMBERED: u64 = 10;
 const ROUND_TRIP_SMOOTHING: f32 = 0.3;
@@ -525,44 +518,6 @@ pub fn admit_late_guests(session: Option<ResMut<NetSession>>) {
 #[derive(Resource, Default)]
 pub struct CatchingUp(pub Option<f32>);
 
-fn pace_for_catching_up(time: &mut Time<Virtual>) {
-    time.set_relative_speed(CATCH_UP_SPEED);
-    time.set_max_delta(CATCH_UP_LONGEST_FRAME);
-}
-
-fn pace_normally(time: &mut Time<Virtual>, game_speed: f32) {
-    time.set_relative_speed(game_speed);
-    time.set_max_delta(REGULAR_LONGEST_FRAME);
-}
-
-/// A machine that joined late runs the battle many times faster, silently, until it reaches the players.
-pub fn catch_up_with_the_battle(
-    session: Option<Res<NetSession>>,
-    tick: Res<SimulationTick>,
-    settings: Res<crate::app::settings::GameSettings>,
-    mut catching_up: ResMut<CatchingUp>,
-    mut time: ResMut<Time<Virtual>>,
-    mut volume: ResMut<GlobalVolume>,
-) {
-    let behind = session
-        .and_then(|session| session.known_through())
-        .map(|known| (known.saturating_sub(tick.0), known));
-    let far_behind = behind.filter(|&(ticks, _)| ticks > CATCH_UP_FROM_TICKS);
-    match (far_behind, catching_up.0.is_some()) {
-        (Some((ticks, known)), _) => {
-            catching_up.0 = Some(1.0 - ticks as f32 / known.max(1) as f32);
-            pace_for_catching_up(&mut time);
-            volume.volume = bevy::audio::Volume::SILENT;
-        }
-        (None, true) => {
-            catching_up.0 = None;
-            pace_normally(&mut time, settings.game_speed_factor());
-            volume.volume = crate::audio::sound::master_volume(&settings);
-        }
-        (None, false) => {}
-    }
-}
-
 pub fn fingerprint_tick(world: &mut World) {
     let tick = world.resource::<SimulationTick>().0;
     if !world.contains_resource::<NetSession>() || !tick.is_multiple_of(CHECKSUM_EVERY_TICKS) {
@@ -628,7 +583,7 @@ impl Plugin for LockstepPlugin {
         app.init_resource::<CatchingUp>()
             .configure_sets(
                 FixedUpdate,
-                crate::FramePhase::Simulation.run_if(simulation_may_advance),
+                iron_tide_sim::FramePhase::Simulation.run_if(simulation_may_advance),
             )
             .add_systems(FixedFirst, receive_turns)
             .add_systems(
@@ -637,12 +592,15 @@ impl Plugin for LockstepPlugin {
             )
             .add_systems(
                 OnEnter(GameState::Playing),
-                retire_commanders_of_players.in_set(crate::MatchStart::Players),
+                retire_commanders_of_players.in_set(iron_tide_sim::MatchStart::Players),
             )
-            .add_systems(FixedUpdate, send_turn.in_set(crate::TickStep::SendOrders))
             .add_systems(
                 FixedUpdate,
-                fingerprint_tick.in_set(crate::TickStep::Fingerprint),
+                send_turn.in_set(iron_tide_sim::TickStep::SendOrders),
+            )
+            .add_systems(
+                FixedUpdate,
+                fingerprint_tick.in_set(iron_tide_sim::TickStep::Fingerprint),
             );
     }
 }
@@ -650,26 +608,6 @@ impl Plugin for LockstepPlugin {
 #[cfg(test)]
 mod catching_up_tests {
     use super::*;
-
-    fn game_time_of_one_frame(time: &mut Time<Virtual>, frame: Duration) -> Duration {
-        let start = Instant::now();
-        let mut real = Time::<Real>::new(start);
-        real.update_with_instant(start);
-        real.update_with_instant(start + frame);
-        bevy::time::update_virtual_time(&mut Time::default(), time, &real);
-        time.delta()
-    }
-
-    #[test]
-    fn catching_up_runs_the_full_speed_even_in_a_slow_background_frame() {
-        let background_frame = Duration::from_millis(33);
-        let mut time = Time::<Virtual>::default();
-        pace_for_catching_up(&mut time);
-        let game_time = game_time_of_one_frame(&mut time, background_frame);
-        assert!(game_time >= background_frame.mul_f32(CATCH_UP_SPEED * 0.99));
-        pace_normally(&mut time, 1.0);
-        assert_eq!(time.max_delta(), Time::<Virtual>::default().max_delta());
-    }
 
     #[test]
     fn turns_arriving_after_a_gap_count_once_the_gap_closes() {

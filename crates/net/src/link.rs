@@ -8,10 +8,10 @@ use tungstenite::protocol::{Role, WebSocketConfig};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Connector, Message as WsMessage, WebSocket};
 
-use crate::app::i18n::tr;
-use crate::missions::levels::LevelDefinition;
-use crate::net::network::{LARGEST_MESSAGE_BYTES, LobbyNews, Message, Offer, chat_line};
-use crate::sim::catalog::Team;
+use crate::network::{LARGEST_MESSAGE_BYTES, LobbyNews, Message, Offer, chat_line};
+use iron_tide_sim::i18n::tr;
+use iron_tide_sim::levels::LevelDefinition;
+use iron_tide_sim::sim::catalog::Team;
 
 pub enum Arrival {
     Message(Message),

@@ -5,14 +5,12 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::app::i18n::{tr, tr_fmt, tr_owned};
-use crate::app::match_flow::GameState;
-use crate::missions::levels::{ActiveLevel, LevelDefinition, SkirmishOptions};
-use crate::net::network::{
-    Dialling, JoinTarget, Link, LobbyNews, MOST_SPECTATORS, NetSession, Offer,
-};
-use crate::sim::catalog::{Alliance, Team};
-use crate::sim::player_commands::{CommandTiming, LocalTeam};
+use crate::network::{Dialling, JoinTarget, Link, LobbyNews, MOST_SPECTATORS, NetSession, Offer};
+use iron_tide_sim::i18n::{tr, tr_fmt, tr_owned};
+use iron_tide_sim::levels::{ActiveLevel, LevelDefinition, SkirmishOptions};
+use iron_tide_sim::match_flow::GameState;
+use iron_tide_sim::sim::catalog::{Alliance, Team};
+use iron_tide_sim::sim::player_commands::{CommandTiming, LocalTeam};
 
 pub const DEFAULT_PORT: u16 = 47_300;
 pub const MOST_PLAYERS: usize = 4;

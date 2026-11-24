@@ -3,8 +3,8 @@ use bevy::ecs::system::ScheduleSystem;
 use bevy::prelude::*;
 
 use crate::{
-    FramePhase, StartupPhase, app::capture, app::frame_pacing, app::match_flow, app::replay,
-    app::savegame, app::settings, app::updates, audio::announcer, audio::battle_noise,
+    FramePhase, StartupPhase, app::capture, app::catching_up, app::frame_pacing, app::match_flow,
+    app::replay, app::savegame, app::settings, app::updates, audio::announcer, audio::battle_noise,
     audio::sound, audio::unit_voices, missions::campaigns, net::lobby, net::network,
     sim::transport, ui::control_groups, ui::field_tips, ui::main_menu, ui::map_editor, ui::menu,
     ui::minimap, ui::network_hud, ui::orders, ui::perf_overlay, ui::placement, ui::queue_bar,
@@ -514,7 +514,8 @@ impl Plugin for NetworkBattlePlugin {
             Update,
             (
                 network::report_session_trouble,
-                network::catch_up_with_the_battle.run_if(in_state(match_flow::GameState::Playing)),
+                catching_up::catch_up_with_the_battle
+                    .run_if(in_state(match_flow::GameState::Playing)),
                 network_hud::show_chat.run_if(in_state(match_flow::GameState::Playing)),
                 main_menu::remember_won_missions.run_if(in_state(match_flow::GameState::Playing)),
                 network_hud::refresh_network_hud.run_if(in_state(match_flow::GameState::Playing)),

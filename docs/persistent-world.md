@@ -178,9 +178,8 @@ for ordinary network matches.
     The simulation is a crate of its own (`crates/sim`, see [architecture.md](architecture.md)): it reaches
     into nothing of drawing, sound, the interface or the network, and the network session and saving add
     their systems through the steps of a tick and of a match's start. It builds on Bevy without rendering,
-    windows or audio. Still to do before the server is small:
-    - the server binary still lives in the game crate and links all of it (59 MB): `net::network`,
-      `link`, `relay` and `server` go into a crate of their own that depends on the simulation only;
+    windows or audio, and the network has a crate of its own on top of it (`crates/net`), so the dedicated
+    server is 3 MB instead of 59 MB and links no renderer.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

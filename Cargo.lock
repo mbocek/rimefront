@@ -3373,9 +3373,8 @@ name = "iron_tide"
 version = "1.6.0"
 dependencies = [
  "bevy",
+ "iron_tide_net",
  "iron_tide_sim",
- "libm",
- "pathfinding",
  "rand",
  "ring",
  "rustls",
@@ -3384,6 +3383,19 @@ dependencies = [
  "serde_json",
  "tungstenite",
  "ureq",
+]
+
+[[package]]
+name = "iron_tide_net"
+version = "1.6.0"
+dependencies = [
+ "bevy",
+ "iron_tide_sim",
+ "ring",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tungstenite",
  "webpki-roots 1.0.12",
 ]
 

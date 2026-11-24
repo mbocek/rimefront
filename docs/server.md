@@ -1,6 +1,6 @@
 # Dedicated server
 
-`iron-tide-server` (`src/bin/server.rs`, `make server`) is a dedicated server for network battles: every player
+`iron-tide-server` (`crates/net/src/bin/server.rs`, `make server`) is a dedicated server for network battles: every player
 connects to it, so nobody forwards a port and no player's computer is the hub. It runs no simulation. Hosting
 from the game on a local network works as before.
 
@@ -45,8 +45,9 @@ apart, a late spectator and a returning player catching up, an address without a
 
 - **Checksums.** Each machine compares the checksums it receives with its own; the server sees all of them and
   could decide alone.
-- **Limits.** Rooms per server, idle rooms, and a smaller binary: the server links the whole game library
-  (about 57 MB) although it needs only the protocol, the relay and the level format.
+- **Limits.** Rooms per server and idle rooms. The binary is small (3 MB) when built on its own,
+  `cargo build --release -p iron_tide_net --bin iron-tide-server`; a workspace build gives it the game's
+  Bevy features and the game's size.
 - **The owner changing the battle** after opening the room, as a host in the game can.
 
 ## Deployment sketch
@@ -57,7 +58,7 @@ The server is one binary listening on one port; a reverse proxy adds TLS and a c
 FROM rust:1.100 AS build
 WORKDIR /src
 COPY . .
-RUN cargo build --release --bin iron-tide-server
+RUN cargo build --release -p iron_tide_net --bin iron-tide-server
 
 FROM debian:stable-slim
 COPY --from=build /src/target/release/iron-tide-server /usr/local/bin/

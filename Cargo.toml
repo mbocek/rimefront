@@ -11,24 +11,16 @@ repository = "https://github.com/mbocek/iron-tide"
 name = "iron-tide"
 path = "src/main.rs"
 
-[[bin]]
-name = "iron-tide-server"
-path = "src/bin/server.rs"
-
 [workspace]
-members = [".", "crates/sim"]
+members = [".", "crates/sim", "crates/net"]
 
 [dependencies]
 iron_tide_sim = { path = "crates/sim" }
+iron_tide_net = { path = "crates/net" }
 bevy = { version = "0.20.1", features = ["jpeg"] }
-libm = "0.2"
-pathfinding = "4.16"
 rand = "0.10.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
-webpki-roots = "1"
 ureq = "3"
 # Already in the build through rustls; hashes downloaded updates against SHA256SUMS.txt.
 ring = "0.17"
@@ -40,4 +32,6 @@ opt-level = 1
 opt-level = 3
 
 [dev-dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 rustls-pki-types = { version = "1", features = ["std"] }

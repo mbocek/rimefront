@@ -1,15 +1,19 @@
 # Code layout
 
-The code is a Cargo workspace of two crates:
+The code is a Cargo workspace of three crates:
 
 - **`crates/sim` (`iron_tide_sim`)** — the battle simulation: `sim`, `world`, `levels`, `level_events`,
   `i18n`, `match_flow`, and in its `lib.rs` `SimulationPlugin` (battle logic, also used headless by the
   tests) with the steps of a tick (`TickStep`) and of starting a match (`MatchStart`). It knows nothing of
   drawing, sound, the interface or the network, and builds on Bevy without them (`cargo build -p
   iron_tide_sim` compiles no renderer); the compiler keeps it so.
+- **`crates/net` (`iron_tide_net`)** — network battles: the lockstep session (`network`), one connection
+  (`link`), the relay, the lobby and the dedicated server with its binary `iron-tide-server`. It depends on
+  the simulation only, so `cargo build -p iron_tide_net --bin iron-tide-server` builds a 3 MB server with no
+  renderer (a workspace build unifies Bevy's features and makes it as large as the game).
 - **the game (`iron_tide`, `src/`)** — everything around it, one directory per domain, and `GamePlugin`. It
-  re-exports the simulation's modules where they always were (`crate::sim`, `crate::world`,
-  `missions::levels`, `app::i18n`, …), and the lockstep session (`net::network::LockstepPlugin`) and saving
+  re-exports the simulation's and the network's modules where they always were (`crate::sim`,
+  `crate::world`, `missions::levels`, `app::i18n`, `net::network`, …), and the lockstep session (`net::network::LockstepPlugin`) and saving
   (`app::savegame::SavePlugin`) slot their systems into the simulation's steps.
 
 ## `sim` — the rules of the battle
@@ -63,7 +67,7 @@ The code is a Cargo workspace of two crates:
 | `level_events`, `event_editing` | scripted mission events ([levels.md](levels.md)); editing them in the battle editor |
 | `random_battle`, `mission_generator` | random battles and whole missions rolled from one seed |
 
-## `net` — playing over the network
+## `net` — playing over the network (the `iron_tide_net` crate)
 
 | Module | Responsibility |
 | --- | --- |
@@ -127,4 +131,5 @@ The code is a Cargo workspace of two crates:
 | `replay` | recording matches, storing and listing replays, watching them |
 | `i18n` | interface languages: loads `assets/i18n/*.json`, `tr` / `tr_fmt` |
 | `updates`, `self_update` | checking GitHub for a newer release and downloading its package; finding how this copy is installed, verifying a package's checksum and installing it in place |
+| `catching_up` | a machine that joined a network battle late running it many times faster, silently, until it reaches the players |
 | `capture`, `capture_pointer` | `IRON_TIDE_CAPTURE=shot.png` saves a screenshot and quits (for development; `_SAVE_SLOT` / `_LOAD_SLOT` test saves, `_REPLAY=1` watches the newest replay, `_SELECT_ALL=1` selects every own unit, `_ZOOM=150` sets the camera distance, `_MENU=keys` opens that menu page; `_MISSION` numbers past the campaign continue with the custom levels); a scripted mouse ([development.md](development.md)) |

@@ -49,8 +49,8 @@ git tag v1.6.0 && git push origin v1.6.0   # the tag should match the version in
 
 ## Tests
 
-The repository is a Cargo workspace (the game and `crates/sim`, see [architecture.md](architecture.md)); the
-`make` targets cover both.
+The repository is a Cargo workspace (the game, `crates/sim` and `crates/net`, see
+[architecture.md](architecture.md)); the `make` targets cover all three.
 
 ```sh
 make test               # everything (about 2 s in release)

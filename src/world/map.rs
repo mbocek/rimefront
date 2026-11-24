@@ -11,15 +11,9 @@ use serde::{Deserialize, Serialize};
 use crate::missions::levels::ActiveLevel;
 use crate::sim::catalog::CRYSTAL_PER_CELL;
 use crate::sim::sim_math;
-use crate::view::crystal_models::{CRYSTAL_MODELS, CrystalModel};
-use crate::view::fog_view::FogTexture;
-use crate::view::terrain_chunks::plan_terrain;
-use crate::view::terrain_material::{WaterMaterial, WaterSurface, water_material};
 use crate::world::map_regions::Regions;
 use crate::world::scenery::{self, SceneryLayout};
-use crate::world::terrain::{
-    FAR_RING_WIDTH, Landscape, OUTLANDS_WIDTH, WATER_LEVEL, approximate_ground,
-};
+use crate::world::terrain::{Landscape, approximate_ground};
 
 pub const CELL_SIZE: f32 = 2.0;
 /// The map every landscape, road and crystal field is authored for; bigger maps spread them out.
@@ -310,6 +304,8 @@ pub struct GameMap {
 #[derive(Component)]
 pub struct CrystalVisual {
     pub cell: IVec2,
+    /// Which of `CRYSTAL_MODELS` it looks like.
+    pub model: &'static str,
     /// This crystal's own size against others holding as much, so a field is not a row of equals.
     pub size: f32,
 }
@@ -658,40 +654,6 @@ fn block_unmirrored_edge(map: &mut GameMap) {
     }
 }
 
-/// The rendered ground and water; the simulation itself only needs the grid from `generate_map`.
-pub fn spawn_terrain_visuals(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-    mut water_materials: ResMut<Assets<WaterMaterial>>,
-    fog: Res<FogTexture>,
-    level: Res<ActiveLevel>,
-) {
-    let placeholder = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.30, 0.36, 0.20),
-        perceptual_roughness: 0.95,
-        ..default()
-    });
-    plan_terrain(&mut commands, &level, placeholder);
-
-    let bounds = map_bounds();
-    let water_span = bounds.world_size() + Vec2::splat(2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH));
-    let water_middle = bounds.world_center();
-    let water_mesh = Plane3d::default()
-        .mesh()
-        .size(water_span.x, water_span.y)
-        .build()
-        .with_generated_tangents()
-        .expect("plane mesh has normals and UVs");
-    commands.spawn((
-        WaterSurface,
-        Mesh3d(meshes.add(water_mesh)),
-        MeshMaterial3d(water_materials.add(water_material(&mut images, fog.0.clone()))),
-        Transform::from_xyz(water_middle.x, WATER_LEVEL, water_middle.y),
-    ));
-}
-
 /// A field's edge: a blob rather than a disc, with a few crystals scattered past it.
 struct FieldOutline {
     /// (amplitude, phase) of the bulges going round the field twice and three times.
@@ -756,6 +718,8 @@ fn seed_crystal_fields(commands: &mut Commands, map: &mut GameMap, rng: &mut Std
     }
 }
 
+pub const CRYSTAL_MODELS: [&str; 3] = ["crystal_a", "crystal_b", "crystal_c"];
+
 /// How far a crystal may sit from its cell's centre, in metres, and how far it may lean.
 const CRYSTAL_SPREAD: f32 = 0.45;
 const CRYSTAL_LEAN: f32 = 0.14;
@@ -777,8 +741,7 @@ pub fn spawn_crystal_visual(
     let heading = Quat::from_rotation_y(rng.random_range(0.0..TAU));
     let size = rng.random_range(0.8..1.2);
     commands.spawn((
-        CrystalVisual { cell, size },
-        CrystalModel(model),
+        CrystalVisual { cell, model, size },
         Transform::from_translation(approximate_ground(cell_center(cell) + spread))
             .with_rotation(lean * heading)
             .with_scale(Vec3::splat(size * crystal_scale(amount))),

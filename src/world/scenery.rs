@@ -8,9 +8,6 @@ use rand::RngExt;
 use rand::rngs::StdRng;
 
 use crate::sim::components::Building;
-use crate::view::ambience::Trampleable;
-use crate::view::assets::ModelLibrary;
-use crate::view::graphics::FineDecor;
 use crate::world::map::{
     CELL_SIZE, GameMap, cell_center, chunk_of, map_bounds, near_base, near_crystal_field,
     opposite_cell, world_to_cell,
@@ -503,27 +500,7 @@ fn chunk_of_prop(prop: &SceneryProp) -> IVec2 {
     chunk_of(world_to_cell(prop.transform.translation))
 }
 
-/// The entity showing a prop near the camera; `scenery_view` spawns and drops them.
-pub fn spawn_scenery_entity(
-    commands: &mut Commands,
-    models: &ModelLibrary,
-    prop: &SceneryProp,
-) -> Entity {
-    let mut scenery = commands.spawn((Scenery, prop.transform));
-    match FLAT_SCENERY_MODELS.iter().find(|&&flat| flat == prop.model) {
-        Some(&flat) => scenery.insert(FlatScenery(flat)),
-        None => scenery.insert(WorldAssetRoot(models.neutral(prop.model))),
-    };
-    if matches!(prop.model, "grass_tuft" | "flowers" | "pebbles") {
-        scenery.insert(FineDecor);
-    }
-    if is_trampleable(prop.model) {
-        scenery.insert(Trampleable::default());
-    }
-    scenery.id()
-}
-
-fn is_trampleable(model_id: &str) -> bool {
+pub fn is_trampleable(model_id: &str) -> bool {
     matches!(
         model_id,
         "grass_tuft" | "flowers" | "reeds" | "bush" | "bush_round" | "bush_flowering"

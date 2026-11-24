@@ -7,15 +7,10 @@ use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
 use bevy::prelude::*;
 
 use crate::view::motion_material::{Motion, MovingMaterial};
-use crate::world::map::CrystalVisual;
+use crate::world::map::{CRYSTAL_MODELS, CrystalVisual};
 
-pub const CRYSTAL_MODELS: [&str; 3] = ["crystal_a", "crystal_b", "crystal_c"];
 const FLOATING_SHARD: &str = "FloatingShard";
 const GLOWING_CORE: &str = "CrystalCore";
-
-/// Which crystal model a deposit shows; the merged parts are attached once they are ready.
-#[derive(Component)]
-pub struct CrystalModel(pub &'static str);
 
 /// Each crystal model as one mesh per material, with floating shards apart so they hover on the GPU.
 /// As a glTF scene a crystal was some fifteen entities with animated transforms, and a map has hundreds.
@@ -233,10 +228,10 @@ fn standard_material(source: &GltfMaterial) -> StandardMaterial {
 pub fn dress_crystals(
     mut commands: Commands,
     library: Res<CrystalModelLibrary>,
-    undressed: Query<(Entity, &CrystalModel), (With<CrystalVisual>, Without<Children>)>,
+    undressed: Query<(Entity, &CrystalVisual), Without<Children>>,
 ) {
-    for (crystal, model) in &undressed {
-        let Some(parts) = library.merged.get(model.0) else {
+    for (crystal, visual) in &undressed {
+        let Some(parts) = library.merged.get(visual.model) else {
             continue;
         };
         commands.entity(crystal).with_children(|deposit| {

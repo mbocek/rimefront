@@ -15,6 +15,7 @@ pub mod local_view;
 pub mod motion_material;
 pub mod overlay;
 pub mod scenery_view;
+pub mod sky;
 pub mod terrain_chunks;
 pub mod terrain_material;
 pub mod wall_joints;

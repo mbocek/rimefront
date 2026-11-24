@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
+use crate::sim::abilities::Mine;
 use crate::sim::catalog::{ArmorClass, HARVESTER_CAPACITY, Team};
 use crate::sim::combat::{DamageSource, Destroyed};
 use crate::sim::components::{Building, Harvester, Mobile, Turret, Unit};
 use crate::sim::neutral_sites::UnclaimedSite;
 use crate::view::animation::{animated_building_model, animated_unit_model, spawn_corpse};
 use crate::view::assets::{ModelLibrary, named_node};
+use crate::view::local_view::LocalView;
 
 pub fn dress_new_unit(
     added: On<Add<Unit>>,
@@ -143,5 +145,44 @@ pub fn show_harvester_load(
         let height = EMPTY_LOAD_SCALE + (1.0 - EMPTY_LOAD_SCALE) * fill;
         let breadth = 0.8 + 0.2 * fill;
         transform.scale = link.full_scale * Vec3::new(breadth, height, breadth);
+    }
+}
+
+/// Mines of the local side and its allies are drawn as small discs; enemy mines stay hidden.
+#[derive(Resource)]
+pub struct MineLook {
+    mesh: Handle<Mesh>,
+    material: Handle<StandardMaterial>,
+}
+
+pub fn create_mine_look(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.insert_resource(MineLook {
+        mesh: meshes.add(Cylinder::new(0.35, 0.08)),
+        material: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.22, 0.24, 0.2),
+            emissive: LinearRgba::rgb(0.8, 0.15, 0.05),
+            ..default()
+        }),
+    });
+}
+
+pub fn show_own_mines(
+    mut commands: Commands,
+    look: Res<MineLook>,
+    view: LocalView,
+    new_mines: Query<(Entity, &Mine), Added<Mine>>,
+) {
+    for (entity, mine) in &new_mines {
+        if view.is_spectating() || !view.is_hostile(mine.team) {
+            commands.entity(entity).insert((
+                Mesh3d(look.mesh.clone()),
+                MeshMaterial3d(look.material.clone()),
+                Visibility::Inherited,
+            ));
+        }
     }
 }

@@ -176,14 +176,14 @@ for ordinary network matches.
 12. **The world runs on the server.** `iron-tide-server` gains a world mode that runs `SimulationPlugin`
     headless (as the tests already do) and takes player commands from the network instead of relaying them.
     First the simulation (`src/sim`, `src/world`) becomes a crate of its own, so the server links only it (it
-    links the whole game today) and the compiler keeps drawing out of it. What it still reaches into, each
-    to be turned into an event the view or sound answers:
-    - `world::map` spawns the ground and water and knows the fog texture (`view::terrain_chunks`,
-      `view::terrain_material`, `view::fog_view`, `view::crystal_models`); `world::weather` and
-      `world::scenery` reach into materials and graphics settings;
-    - `sim::abilities` draws mines (`view::local_view`);
-    - `SimulationPlugin` schedules systems of `app::match_flow`, `app::savegame` and `net::network`: the
-      match states belong with the simulation, saving and the network session around it.
+    links the whole game today) and the compiler keeps drawing out of it. It no longer reaches into drawing,
+    sound or the interface: cues, models, corpses, terrain, crystals, scenery entities, the sky and mines are
+    answered by `view` and `audio`. What ties remain:
+    - it uses `app::i18n` for its messages, `app::match_flow` for the match clock and states and
+      `missions::levels` for the level being played, all three to go into the crate with it;
+    - `sim::player_commands` delays commands by the network session's lead (`net::network`);
+    - `SimulationPlugin` schedules systems of `app::savegame` and `net::network` inside its tick: saving and
+      the lockstep session are to be added around the simulation by the game instead.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

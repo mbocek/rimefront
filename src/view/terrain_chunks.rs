@@ -5,8 +5,10 @@ use bevy::tasks::{AsyncComputeTaskPool, Task, block_on};
 
 use crate::missions::levels::ActiveLevel;
 use crate::view::camera::{RtsCamera, ground_in_view};
-use crate::view::terrain_material::TerrainSurface;
+use crate::view::fog_view::FogTexture;
+use crate::view::terrain_material::{TerrainSurface, WaterMaterial, WaterSurface, water_material};
 use crate::world::map::{CELL_SIZE, CHUNK_CELLS, GameMap, map_bounds};
+use crate::world::terrain::WATER_LEVEL;
 use crate::world::terrain::{
     COARSE_SPACING, DETAILED_SPACING, FAR_RING_WIDTH, GroundLayers, LandscapeContext,
     OUTLANDS_WIDTH, build_terrain_patch,
@@ -213,6 +215,40 @@ pub fn resoil_terrain_chunks(
         chunk.crystal_soil = crystal_soil;
         commands.entity(entity).insert(building);
     }
+}
+
+/// The rendered ground and water; the simulation itself only needs the grid from `generate_map`.
+pub fn spawn_terrain_visuals(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+    mut water_materials: ResMut<Assets<WaterMaterial>>,
+    fog: Res<FogTexture>,
+    level: Res<ActiveLevel>,
+) {
+    let placeholder = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.30, 0.36, 0.20),
+        perceptual_roughness: 0.95,
+        ..default()
+    });
+    plan_terrain(&mut commands, &level, placeholder);
+
+    let bounds = map_bounds();
+    let water_span = bounds.world_size() + Vec2::splat(2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH));
+    let water_middle = bounds.world_center();
+    let water_mesh = Plane3d::default()
+        .mesh()
+        .size(water_span.x, water_span.y)
+        .build()
+        .with_generated_tangents()
+        .expect("plane mesh has normals and UVs");
+    commands.spawn((
+        WaterSurface,
+        Mesh3d(meshes.add(water_mesh)),
+        MeshMaterial3d(water_materials.add(water_material(&mut images, fog.0.clone()))),
+        Transform::from_xyz(water_middle.x, WATER_LEVEL, water_middle.y),
+    ));
 }
 
 #[cfg(test)]

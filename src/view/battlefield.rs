@@ -11,8 +11,8 @@ use crate::view::assets::ModelLibrary;
 use crate::view::camera::RtsCamera;
 use crate::view::effects::{EffectAssets, spawn_blast};
 use crate::view::local_view::LocalView;
+use crate::view::sky::WeatherCycle;
 use crate::world::season::Season;
-use crate::world::weather::WeatherCycle;
 
 const CRATER_LIFETIME_SECS: f32 = 40.0;
 const MAX_CRATERS: usize = 80;

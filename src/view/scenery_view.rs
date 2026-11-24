@@ -2,10 +2,14 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
+use crate::view::ambience::Trampleable;
 use crate::view::assets::ModelLibrary;
 use crate::view::camera::{RtsCamera, ground_in_view};
+use crate::view::graphics::FineDecor;
 use crate::world::map::{CELL_SIZE, CHUNK_CELLS};
-use crate::world::scenery::{Scenery, SceneryLayout, spawn_scenery_entity};
+use crate::world::scenery::{
+    FLAT_SCENERY_MODELS, FlatScenery, Scenery, SceneryLayout, SceneryProp, is_trampleable,
+};
 
 const CHUNK_METRES: f32 = CHUNK_CELLS as f32 * CELL_SIZE;
 /// Props this far beyond the view are shown ahead, so panning does not reveal a chunk still empty.
@@ -109,4 +113,23 @@ fn chunk_area(chunk: IVec2) -> Rect {
 
 fn overlaps(a: Rect, b: Rect) -> bool {
     !a.intersect(b).is_empty()
+}
+
+pub fn spawn_scenery_entity(
+    commands: &mut Commands,
+    models: &ModelLibrary,
+    prop: &SceneryProp,
+) -> Entity {
+    let mut scenery = commands.spawn((Scenery, prop.transform));
+    match FLAT_SCENERY_MODELS.iter().find(|&&flat| flat == prop.model) {
+        Some(&flat) => scenery.insert(FlatScenery(flat)),
+        None => scenery.insert(WorldAssetRoot(models.neutral(prop.model))),
+    };
+    if matches!(prop.model, "grass_tuft" | "flowers" | "pebbles") {
+        scenery.insert(FineDecor);
+    }
+    if is_trampleable(prop.model) {
+        scenery.insert(Trampleable::default());
+    }
+    scenery.id()
 }

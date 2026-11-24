@@ -45,7 +45,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `scenery` | forests, meadows, reeds, mountains with boulders as a layout of props by chunk |
 | `map_edits` | the map editor's brush strokes applied to a generated map |
 | `season` | summer, autumn and winter: terrain tint, snow, foliage colours, light |
-| `weather` | the sky changing during a match: clouds, showers, wet ground |
+| `weather` | the forecast of a match: clouds and showers, and the sight they cost |
 
 ## `missions` — levels and campaigns
 
@@ -73,11 +73,12 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `camera` | the RTS camera and the ground it sees |
 | `local_view` | the battle as this machine's player sees it, for drawing, sound and the interface |
 | `interpolation` | drawing units and projectiles between simulation ticks |
-| `terrain_material`, `terrain_chunks` | texture layers and the WESL shader; the ground as one patch per chunk, kept only around the camera, built on background threads and rebuilt when its crystal soil changes |
-| `scenery_view`, `flat_scenery` | entities for the props around the camera, redone when a chunk's props change; scenery models merged into one mesh each |
+| `terrain_material`, `terrain_chunks` | texture layers and the WESL shader; the ground and water, the ground as one patch per chunk, kept only around the camera, built on background threads and rebuilt when its crystal soil changes |
+| `scenery_view`, `flat_scenery` | entities for the props around the camera, with their wind and trampling, redone when a chunk's props change; scenery models merged into one mesh each |
 | `crystal_models`, `motion_material` | crystal deposits merged into one mesh per material; GPU vertex motion (wind, hovering shards) |
 | `fog_view` | how the terrain, water and enemies show the fog of war; the fog texture, repainted and uploaded by chunk |
-| `dressing` | models for the units, structures and sites the simulation spawns; turrets and harvester loads following the simulation; fallen infantry |
+| `dressing` | models for the units, structures and sites the simulation spawns; turrets and harvester loads following the simulation; fallen infantry; the local side's mines |
+| `sky` | the weather on screen: sunlight, sky light, wet ground, and telling the player when rain sets in |
 | `overlay` | health bars, selection |
 | `battlefield` | scorch marks, vehicle wrecks and rain |
 | `wall_joints` | joins neighbouring wall segments of a side into one continuous wall |

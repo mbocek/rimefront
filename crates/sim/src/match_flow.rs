@@ -101,14 +101,14 @@ pub fn continue_after_restart(mut next: ResMut<NextState<GameState>>) {
 }
 
 /// Everything spawned during a match, a replay or a map editing session goes away when it ends, except
-/// entities marked `Persistent`.
-pub fn scope_match_entities(
+/// entities marked `Persistent`: the simulation scopes what has a `Transform`, the interface its nodes.
+pub fn scope_match_entities<Kind: Component>(
     mut commands: Commands,
     state: Res<State<GameState>>,
     unscoped: Query<
         Entity,
         (
-            Or<(With<Transform>, With<Node>)>,
+            With<Kind>,
             Without<ChildOf>,
             Without<Persistent>,
             Without<DespawnOnExit<GameState>>,

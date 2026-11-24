@@ -5,7 +5,8 @@ The code is a Cargo workspace of two crates:
 - **`crates/sim` (`iron_tide_sim`)** — the battle simulation: `sim`, `world`, `levels`, `level_events`,
   `i18n`, `match_flow`, and in its `lib.rs` `SimulationPlugin` (battle logic, also used headless by the
   tests) with the steps of a tick (`TickStep`) and of starting a match (`MatchStart`). It knows nothing of
-  drawing, sound, the interface or the network; the compiler keeps it so.
+  drawing, sound, the interface or the network, and builds on Bevy without them (`cargo build -p
+  iron_tide_sim` compiles no renderer); the compiler keeps it so.
 - **the game (`iron_tide`, `src/`)** — everything around it, one directory per domain, and `GamePlugin`. It
   re-exports the simulation's modules where they always were (`crate::sim`, `crate::world`,
   `missions::levels`, `app::i18n`, …), and the lockstep session (`net::network::LockstepPlugin`) and saving

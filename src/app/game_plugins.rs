@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::{
     FramePhase, StartupPhase, app::capture, app::frame_pacing, app::match_flow, app::replay,
     app::savegame, app::settings, app::updates, audio::announcer, audio::battle_noise,
-    audio::sound, audio::unit_voices, missions::campaigns, net::lobby, net::network, sim::sorties,
+    audio::sound, audio::unit_voices, missions::campaigns, net::lobby, net::network,
     sim::transport, ui::control_groups, ui::field_tips, ui::main_menu, ui::map_editor, ui::menu,
     ui::minimap, ui::network_hud, ui::orders, ui::perf_overlay, ui::placement, ui::queue_bar,
     ui::sidebar, ui::structure_tools, ui::support_tools, ui::tutorial, view::ambience,
@@ -40,6 +40,8 @@ impl Plugin for BattleViewPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(dressing::dress_new_unit)
             .add_observer(dressing::dress_new_building)
+            .add_observer(dressing::hide_new_mine)
+            .add_observer(crystal_models::show_new_crystal)
             .init_resource::<camera::Cursor>()
             .init_resource::<camera::ScriptedPointer>()
             .init_resource::<orders::DragSelection>()
@@ -55,8 +57,8 @@ impl Plugin for BattleViewPlugin {
                 (
                     animation::link_rotor_nodes,
                     animation::spin_rotors,
-                    sorties::find_landing_gear,
-                    sorties::fold_landing_gear,
+                    dressing::find_landing_gear,
+                    dressing::fold_landing_gear,
                 )
                     .chain()
                     .in_set(FramePhase::Presentation),
@@ -262,43 +264,51 @@ pub struct MenusPlugin;
 
 impl Plugin for MenusPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<campaigns::CampaignLibrary>()
-            .init_resource::<menu::MenuState>()
-            .init_resource::<updates::Updates>()
-            .init_resource::<lobby::NetLobby>()
-            .init_resource::<network_hud::BattleChat>()
-            .add_systems(
-                PostStartup,
-                (match_flow::finish_booting, updates::check_for_updates),
+        app.add_systems(
+            Last,
+            match_flow::scope_match_entities::<Node>.run_if(
+                in_state(match_flow::GameState::Playing)
+                    .or_else(in_state(match_flow::GameState::Replay))
+                    .or_else(in_state(match_flow::GameState::MapEditor)),
+            ),
+        )
+        .init_resource::<campaigns::CampaignLibrary>()
+        .init_resource::<menu::MenuState>()
+        .init_resource::<updates::Updates>()
+        .init_resource::<lobby::NetLobby>()
+        .init_resource::<network_hud::BattleChat>()
+        .add_systems(
+            PostStartup,
+            (match_flow::finish_booting, updates::check_for_updates),
+        )
+        .add_systems(
+            OnEnter(match_flow::GameState::MainMenu),
+            (
+                match_flow::unpause,
+                lobby::end_network_battle,
+                campaigns::reload_campaigns,
+                main_menu::build_main_menu,
             )
-            .add_systems(
-                OnEnter(match_flow::GameState::MainMenu),
-                (
-                    match_flow::unpause,
-                    lobby::end_network_battle,
-                    campaigns::reload_campaigns,
-                    main_menu::build_main_menu,
-                )
-                    .chain(),
+                .chain(),
+        )
+        .add_systems(
+            Update,
+            (
+                updates::receive_update_news,
+                main_menu::type_on_network_page,
+                lobby::run_lobby,
+                main_menu::step_back_on_escape,
+                main_menu::rebuild_screen,
+                main_menu::refresh_main_menu,
+                main_menu::show_network_status,
+                main_menu::refresh_update_banner,
+                menu::pause_while_menu_open,
+                menu::rebuild_menu_page,
+                menu::refresh_menu,
             )
-            .add_systems(
-                Update,
-                (
-                    updates::receive_update_news,
-                    main_menu::type_on_network_page,
-                    lobby::run_lobby,
-                    main_menu::step_back_on_escape,
-                    main_menu::rebuild_screen,
-                    main_menu::refresh_main_menu,
-                    main_menu::show_network_status,
-                    main_menu::refresh_update_banner,
-                    menu::pause_while_menu_open,
-                    menu::rebuild_menu_page,
-                    menu::refresh_menu,
-                )
-                    .chain()
-                    .run_if(in_state(match_flow::GameState::MainMenu)),
-            );
+                .chain()
+                .run_if(in_state(match_flow::GameState::MainMenu)),
+        );
     }
 }
 

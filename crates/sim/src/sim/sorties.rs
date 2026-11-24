@@ -162,56 +162,6 @@ impl Sortie {
     }
 }
 
-/// The landing gear legs of an aircraft model, with their rest scale.
-#[derive(Component)]
-pub struct LandingGear(Vec<(Entity, Vec3)>);
-
-/// Model nodes whose names start with this fold away in flight (tools/blender/irontide_models/units.py).
-const LANDING_GEAR_NODE: &str = "LandingGear";
-/// Height above the pad by which the gear is fully folded.
-const GEAR_FOLDED_ABOVE_PAD: f32 = 1.2;
-/// Folded legs keep a sliver of their size, as a zero scale breaks their lighting.
-const FOLDED_GEAR_SCALE: f32 = 0.01;
-
-pub fn find_landing_gear(
-    mut commands: Commands,
-    aircraft: Query<Entity, (With<Sortie>, Without<LandingGear>)>,
-    children: Query<&Children>,
-    nodes: Query<(&Name, &Transform)>,
-) {
-    for entity in &aircraft {
-        let legs: Vec<(Entity, Vec3)> = children
-            .iter_descendants(entity)
-            .filter_map(|node| {
-                let (name, transform) = nodes.get(node).ok()?;
-                name.as_str()
-                    .starts_with(LANDING_GEAR_NODE)
-                    .then_some((node, transform.scale))
-            })
-            .collect();
-        if !legs.is_empty() {
-            commands.entity(entity).insert(LandingGear(legs));
-        }
-    }
-}
-
-/// Folds the gear up into the airframe as the aircraft rises off the pad and lets it down again to land.
-pub fn fold_landing_gear(
-    aircraft: Query<(&Sortie, &LandingGear)>,
-    mut nodes: Query<&mut Transform, Without<Sortie>>,
-) {
-    for (sortie, gear) in &aircraft {
-        let lowered =
-            1.0 - ((sortie.altitude - ON_THE_PAD_HEIGHT) / GEAR_FOLDED_ABOVE_PAD).clamp(0.0, 1.0);
-        let share = FOLDED_GEAR_SCALE + (1.0 - FOLDED_GEAR_SCALE) * lowered;
-        for &(leg, rest) in &gear.0 {
-            if let Ok(mut transform) = nodes.get_mut(leg) {
-                transform.scale = rest * share;
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

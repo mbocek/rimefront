@@ -224,6 +224,10 @@ fn standard_material(source: &GltfMaterial) -> StandardMaterial {
     }
 }
 
+pub fn show_new_crystal(added: On<Add<CrystalVisual>>, mut commands: Commands) {
+    commands.entity(added.entity).insert(Visibility::default());
+}
+
 /// Gives each new crystal deposit its merged parts once they are ready.
 pub fn dress_crystals(
     mut commands: Commands,

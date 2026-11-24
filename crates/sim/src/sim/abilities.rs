@@ -61,11 +61,7 @@ pub fn lay_mine(
 
 /// Puts a mine in the ground as it is, for a new one or one restored from a save.
 pub fn bury(commands: &mut Commands, mine: Mine) {
-    commands.spawn((
-        mine,
-        Transform::from_translation(cell_center(mine.cell)),
-        Visibility::Hidden,
-    ));
+    commands.spawn((mine, Transform::from_translation(cell_center(mine.cell))));
 }
 
 pub fn detonate_mines(

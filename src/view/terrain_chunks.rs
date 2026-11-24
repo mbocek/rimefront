@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use bevy::asset::RenderAssetUsages;
+use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on};
 
@@ -9,12 +11,113 @@ use crate::view::fog_view::FogTexture;
 use crate::view::terrain_material::{TerrainSurface, WaterMaterial, WaterSurface, water_material};
 use crate::world::map::{CELL_SIZE, CHUNK_CELLS, GameMap, map_bounds};
 use crate::world::terrain::WATER_LEVEL;
-use crate::world::terrain::{
-    COARSE_SPACING, DETAILED_SPACING, FAR_RING_WIDTH, GroundLayers, LandscapeContext,
-    OUTLANDS_WIDTH, build_terrain_patch,
-};
+use crate::world::terrain::{FAR_RING_WIDTH, GroundLayers, LandscapeContext, OUTLANDS_WIDTH};
 
 const PATCH_METRES: f32 = CHUNK_CELLS as f32 * CELL_SIZE;
+
+/// How far a patch's skirt hangs below its edge, deep enough to hide the crack where it meets a coarser one.
+const SKIRT_DEPTH: f32 = 3.0;
+
+/// Ground with a vertex every `spacing` metres: the map and its rim, or the coarse mountains beyond.
+pub const DETAILED_SPACING: f32 = 0.5;
+pub const COARSE_SPACING: f32 = 2.0;
+
+/// The ground over `area` with its layer weights as vertex colours. Normals come from the heights around each
+/// vertex, so neighbouring patches meet without a lighting seam, and a skirt hangs from the edges to hide the
+/// crack where a patch meets a coarser one.
+pub fn build_terrain_patch(
+    ground: &GroundLayers,
+    area: Rect,
+    spacing: f32,
+    crystal_soil: impl Fn(IVec2) -> bool,
+) -> Mesh {
+    let landscape = ground.landscape();
+    let vertices = (area.size() / spacing).round().as_ivec2() + IVec2::ONE;
+    let point = |x: i32, z: i32| area.min + Vec2::new(x as f32, z as f32) * spacing;
+    let with_apron = vertices + IVec2::splat(2);
+    let heights: Vec<f32> = (0..with_apron.element_product())
+        .map(|i| {
+            let at = point(i % with_apron.x - 1, i / with_apron.x - 1);
+            landscape.height(at.x, at.y)
+        })
+        .collect();
+    let height = |x: i32, z: i32| heights[((z + 1) * with_apron.x + x + 1) as usize];
+
+    let count = vertices.element_product() as usize;
+    let mut positions = Vec::with_capacity(count);
+    let mut normals = Vec::with_capacity(count);
+    let mut colors = Vec::with_capacity(count);
+    let mut uvs = Vec::with_capacity(count);
+    for z in 0..vertices.y {
+        for x in 0..vertices.x {
+            let at = point(x, z);
+            let soil = if crystal_soil((at / CELL_SIZE).floor().as_ivec2()) {
+                1.0
+            } else {
+                0.0
+            };
+            let slope_x = height(x + 1, z) - height(x - 1, z);
+            let slope_z = height(x, z + 1) - height(x, z - 1);
+            positions.push([at.x, height(x, z), at.y]);
+            normals.push(
+                Vec3::new(-slope_x, 2.0 * spacing, -slope_z)
+                    .normalize()
+                    .to_array(),
+            );
+            colors.push(ground.weights(at, soil).to_array());
+            uvs.push([at.x, at.y]);
+        }
+    }
+
+    let index_of = |x: i32, z: i32| (z * vertices.x + x) as u32;
+    let mut indices = Vec::with_capacity(((vertices - IVec2::ONE).element_product() * 6) as usize);
+    for z in 0..vertices.y - 1 {
+        for x in 0..vertices.x - 1 {
+            let (top_left, top_right) = (index_of(x, z), index_of(x + 1, z));
+            let (bottom_left, bottom_right) = (index_of(x, z + 1), index_of(x + 1, z + 1));
+            indices.extend_from_slice(&[
+                top_left,
+                bottom_left,
+                top_right,
+                top_right,
+                bottom_left,
+                bottom_right,
+            ]);
+        }
+    }
+
+    let last = vertices - IVec2::ONE;
+    let rim: Vec<u32> = (0..last.x)
+        .map(|x| index_of(x, 0))
+        .chain((0..last.y).map(|z| index_of(last.x, z)))
+        .chain((1..=last.x).rev().map(|x| index_of(x, last.y)))
+        .chain((1..=last.y).rev().map(|z| index_of(0, z)))
+        .collect();
+    for (step, &edge) in rim.iter().enumerate() {
+        let next_edge = rim[(step + 1) % rim.len()];
+        let hanging = positions.len() as u32;
+        for source in [edge, next_edge] {
+            let [x, y, z] = positions[source as usize];
+            positions.push([x, y - SKIRT_DEPTH, z]);
+            normals.push(normals[source as usize]);
+            colors.push(colors[source as usize]);
+            uvs.push(uvs[source as usize]);
+        }
+        let (below, next_below) = (hanging, hanging + 1);
+        indices.extend_from_slice(&[edge, below, next_edge, next_edge, below, next_below]);
+        indices.extend_from_slice(&[edge, next_edge, below, next_edge, next_below, below]);
+    }
+
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(Indices::U32(indices))
+}
 
 /// One chunk of ground, drawn only when in view; a crystal painted in the editor rebuilds only its chunk.
 #[derive(Component)]

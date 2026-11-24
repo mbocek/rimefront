@@ -173,7 +173,7 @@ impl Plugin for SimulationPlugin {
             )
             .add_systems(
                 Last,
-                match_flow::scope_match_entities.run_if(
+                match_flow::scope_match_entities::<Transform>.run_if(
                     in_state(match_flow::GameState::Playing)
                         .or_else(in_state(match_flow::GameState::Replay))
                         .or_else(in_state(match_flow::GameState::MapEditor)),

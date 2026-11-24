@@ -7,7 +7,14 @@ description = "The battle simulation of Iron Tide: rules, map and levels, withou
 repository = "https://github.com/mbocek/iron-tide"
 
 [dependencies]
-bevy = { version = "0.20.1", features = ["jpeg"] }
+bevy = { version = "0.20.1", default-features = false, features = [
+    "std",
+    "async_executor",
+    "bevy_state",
+    "bevy_color",
+    "bevy_log",
+    "multi_threaded",
+] }
 libm = "0.2"
 pathfinding = "4.16"
 rand = "0.10.4"

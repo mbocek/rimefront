@@ -744,7 +744,6 @@ pub fn spawn_crystal_visual(
         Transform::from_translation(approximate_ground(cell_center(cell) + spread))
             .with_rotation(lean * heading)
             .with_scale(Vec3::splat(size * crystal_scale(amount))),
-        Visibility::default(),
     ));
 }
 

@@ -177,12 +177,10 @@ for ordinary network matches.
     headless (as the tests already do) and takes player commands from the network instead of relaying them.
     The simulation is a crate of its own (`crates/sim`, see [architecture.md](architecture.md)): it reaches
     into nothing of drawing, sound, the interface or the network, and the network session and saving add
-    their systems through the steps of a tick and of a match's start. Still to do before the server is small:
+    their systems through the steps of a tick and of a match's start. It builds on Bevy without rendering,
+    windows or audio. Still to do before the server is small:
     - the server binary still lives in the game crate and links all of it (59 MB): `net::network`,
       `link`, `relay` and `server` go into a crate of their own that depends on the simulation only;
-    - the simulation crate still depends on Bevy with rendering, for the ground patch mesh
-      (`world::terrain::build_terrain_patch`, which belongs in `view`) and the `Visibility` crystals and
-      mines are spawned with.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.

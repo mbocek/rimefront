@@ -6,14 +6,15 @@ use crate::{
     FramePhase, StartupPhase, app::capture, app::frame_pacing, app::match_flow, app::replay,
     app::savegame, app::settings, app::updates, audio::announcer, audio::battle_noise,
     audio::sound, audio::unit_voices, missions::campaigns, net::lobby, net::network,
-    sim::abilities, sim::combat, sim::economy, sim::sorties, sim::transport, ui::control_groups,
-    ui::field_tips, ui::main_menu, ui::map_editor, ui::menu, ui::minimap, ui::network_hud,
-    ui::orders, ui::perf_overlay, ui::placement, ui::queue_bar, ui::sidebar, ui::structure_tools,
+    sim::abilities, sim::sorties, sim::transport, ui::control_groups, ui::field_tips,
+    ui::main_menu, ui::map_editor, ui::menu, ui::minimap, ui::network_hud, ui::orders,
+    ui::perf_overlay, ui::placement, ui::queue_bar, ui::sidebar, ui::structure_tools,
     ui::support_tools, ui::tutorial, view::ambience, view::animation, view::assets,
-    view::battlefield, view::camera, view::crystal_models, view::damage_feedback, view::effects,
-    view::flat_scenery, view::fog_view, view::graphics, view::interpolation, view::local_view,
-    view::motion_material, view::overlay, view::scenery_view, view::terrain_chunks,
-    view::terrain_material, view::wall_joints, world::map, world::map_edits, world::weather,
+    view::battlefield, view::camera, view::crystal_models, view::damage_feedback, view::dressing,
+    view::effects, view::flat_scenery, view::fog_view, view::graphics, view::interpolation,
+    view::local_view, view::motion_material, view::overlay, view::scenery_view,
+    view::terrain_chunks, view::terrain_material, view::wall_joints, world::map, world::map_edits,
+    world::weather,
 };
 
 /// Draws what the simulation moves part way between ticks.
@@ -38,7 +39,9 @@ pub struct BattleViewPlugin;
 
 impl Plugin for BattleViewPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<camera::Cursor>()
+        app.add_observer(dressing::dress_new_unit)
+            .add_observer(dressing::dress_new_building)
+            .init_resource::<camera::Cursor>()
             .init_resource::<camera::ScriptedPointer>()
             .init_resource::<orders::DragSelection>()
             .init_resource::<orders::OrderMarker>()
@@ -170,10 +173,11 @@ impl Plugin for BattleViewPlugin {
                 Update,
                 (
                     (
-                        economy::link_ore_load_nodes,
-                        economy::show_harvester_load,
-                        combat::link_turret_nodes,
-                        combat::rotate_turret_nodes,
+                        dressing::link_ore_load_nodes,
+                        dressing::show_harvester_load,
+                        dressing::link_turret_nodes,
+                        dressing::rotate_turret_nodes,
+                        dressing::lay_corpses,
                         ambience::trample_vegetation,
                         abilities::show_own_mines,
                         ambience::emit_crystal_sparkles,

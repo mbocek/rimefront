@@ -6,8 +6,6 @@ use crate::sim::components::*;
 use crate::sim::fog::Sight;
 use crate::sim::medical::Healer;
 use crate::sim::sorties::Sortie;
-use crate::view::animation::{animated_building_model, animated_unit_model};
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{
     CELL_SIZE, GameMap, footprint_center, in_far_half, opposite_cell, opposite_origin,
 };
@@ -16,7 +14,6 @@ const TURRET_TURN_RATE: f32 = 3.5;
 
 pub fn spawn_unit(
     commands: &mut Commands,
-    models: &ModelLibrary,
     kind: UnitKind,
     team: Team,
     position: Vec3,
@@ -32,8 +29,6 @@ pub fn spawn_unit(
         Armor(spec.armor),
         Mobile::for_unit(kind, facing),
         Orders::default(),
-        WorldAssetRoot(models.unit(kind, team)),
-        animated_unit_model(kind, team),
         Transform::from_translation(position).with_rotation(Quat::from_rotation_y(facing)),
     ));
     if let Some(weapon) = spec.weapon {
@@ -80,7 +75,6 @@ pub fn spawn_unit(
 
 pub fn spawn_building(
     commands: &mut Commands,
-    models: &ModelLibrary,
     map: &mut GameMap,
     kind: BuildingKind,
     team: Team,
@@ -95,7 +89,6 @@ pub fn spawn_building(
         BodyRadius(footprint_radius),
         Sight(spec.sight),
         Armor(ArmorClass::Structure),
-        WorldAssetRoot(models.building(kind, team)),
         Transform::from_translation(footprint_center(origin, spec.footprint))
             .with_rotation(Quat::from_rotation_y(building_yaw(kind, origin))),
     ));
@@ -108,9 +101,6 @@ pub fn spawn_building(
             AttackTarget::default(),
             Turret::new(0.0, TURRET_TURN_RATE),
         ));
-    }
-    if let Some(animated) = animated_building_model(kind, team) {
-        building.insert(animated);
     }
     if kind.is_wall() {
         building.insert(WallSegment { cell: origin, team });

@@ -5,7 +5,6 @@ use crate::sim::catalog::{ArmorClass, BuildingKind, Team};
 use crate::sim::components::{Armor, BodyRadius, Building, Health, Unit};
 use crate::sim::economy::Economies;
 use crate::sim::spawn::building_yaw;
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{
     CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, map_bounds,
     near_base, opposite_origin, self_mirrored_origin,
@@ -26,7 +25,6 @@ pub struct UnclaimedSite;
 
 pub fn spawn_unclaimed_site(
     commands: &mut Commands,
-    models: &ModelLibrary,
     map: &mut GameMap,
     kind: BuildingKind,
     origin: IVec2,
@@ -39,7 +37,6 @@ pub fn spawn_unclaimed_site(
             Health::full(spec.max_health),
             BodyRadius(spec.footprint.as_vec2().max_element() * CELL_SIZE * 0.5),
             Armor(ArmorClass::Structure),
-            WorldAssetRoot(models.unclaimed_site(kind)),
             Transform::from_translation(footprint_center(origin, spec.footprint))
                 .with_rotation(Quat::from_rotation_y(building_yaw(kind, origin))),
         ))
@@ -51,7 +48,7 @@ pub fn spawn_unclaimed_site(
 /// Where the sites of a map stand: an Observation Post in the middle, or a mirrored pair of them beside it
 /// where the middle is a ford, and mirrored pairs of Supply Depots between the corners and Field Hospitals
 /// on the road from each corner to the middle. Mirroring keeps the map as fair as the rest of it.
-pub fn place_neutral_sites(commands: &mut Commands, models: &ModelLibrary, map: &mut GameMap) {
+pub fn place_neutral_sites(commands: &mut Commands, map: &mut GameMap) {
     let bounds = map_bounds();
     let at_share =
         |x: f32, y: f32| bounds.min + (bounds.size.as_vec2() * Vec2::new(x, y)).as_ivec2();
@@ -59,7 +56,7 @@ pub fn place_neutral_sites(commands: &mut Commands, models: &ModelLibrary, map: 
     let middle = self_mirrored_origin(post.spec().footprint);
     let mut pairs = Vec::new();
     if footprint_is_free(map, post, middle) {
-        spawn_unclaimed_site(commands, models, map, post, middle);
+        spawn_unclaimed_site(commands, map, post, middle);
     } else {
         pairs.push((post, at_share(0.4, 0.4)));
     }
@@ -69,9 +66,9 @@ pub fn place_neutral_sites(commands: &mut Commands, models: &ModelLibrary, map: 
         let Some(origin) = mirrored_spot(map, kind, spot) else {
             continue;
         };
-        spawn_unclaimed_site(commands, models, map, kind, origin);
+        spawn_unclaimed_site(commands, map, kind, origin);
         let twin = opposite_origin(origin, kind.spec().footprint);
-        spawn_unclaimed_site(commands, models, map, kind, twin);
+        spawn_unclaimed_site(commands, map, kind, twin);
     }
 }
 

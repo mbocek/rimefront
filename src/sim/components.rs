@@ -166,18 +166,11 @@ impl AttackTarget {
 pub struct Turret {
     pub yaw: f32,
     pub turn_rate: f32,
-    pub node: Option<Entity>,
-    pub node_base_rotation: Quat,
 }
 
 impl Turret {
     pub fn new(yaw: f32, turn_rate: f32) -> Self {
-        Self {
-            yaw,
-            turn_rate,
-            node: None,
-            node_base_rotation: Quat::IDENTITY,
-        }
+        Self { yaw, turn_rate }
     }
 }
 

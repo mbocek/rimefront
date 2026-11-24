@@ -20,8 +20,6 @@ use crate::sim::sim_math;
 use crate::sim::spatial_index::SpatialIndex;
 use crate::sim::transport::Embarked;
 use crate::sim::veterancy::{Rank, Veterancy};
-use crate::view::animation::{animated_unit_model, spawn_corpse};
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{CELL_SIZE, GameMap, world_to_cell};
 
 const SIGHT_BEYOND_RANGE: f32 = 6.0;
@@ -163,6 +161,7 @@ pub struct Destroyed {
     pub team: Team,
     pub what: DamageSource,
     pub position: Vec3,
+    pub rotation: Quat,
 }
 
 /// An explosion that leaves a scorch mark of this radius in meters on the ground.
@@ -699,7 +698,6 @@ pub fn remove_destroyed(
     mut impacts: MessageWriter<Impact>,
     mut commands: Commands,
     mut blasts: MessageWriter<BlastCue>,
-    models: Res<ModelLibrary>,
     mut map: ResMut<GameMap>,
     destroyed: Query<(
         Entity,
@@ -727,6 +725,7 @@ pub fn remove_destroyed(
                 team,
                 what,
                 position: transform.translation,
+                rotation: transform.rotation,
             });
         }
         let blast = match (building, unit) {
@@ -734,17 +733,11 @@ pub fn remove_destroyed(
                 map.set_building(building.origin, building.kind.spec().footprint, None);
                 if building.kind.is_neutral_site() {
                     let (kind, origin) = (building.kind, building.origin);
-                    spawn_unclaimed_site(&mut commands, &models, &mut map, kind, origin);
+                    spawn_unclaimed_site(&mut commands, &mut map, kind, origin);
                 }
                 BlastSize::BuildingCollapse
             }
             (None, Some(unit)) if unit.0.spec().armor == ArmorClass::Infantry => {
-                spawn_corpse(
-                    &mut commands,
-                    models.unit(unit.0, team),
-                    animated_unit_model(unit.0, team),
-                    *transform,
-                );
                 BlastSize::BulletImpact
             }
             _ => BlastSize::VehicleWreck,
@@ -777,37 +770,5 @@ pub fn remove_destroyed(
             blast,
         ));
         commands.entity(entity).despawn();
-    }
-}
-
-pub fn link_turret_nodes(
-    mut turrets: Query<(Entity, &mut Turret)>,
-    children: Query<&Children>,
-    nodes: Query<(&Name, &Transform)>,
-) {
-    for (entity, mut turret) in &mut turrets {
-        if turret.node.is_some() {
-            continue;
-        }
-        let found = crate::view::assets::named_node(entity, "Turret", &children, &nodes)
-            .map(|(node, transform)| (node, transform.rotation));
-        if let Some((node, base_rotation)) = found {
-            turret.node = Some(node);
-            turret.node_base_rotation = base_rotation;
-        }
-    }
-}
-
-pub fn rotate_turret_nodes(
-    turrets: Query<(&Turret, Option<&Mobile>)>,
-    mut nodes: Query<&mut Transform, Without<Turret>>,
-) {
-    for (turret, mobile) in &turrets {
-        let Some(mut node_transform) = turret.node.and_then(|node| nodes.get_mut(node).ok()) else {
-            continue;
-        };
-        let body_yaw = mobile.map_or(0.0, |m| m.facing);
-        node_transform.rotation =
-            Quat::from_rotation_y(turret.yaw - body_yaw) * turret.node_base_rotation;
     }
 }

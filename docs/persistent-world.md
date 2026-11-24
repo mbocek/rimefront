@@ -178,8 +178,6 @@ for ordinary network matches.
     First the simulation (`src/sim`, `src/world`) becomes a crate of its own, so the server links only it (it
     links the whole game today) and the compiler keeps drawing out of it. What it still reaches into, each
     to be turned into an event the view or sound answers:
-    - `sim::combat`, `sim::spawn` and `sim::economy` attach models and corpses as they spawn things
-      (`view::assets`, `view::animation`);
     - `world::map` spawns the ground and water and knows the fog texture (`view::terrain_chunks`,
       `view::terrain_material`, `view::fog_view`, `view::crystal_models`); `world::weather` and
       `world::scenery` reach into materials and graphics settings;

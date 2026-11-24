@@ -15,7 +15,6 @@ use crate::sim::player_commands::{CommandQueue, SimulationTick};
 use crate::sim::production::{BuildItem, PlacementContext, Production, construct_building};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::sim::veterancy::LastHits;
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cell_center, in_far_half};
 
 #[derive(States, Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -133,22 +132,9 @@ fn forbidden_items(level: &crate::missions::levels::LevelDefinition) -> Vec<Buil
     units.chain(buildings).collect()
 }
 
-fn deploy_force(
-    commands: &mut Commands,
-    models: &ModelLibrary,
-    map: &mut GameMap,
-    team: Team,
-    force: &ForceSetup,
-) {
+fn deploy_force(commands: &mut Commands, map: &mut GameMap, team: Team, force: &ForceSetup) {
     let base = force.site.origin();
-    spawn_building(
-        commands,
-        models,
-        map,
-        BuildingKind::CommandCenter,
-        team,
-        base,
-    );
+    spawn_building(commands, map, BuildingKind::CommandCenter, team, base);
     let mut own_buildings = vec![(base, BuildingKind::CommandCenter.spec().footprint)];
     for &kind in &force.buildings {
         let context = PlacementContext {
@@ -161,7 +147,7 @@ fn deploy_force(
             warn!("no room for a starting {kind:?} of {team:?}");
             continue;
         };
-        construct_building(commands, models, map, kind, team, origin);
+        construct_building(commands, map, kind, team, origin);
         own_buildings.push((origin, kind.spec().footprint));
     }
 
@@ -173,21 +159,13 @@ fn deploy_force(
         let slot = IVec2::new(i as i32 % columns, i as i32 / columns);
         let wanted = rally + slot * direction;
         let cell = map.nearest_passable(wanted).unwrap_or(wanted);
-        spawn_unit(
-            commands,
-            models,
-            kind,
-            team,
-            cell_center(cell),
-            force.site.facing(),
-        );
+        spawn_unit(commands, kind, team, cell_center(cell), force.site.facing());
     }
 }
 
 /// Builds the opening position of the active level: bases, armies, money, opponents and tech limits.
 pub fn deploy_level_forces(
     mut commands: Commands,
-    models: Res<ModelLibrary>,
     level: Res<ActiveLevel>,
     rules: Res<MatchRules>,
     pending_load: Option<Res<PendingLoad>>,
@@ -219,19 +197,13 @@ pub fn deploy_level_forces(
         }
     }
     if level.neutral_sites {
-        crate::sim::neutral_sites::place_neutral_sites(&mut commands, &models, &mut map);
+        crate::sim::neutral_sites::place_neutral_sites(&mut commands, &mut map);
     }
     if !rules.starting_forces {
         return;
     }
-    deploy_force(
-        &mut commands,
-        &models,
-        &mut map,
-        Team::Player,
-        &level.player,
-    );
+    deploy_force(&mut commands, &mut map, Team::Player, &level.player);
     for (team, enemy) in level.opponents() {
-        deploy_force(&mut commands, &models, &mut map, team, &enemy.force);
+        deploy_force(&mut commands, &mut map, team, &enemy.force);
     }
 }

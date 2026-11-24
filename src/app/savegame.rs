@@ -24,7 +24,6 @@ use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::sim::structures::{BeingSold, Repairing};
 use crate::sim::veterancy::Veterancy;
 use crate::ui::key_bindings::Action;
-use crate::view::assets::ModelLibrary;
 use crate::view::camera::RtsCamera;
 use crate::world::map::{GameMap, cell_of_index, spawn_crystal_visual};
 
@@ -397,7 +396,6 @@ pub fn begin_requested_load(
 pub fn restore_pending_load(
     mut commands: Commands,
     pending: Option<Res<PendingLoad>>,
-    models: Res<ModelLibrary>,
     mut map: ResMut<GameMap>,
     mut economies: ResMut<Economies>,
     mut production: ResMut<Production>,
@@ -421,19 +419,13 @@ pub fn restore_pending_load(
         }
     }
     for saved in &save.buildings {
-        respawn_building(&mut commands, &models, &mut map, saved);
+        respawn_building(&mut commands, &mut map, saved);
     }
     for saved in &save.units {
-        respawn_unit(&mut commands, &models, saved);
+        respawn_unit(&mut commands, saved);
     }
     for &(kind, origin) in &save.unclaimed_sites {
-        spawn_unclaimed_site(
-            &mut commands,
-            &models,
-            &mut map,
-            kind,
-            IVec2::from_array(origin),
-        );
+        spawn_unclaimed_site(&mut commands, &mut map, kind, IVec2::from_array(origin));
     }
     for (team, credits) in Team::ALL.into_iter().zip(&save.credits) {
         economies.of_mut(team).credits = *credits;
@@ -464,14 +456,9 @@ pub fn restore_pending_load(
     notifications.push(tr("Game loaded"));
 }
 
-fn respawn_building(
-    commands: &mut Commands,
-    models: &ModelLibrary,
-    map: &mut GameMap,
-    saved: &SavedBuilding,
-) {
+fn respawn_building(commands: &mut Commands, map: &mut GameMap, saved: &SavedBuilding) {
     let origin = IVec2::from_array(saved.origin);
-    let entity = spawn_building(commands, models, map, saved.kind, saved.team, origin);
+    let entity = spawn_building(commands, map, saved.kind, saved.team, origin);
     commands.entity(entity).insert(Health {
         current: saved.health,
         max: saved.kind.spec().max_health,
@@ -486,16 +473,9 @@ fn respawn_building(
     }
 }
 
-fn respawn_unit(commands: &mut Commands, models: &ModelLibrary, saved: &SavedUnit) {
+fn respawn_unit(commands: &mut Commands, saved: &SavedUnit) {
     let position = Vec3::from_array(saved.position);
-    let entity = spawn_unit(
-        commands,
-        models,
-        saved.kind,
-        saved.team,
-        position,
-        saved.facing,
-    );
+    let entity = spawn_unit(commands, saved.kind, saved.team, position, saved.facing);
     let (veterancy, health) = Veterancy::restored(saved.kind, saved.experience, saved.health);
     commands.entity(entity).insert(health);
     if saved.kind.spec().weapon.is_some() {

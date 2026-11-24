@@ -16,7 +16,6 @@ use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::research::Upgrade;
 use crate::sim::spawn::{exit_cell, spawn_building, spawn_unit};
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cell_center, footprint_cells, footprint_center, world_to_cell};
 
 pub const MAX_QUEUE_LENGTH: usize = 8;
@@ -322,7 +321,6 @@ pub fn advance_production(
     mut commands: Commands,
     mut rng: ResMut<SimulationRng>,
     time: Res<Time>,
-    models: Res<ModelLibrary>,
     map: Res<GameMap>,
     economies: Res<Economies>,
     mut production: ResMut<Production>,
@@ -390,7 +388,6 @@ pub fn advance_production(
                     deploy_unit(
                         &mut commands,
                         &mut rng,
-                        &models,
                         &map,
                         kind,
                         team,
@@ -410,7 +407,6 @@ pub fn advance_production(
 fn deploy_unit(
     commands: &mut Commands,
     rng: &mut SimulationRng,
-    models: &ModelLibrary,
     map: &GameMap,
     kind: UnitKind,
     team: Team,
@@ -425,7 +421,7 @@ fn deploy_unit(
     } else {
         cell_center(exit)
     };
-    let entity = spawn_unit(commands, models, kind, team, launch, 0.0);
+    let entity = spawn_unit(commands, kind, team, launch, 0.0);
     if let Some(rally) = rally.filter(|_| kind != UnitKind::Harvester) {
         commands.entity(entity).insert(Orders {
             current: Some(Order::Move(rally.0)),
@@ -443,26 +439,18 @@ fn deploy_unit(
 
 pub fn construct_building(
     commands: &mut Commands,
-    models: &ModelLibrary,
     map: &mut GameMap,
     kind: BuildingKind,
     team: Team,
     origin: IVec2,
 ) {
-    spawn_building(commands, models, map, kind, team, origin);
+    spawn_building(commands, map, kind, team, origin);
     if kind == BuildingKind::Refinery {
         let building = Building { kind, origin };
         let dock = map
             .nearest_passable(exit_cell(&building))
             .unwrap_or(exit_cell(&building));
-        spawn_unit(
-            commands,
-            models,
-            UnitKind::Harvester,
-            team,
-            cell_center(dock),
-            0.0,
-        );
+        spawn_unit(commands, UnitKind::Harvester, team, cell_center(dock), 0.0);
     }
 }
 

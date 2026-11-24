@@ -7,7 +7,6 @@ use crate::sim::catalog::{BuildingKind, Team, UnitKind};
 use crate::sim::components::{Building, Order, Orders, Unit};
 use crate::sim::economy::Economies;
 use crate::sim::spawn::spawn_unit;
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cell_center, map_bounds};
 
 /// Arrivals line up this many abreast, the way a starting force does.
@@ -87,7 +86,6 @@ pub fn run_level_events(
     mut commands: Commands,
     level: Res<ActiveLevel>,
     clock: Res<MatchClock>,
-    models: Res<ModelLibrary>,
     map: Res<GameMap>,
     mut economies: ResMut<Economies>,
     mut fired: ResMut<EventsFired>,
@@ -109,7 +107,7 @@ pub fn run_level_events(
                 }
                 EventAction::Reinforcements { team, units, from } => {
                     let toward = level.player.site.origin() + level.player.site.rally_offset();
-                    bring_reinforcements(&mut commands, &models, &map, team, &units, from, toward);
+                    bring_reinforcements(&mut commands, &map, team, &units, from, toward);
                 }
                 EventAction::Credits { team, amount } => {
                     economies.of_mut(team).credits += amount;
@@ -163,7 +161,6 @@ fn corner_of(site: BaseSite) -> IVec2 {
 
 fn bring_reinforcements(
     commands: &mut Commands,
-    models: &ModelLibrary,
     map: &GameMap,
     team: Team,
     units: &[UnitKind],
@@ -183,7 +180,7 @@ fn bring_reinforcements(
         let slot = IVec2::new(index % ARRIVAL_COLUMNS, index / ARRIVAL_COLUMNS) * inward;
         let wanted = corner + slot;
         let cell = map.nearest_passable(wanted).unwrap_or(wanted);
-        let unit = spawn_unit(commands, models, kind, team, cell_center(cell), facing);
+        let unit = spawn_unit(commands, kind, team, cell_center(cell), facing);
         commands.entity(unit).insert(Orders {
             current: Some(order),
             queued: default(),

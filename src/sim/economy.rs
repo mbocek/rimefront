@@ -338,48 +338,6 @@ pub fn clear_depleted_crystals(
     }
 }
 
-const EMPTY_LOAD_SCALE: f32 = 0.05;
-const LOAD_NODE_NAME: &str = "OreLoad";
-
-/// The hopper's ore heap inside the harvester model, scaled up from its floor as cargo accumulates.
-#[derive(Component)]
-pub struct OreLoadLink {
-    node: Entity,
-    full_scale: Vec3,
-}
-
-pub fn link_ore_load_nodes(
-    mut commands: Commands,
-    unlinked: Query<Entity, (With<Harvester>, Without<OreLoadLink>)>,
-    children: Query<&Children>,
-    nodes: Query<(&Name, &Transform)>,
-) {
-    for harvester in &unlinked {
-        let found = crate::view::assets::named_node(harvester, LOAD_NODE_NAME, &children, &nodes)
-            .map(|(node, transform)| (node, transform.scale));
-        if let Some((node, full_scale)) = found {
-            commands
-                .entity(harvester)
-                .insert(OreLoadLink { node, full_scale });
-        }
-    }
-}
-
-pub fn show_harvester_load(
-    harvesters: Query<(&Harvester, &OreLoadLink)>,
-    mut nodes: Query<&mut Transform, Without<Harvester>>,
-) {
-    for (harvester, link) in &harvesters {
-        let Ok(mut transform) = nodes.get_mut(link.node) else {
-            continue;
-        };
-        let fill = (harvester.cargo as f32 / HARVESTER_CAPACITY as f32).clamp(0.0, 1.0);
-        let height = EMPTY_LOAD_SCALE + (1.0 - EMPTY_LOAD_SCALE) * fill;
-        let breadth = 0.8 + 0.2 * fill;
-        transform.scale = link.full_scale * Vec3::new(breadth, height, breadth);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

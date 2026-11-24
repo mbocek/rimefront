@@ -23,7 +23,6 @@ use crate::sim::research::Upgrade;
 use crate::sim::servicing::{service_radius, waiting_spot};
 use crate::sim::structures::{BeingSold, Repairing, StructureOrder, StructureOrderKind};
 use crate::sim::support_powers::{SupportPower, SupportPowers};
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{
     CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, in_far_half,
     mirror_centre, opposite_cell, opposite_origin, world_to_cell,
@@ -287,7 +286,6 @@ pub fn command_enemies(
     mut commands: Commands,
     mut rng: ResMut<SimulationRng>,
     time: Res<Time>,
-    models: Res<ModelLibrary>,
     targets: Res<Targets>,
     intel: Res<Intel>,
     mut commanders: ResMut<AiCommanders>,
@@ -312,7 +310,6 @@ pub fn command_enemies(
         let placed = place_finished_structure(
             ai,
             &mut commands,
-            &models,
             &mut map,
             &mut production,
             intel.vision(ai.team),
@@ -377,7 +374,6 @@ pub fn fortify_turrets(
     mut commands: Commands,
     time: Res<Time>,
     mut cadences: ResMut<crate::sim::cadence::SimulationCadences>,
-    models: Res<ModelLibrary>,
     commanders: Res<AiCommanders>,
     mut map: ResMut<GameMap>,
     mut economies: ResMut<Economies>,
@@ -415,7 +411,7 @@ pub fn fortify_turrets(
                 break;
             }
             if map.is_buildable(cell) && !occupied.contains(&cell) {
-                construct_building(&mut commands, &models, &mut map, wall, ai.team, cell);
+                construct_building(&mut commands, &mut map, wall, ai.team, cell);
                 economies.of_mut(ai.team).credits -= wall.spec().cost;
             }
         }
@@ -550,7 +546,6 @@ pub fn repair_damaged_structures(
 fn place_finished_structure(
     ai: &AiCommander,
     commands: &mut Commands,
-    models: &ModelLibrary,
     map: &mut GameMap,
     production: &mut Production,
     known_ground: &FogOfWar,
@@ -563,7 +558,7 @@ fn place_finished_structure(
         find_building_site(&context, ai.base, kind)
     };
     let origin = site?;
-    construct_building(commands, models, map, kind, ai.team, origin);
+    construct_building(commands, map, kind, ai.team, origin);
     production.lane_mut(ai.team, Lane::Structures).ready = None;
     Some(kind)
 }

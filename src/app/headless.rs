@@ -185,10 +185,8 @@ impl Battle {
 
     pub fn spawn_unit(&mut self, kind: UnitKind, team: Team, cell: IVec2) -> Entity {
         let world = self.world();
-        let entity = world.resource_scope(|world, models: Mut<ModelLibrary>| {
-            let mut commands = world.commands();
-            spawn_unit(&mut commands, &models, kind, team, cell_center(cell), 0.0)
-        });
+        let mut commands = world.commands();
+        let entity = spawn_unit(&mut commands, kind, team, cell_center(cell), 0.0);
         world.flush();
         entity
     }
@@ -213,11 +211,9 @@ impl Battle {
 
     pub fn construct(&mut self, kind: BuildingKind, team: Team, origin: IVec2) {
         let world = self.world();
-        world.resource_scope(|world, models: Mut<ModelLibrary>| {
-            world.resource_scope(|world, mut map: Mut<GameMap>| {
-                let mut commands = world.commands();
-                construct_building(&mut commands, &models, &mut map, kind, team, origin);
-            });
+        world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            construct_building(&mut commands, &mut map, kind, team, origin);
         });
         world.flush();
     }

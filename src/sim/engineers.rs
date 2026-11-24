@@ -11,7 +11,6 @@ use crate::sim::movement::order_move;
 use crate::sim::notifications::Notifications;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::spawn::spawn_building;
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_center};
 
 /// How close to a structure's walls an engineer has to get before it slips inside.
@@ -72,7 +71,6 @@ pub fn carry_out_engineer_tasks(
     mut cues: MessageWriter<SoundCue>,
     mut notifications: ResMut<Notifications>,
     time: Res<Time>,
-    models: Res<ModelLibrary>,
     mut map: ResMut<GameMap>,
     mut engineers: Query<(
         Entity,
@@ -132,7 +130,7 @@ pub fn carry_out_engineer_tasks(
                     (building.kind, building.origin, health.max - health.current);
                 commands.entity(task.building).despawn();
                 map.set_building(origin, footprint, None);
-                let captured = spawn_building(&mut commands, &models, &mut map, kind, team, origin);
+                let captured = spawn_building(&mut commands, &mut map, kind, team, origin);
                 commands.entity(captured).insert(Health {
                     current: kind.spec().max_health - damage,
                     max: kind.spec().max_health,

@@ -11,7 +11,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | --- | --- |
 | `catalog` | unit and building statistics, weapons, armor |
 | `cues` | the sounds and blasts the simulation asks for; `audio` and `view` play and draw them |
-| `spawn` | spawning units and buildings from the glTF models |
+| `spawn` | spawning units and buildings as simulation data; `view::dressing` gives them their models |
 | `movement` | path following, unit separation |
 | `spatial_index` | finding the units and structures near a point without checking all of them |
 | `combat` | target acquisition, chasing, turrets, projectiles, damage |
@@ -77,6 +77,7 @@ it is listed in [persistent-world.md](persistent-world.md) as the work before it
 | `scenery_view`, `flat_scenery` | entities for the props around the camera, redone when a chunk's props change; scenery models merged into one mesh each |
 | `crystal_models`, `motion_material` | crystal deposits merged into one mesh per material; GPU vertex motion (wind, hovering shards) |
 | `fog_view` | how the terrain, water and enemies show the fog of war; the fog texture, repainted and uploaded by chunk |
+| `dressing` | models for the units, structures and sites the simulation spawns; turrets and harvester loads following the simulation; fallen infantry |
 | `overlay` | health bars, selection |
 | `battlefield` | scorch marks, vehicle wrecks and rain |
 | `wall_joints` | joins neighbouring wall segments of a side into one continuous wall |

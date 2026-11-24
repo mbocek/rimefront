@@ -19,7 +19,6 @@ use crate::sim::production::{
 use crate::sim::structures::{StructureOrder, StructureOrderKind};
 use crate::sim::support_powers::{SupportPower, SupportPowers, owned_kinds};
 use crate::sim::transport::{BoardingTask, Unloading};
-use crate::view::assets::ModelLibrary;
 use crate::world::map::{GameMap, cells_by_distance, world_to_cell};
 
 /// Ticks between issuing a command and carrying it out; across a network the order needs time to arrive.
@@ -263,7 +262,6 @@ pub struct Battlefield<'w, 's> {
     commands: Commands<'w, 's>,
     ids: Res<'w, SimEntities>,
     local: Res<'w, LocalTeam>,
-    models: Res<'w, ModelLibrary>,
     diplomacy: Res<'w, Diplomacy>,
     map: ResMut<'w, GameMap>,
     production: ResMut<'w, Production>,
@@ -609,14 +607,7 @@ impl Battlefield<'_, '_> {
         if !placeable {
             return;
         }
-        construct_building(
-            &mut self.commands,
-            &self.models,
-            &mut self.map,
-            kind,
-            team,
-            origin,
-        );
+        construct_building(&mut self.commands, &mut self.map, kind, team, origin);
         self.production.lane_mut(team, Lane::Structures).ready = None;
     }
 
@@ -635,14 +626,7 @@ impl Battlefield<'_, '_> {
             affordable_wall_line(&mut context, from, to, credits)
         };
         for &cell in &segments {
-            construct_building(
-                &mut self.commands,
-                &self.models,
-                &mut self.map,
-                wall,
-                team,
-                cell,
-            );
+            construct_building(&mut self.commands, &mut self.map, wall, team, cell);
         }
         self.economies.of_mut(team).credits -= segments.len() as i32 * wall.spec().cost;
     }

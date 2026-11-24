@@ -5,6 +5,7 @@ pub mod battlefield;
 pub mod camera;
 pub mod crystal_models;
 pub mod damage_feedback;
+pub mod dressing;
 pub mod effects;
 pub mod flat_scenery;
 pub mod fog_view;

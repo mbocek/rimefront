@@ -148,6 +148,11 @@ impl CommandQueue {
         });
     }
 
+    /// Every command not yet carried out, for a battle whose commands run elsewhere.
+    pub fn take_all(&mut self) -> Vec<ScheduledCommand> {
+        std::mem::take(&mut self.pending)
+    }
+
     pub fn schedule(&mut self, scheduled: ScheduledCommand) {
         self.pending.push(scheduled);
     }

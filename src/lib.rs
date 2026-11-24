@@ -24,6 +24,7 @@ impl Plugin for GamePlugin {
             SimulationPlugin::default(),
             network::LockstepPlugin,
             savegame::SavePlugin,
+            net::world_client::WorldClientPlugin,
         ))
         .add_plugins((
             game_plugins::InterpolationPlugin,

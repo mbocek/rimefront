@@ -631,5 +631,8 @@
   "Join a room: ws://server/room/NAME": "Pripoj sa do miestnosti: ws://server/room/NÁZOV",
   "The battle in this room has no room for you": "V bitke tejto miestnosti už nie je miesto",
   "This room is full": "Táto miestnosť je plná",
-  "A room with this name is already open; join it or pick another name": "Miestnosť s týmto názvom je už otvorená; pripoj sa do nej alebo zvoľ iný názov"
+  "A room with this name is already open; join it or pick another name": "Miestnosť s týmto názvom je už otvorená; pripoj sa do nej alebo zvoľ iný názov",
+  "ENTER THE SERVER'S WORLD": "VSTÚPIŤ DO SVETA SERVERA",
+  "PLAY A WORLD ALONE": "HRAŤ SVET SÁM",
+  "A persistent world grows as players arrive; each newcomer gets a base of their own. Type ws://server/world above to enter a server's world, or play one alone. Early preview: you see and command your units, but production and combat effects are not shown yet.": "Trvalý svet rastie s príchodom hráčov; každý nováčik dostane vlastnú základňu. Napíš hore ws://server/world a vstúp do sveta servera, alebo hraj svet sám. Skorá ukážka: svoje jednotky vidíš a velíš im, výroba a efekty boja sa zatiaľ nezobrazujú."
 }

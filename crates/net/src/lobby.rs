@@ -404,7 +404,7 @@ impl NetLobby {
         self.changed = true;
     }
 
-    fn fail(&mut self, reason: String) {
+    pub fn fail(&mut self, reason: String) {
         self.enter(LobbyPhase::Failed(reason));
     }
 

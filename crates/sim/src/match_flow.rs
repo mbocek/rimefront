@@ -44,6 +44,11 @@ pub struct MatchRules {
     pub starting_forces: bool,
 }
 
+/// The battle is a copy of a world that runs elsewhere: its rules do not run here, and its units and
+/// structures come and go as the world shows them, with the world's ids.
+#[derive(Resource)]
+pub struct MirroredBattle;
+
 /// A saved game is about to replace the level's starting forces, so they are not deployed.
 #[derive(Resource)]
 pub struct RestoringSave;
@@ -228,6 +233,7 @@ pub fn deploy_level_forces(
     level: Res<ActiveLevel>,
     rules: Res<MatchRules>,
     restoring: Option<Res<RestoringSave>>,
+    mirrored: Option<Res<MirroredBattle>>,
     mut map: ResMut<GameMap>,
     mut economies: ResMut<Economies>,
     mut production: ResMut<Production>,
@@ -237,7 +243,7 @@ pub fn deploy_level_forces(
     let forbidden = forbidden_items(level);
     production.forbid_to_every_side(forbidden);
     production.set_player_faction(level.player_faction);
-    if restoring.is_some() {
+    if restoring.is_some() || mirrored.is_some() {
         return;
     }
 

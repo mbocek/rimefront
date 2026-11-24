@@ -249,7 +249,19 @@ impl Plugin for SimulationPlugin {
                         .chain(),
                 )
                     .chain()
-                    .in_set(TickStep::Rules),
+                    .in_set(TickStep::Rules)
+                    .run_if(not(resource_exists::<match_flow::MirroredBattle>)),
+            )
+            .add_systems(
+                FixedUpdate,
+                (
+                    economy::tally_power,
+                    intel::update_intel,
+                    combat::snapshot_targets,
+                )
+                    .chain()
+                    .in_set(TickStep::Rules)
+                    .run_if(resource_exists::<match_flow::MirroredBattle>),
             )
             .add_systems(
                 FixedUpdate,

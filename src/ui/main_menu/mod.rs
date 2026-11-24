@@ -30,6 +30,7 @@ use crate::missions::levels::{
     SkirmishOptions, TechLevel, Weather, custom_levels, save_custom_level,
 };
 use crate::net::lobby::{MOST_PLAYERS, NetLobby, network_level};
+use crate::net::world_client::WorldClient;
 use crate::sim::catalog::Team;
 use crate::sim::catalog::{Alliance, Faction};
 use crate::ui::sidebar::{

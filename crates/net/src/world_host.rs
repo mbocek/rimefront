@@ -195,9 +195,11 @@ impl WorldHost {
                     return;
                 };
                 player.team = Some(team);
+                let map_seed = self.app.world().resource::<ActiveLevel>().0.map_seed;
                 player.connection.send(&Message::Entered {
                     team,
                     tick: self.tick(),
+                    map_seed,
                 });
             }
             (Message::Orders { commands }, Some(team)) => {

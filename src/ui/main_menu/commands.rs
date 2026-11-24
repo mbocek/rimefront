@@ -23,6 +23,8 @@ pub enum MenuCommand {
     HostNetworkBattle,
     JoinNetworkBattle,
     OpenServerRoom,
+    PlayWorldAlone,
+    EnterServerWorld,
     AcceptNetworkOffer,
     StartNetworkBattle,
     CancelNetworkBattle,
@@ -169,6 +171,13 @@ pub(super) fn run_command(
                 players,
             );
         }
+        MenuCommand::PlayWorldAlone => {
+            commands.insert_resource(WorldClient::alone(rand::rng().random()));
+        }
+        MenuCommand::EnterServerWorld => match WorldClient::on_server(&settings.join_address) {
+            Ok(client) => commands.insert_resource(client),
+            Err(reason) => lobby.fail(reason),
+        },
         MenuCommand::AcceptNetworkOffer => lobby.accept_offer(),
         MenuCommand::StartNetworkBattle => lobby.start_battle(),
         MenuCommand::CancelNetworkBattle => lobby.cancel(),

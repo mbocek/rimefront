@@ -15,6 +15,7 @@ use crate::app::savegame::SaveRequests;
 use crate::missions::levels::{
     ActiveLevel, LevelDefinition, SkirmishOptions, campaign, custom_levels,
 };
+use crate::net::world_client::WorldClient;
 use crate::sim::catalog::Team;
 use crate::sim::components::{Selected, Unit};
 use crate::ui::map_editor::open_map_editor;
@@ -57,6 +58,9 @@ const CAPTURE_OPEN_ROOM_VAR: &str = "IRON_TIDE_CAPTURE_OPEN_ROOM";
 /// `IRON_TIDE_CAPTURE_CLAIM_SITES=6` gives out that many starting sites of a wilds level two seconds in,
 /// widening the world as it would for newcomers.
 const CAPTURE_CLAIM_SITES_VAR: &str = "IRON_TIDE_CAPTURE_CLAIM_SITES";
+/// `IRON_TIDE_CAPTURE_WORLD=29` plays the world grown from that seed, run by the game itself;
+/// `IRON_TIDE_CAPTURE_WORLD=ws://host:port/world` enters a server's world.
+const CAPTURE_WORLD_VAR: &str = "IRON_TIDE_CAPTURE_WORLD";
 const LOAD_AFTER_SECS: f32 = 1.5;
 /// A hosting capture run starts the battle only after this, so spectators can join too.
 const HOST_WAITS_FOR_GUESTS_SECS: f32 = 10.0;
@@ -437,6 +441,14 @@ fn start_requested_mission(
     }
     if let Ok(address) = std::env::var(CAPTURE_JOIN_VAR) {
         lobby.join(&address);
+        return;
+    }
+    if let Ok(world) = std::env::var(CAPTURE_WORLD_VAR) {
+        let client = match world.parse() {
+            Ok(map_seed) => WorldClient::alone(map_seed),
+            Err(_) => WorldClient::on_server(&world).expect("the server's world can be reached"),
+        };
+        commands.insert_resource(client);
         return;
     }
     if let Ok(address) = std::env::var(CAPTURE_OPEN_ROOM_VAR) {

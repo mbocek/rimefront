@@ -101,6 +101,23 @@ pub(super) fn spawn_network_details(
             14.0,
             TEXT_DIM,
         ));
+        spawn_command_button(
+            panel,
+            fonts,
+            tr("ENTER THE SERVER'S WORLD"),
+            MenuCommand::EnterServerWorld,
+        );
+        spawn_command_button(
+            panel,
+            fonts,
+            tr("PLAY A WORLD ALONE"),
+            MenuCommand::PlayWorldAlone,
+        );
+        panel.spawn(fonts.text(
+            tr("A persistent world grows as players arrive; each newcomer gets a base of their own. Type ws://server/world above to enter a server's world, or play one alone. Early preview: you see and command your units, but production and combat effects are not shown yet."),
+            14.0,
+            TEXT_DIM,
+        ));
     }
     panel.spawn((NetworkStatusText, fonts.text("", 16.0, GOOD)));
     if lobby.is_hosting() {

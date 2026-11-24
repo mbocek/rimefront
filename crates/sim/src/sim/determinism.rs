@@ -63,6 +63,11 @@ impl SimEntities {
     pub fn get(&self, id: SimId) -> Option<Entity> {
         self.0.get(&id).copied()
     }
+
+    /// Records an id given elsewhere, for a battle that mirrors a world.
+    pub fn adopt(&mut self, id: SimId, entity: Entity) {
+        self.0.insert(id, entity);
+    }
 }
 
 pub fn forget_removed_entity(
@@ -92,10 +97,14 @@ pub struct Registry<'w, 's> {
     ids: ResMut<'w, SimIds>,
     entities: ResMut<'w, SimEntities>,
     commands: Commands<'w, 's>,
+    mirrored: Option<Res<'w, crate::match_flow::MirroredBattle>>,
 }
 
 impl Registry<'_, '_> {
     fn number(&mut self, entity: Entity) {
+        if self.mirrored.is_some() {
+            return;
+        }
         let id = SimId(self.ids.next);
         self.ids.next += 1;
         self.entities.0.insert(id, entity);

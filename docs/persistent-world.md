@@ -234,8 +234,17 @@ for ordinary network matches.
     A player's `WorldMirror` applies them, and a test checks that after a minute it holds exactly what the
     world shows that side, the computer side's Command Center not among it. Measured in that test, as JSON:
     a minute of a quiet start costs 6 kB, and a tank driving costs 41 kB in 10 s, about 4 kB/s for every
-    moving unit, so a compact binary format (step 15) is due before crowds. The game drawing a mirror is
-    still to do.
+    moving unit, so a compact binary format (step 15) is due before crowds.
+    The game plays a world too (`net::world_client`): *Play a world alone* on the network page runs a
+    `WorldHost` on a thread of the game's own, *Enter the server's world* connects to `ws://server/world`.
+    Once the world lets the player in, the game starts a battle on the world's map and seed as a
+    `MirroredBattle`: the simulation's rules do not run, only fog, intel and targets, and every tick the units
+    and structures the world showed appear, move and go with the world's ids, so selection, orders, the fog
+    and the minimap work as in any battle; the player's orders go to the world instead of the queue. A test
+    (`tests/world_client.rs`) enters a world run on its own thread and drives a tank there;
+    `IRON_TIDE_CAPTURE_WORLD=29` (or a server address) captures one. Not mirrored yet: production queues,
+    research, power and support charge (the sidebar shows the game's own, empty), projectiles and blasts,
+    structures under construction, crystal mined away, and enemy structures once out of sight.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.

@@ -102,6 +102,7 @@ pub enum Message {
     Entered {
         team: Team,
         tick: u64,
+        map_seed: u64,
     },
     /// From a world: what changed in what its player sees.
     WorldView(Box<ViewChange>),

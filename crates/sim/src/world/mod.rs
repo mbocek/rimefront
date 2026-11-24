@@ -4,6 +4,7 @@ pub mod map_edits;
 pub mod map_regions;
 pub mod scenery;
 pub mod season;
+pub mod sites;
 pub mod terrain;
 pub mod weather;
 pub mod wilds;

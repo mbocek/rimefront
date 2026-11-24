@@ -17,12 +17,15 @@ use crate::world::scenery::{
     MAX_MEADOW_DIRT, MIXED_FOREST, ROCKS, SceneryLayout, block_cell_with_prop, cover_mountains,
     pick, place_decor,
 };
+use crate::world::sites::{sites_around, sites_within};
 use crate::world::terrain::{GroundLayers, Landscape};
 
 /// Share of chunks with a crystal field of their own, besides the one beside each base.
 const FIELD_CHANCE: f64 = 0.4;
 const HOME_FIELD_OFFSET: f32 = 7.5;
 const HOME_FIELD_RADIUS: f32 = 3.6;
+/// Own fields keep this far from a base or a starting site, and its surroundings stay open half as far.
+const BASE_CLEARANCE: f32 = 18.0;
 const FIELD_RADIUS: std::ops::Range<f32> = 2.6..4.2;
 /// A field's centre stays this far inside its chunk, so it reaches no further than the next chunk.
 const FIELD_MARGIN: i32 = 5;
@@ -58,6 +61,7 @@ pub fn generate_wilds(
     let mut outlands = StdRng::seed_from_u64(map_seed ^ OUTLANDS_SALT);
     cover_mountains(scenery, Landscape::Wilds, &mut outlands);
     let mut fields = home_fields();
+    fields.extend(sites_within(map_seed, bounds).into_iter().map(site_field));
     fields.extend(own_fields_among(
         map_seed,
         (0..bounds.chunk_count()).map(|index| bounds.chunk_at(index)),
@@ -104,8 +108,12 @@ pub fn widen_world(world: &mut World, wider: MapBounds) {
     });
     world.flush();
     world.resource_mut::<Intel>().widen(wider);
-    let new_fields: Vec<CrystalField> =
-        own_fields_among(map_seed, new_chunks.into_iter()).collect();
+    let old_sites = sites_within(map_seed, narrow);
+    let new_sites = sites_within(map_seed, wider)
+        .into_iter()
+        .filter(|site| !old_sites.contains(site));
+    let mut new_fields: Vec<CrystalField> = new_sites.map(site_field).collect();
+    new_fields.extend(own_fields_among(map_seed, new_chunks.into_iter()));
     world.resource_mut::<CrystalFields>().0.extend(new_fields);
 }
 
@@ -117,8 +125,9 @@ pub fn generate_chunk(
     map_seed: u64,
     chunk: IVec2,
 ) {
-    let fields = fields_reaching(map_seed, chunk);
     let (first, last) = map_bounds().cells_of_chunk(chunk);
+    let sites: Vec<IVec2> = sites_around(map_seed, (first + last) / 2).collect();
+    let fields = fields_reaching(map_seed, chunk, &sites);
     for cell in cells_between(first, last) {
         let amount = crystal_at(map, &fields, cell);
         if amount > 0 {
@@ -126,11 +135,12 @@ pub fn generate_chunk(
             spawn_crystal_visual(commands, &mut crystal_look(map_seed, cell), cell, amount);
         }
     }
-    let mut rng = chunk_rng(map_seed ^ SCENERY_SALT, chunk);
+    let mut rng = coordinate_rng(map_seed ^ SCENERY_SALT, chunk);
     let mut chunk_scenery = ChunkScenery {
         scenery,
         map,
         fields: &fields,
+        sites: &sites,
         first,
         last,
     };
@@ -144,14 +154,15 @@ fn cells_between(first: IVec2, last: IVec2) -> impl Iterator<Item = IVec2> {
     (first.y..=last.y).flat_map(move |y| (first.x..=last.x).map(move |x| IVec2::new(x, y)))
 }
 
-fn chunk_rng(seed: u64, chunk: IVec2) -> StdRng {
+/// A random sequence fixed for each coordinate of a grid: a chunk, a cell or a square of sites.
+pub(crate) fn coordinate_rng(seed: u64, chunk: IVec2) -> StdRng {
     let key = ((chunk.x as u32 as u64) << 32) | chunk.y as u32 as u64;
     StdRng::seed_from_u64(seed ^ key.wrapping_mul(0x9e37_79b9_7f4a_7c15))
 }
 
 /// Each crystal looks the same however its chunk came to be generated.
 fn crystal_look(map_seed: u64, cell: IVec2) -> StdRng {
-    chunk_rng(map_seed ^ CRYSTAL_LOOK_SALT, cell)
+    coordinate_rng(map_seed ^ CRYSTAL_LOOK_SALT, cell)
 }
 
 /// A field beside every base, where the standard map has the player's: diagonally towards the middle of the
@@ -174,7 +185,7 @@ fn home_fields() -> Vec<CrystalField> {
 /// The field a chunk has of its own, if any; never beside a base, where the home fields are. It does not
 /// depend on the map's bounds, so a chunk at the edge has its neighbour's crystal before the map widens there.
 fn own_field(map_seed: u64, chunk: IVec2) -> Option<CrystalField> {
-    let mut rng = chunk_rng(map_seed ^ FIELDS_SALT, chunk);
+    let mut rng = coordinate_rng(map_seed ^ FIELDS_SALT, chunk);
     if !rng.random_bool(FIELD_CHANCE) {
         return None;
     }
@@ -183,13 +194,25 @@ fn own_field(map_seed: u64, chunk: IVec2) -> Option<CrystalField> {
         + IVec2::new(rng.random_range(inside.clone()), rng.random_range(inside));
     let radius = rng.random_range(FIELD_RADIUS);
     let clear_of_bases = base_sites()
-        .iter()
-        .all(|site| (center - *site).as_vec2().length() > 2.0 * 9.0);
+        .into_iter()
+        .chain(sites_around(map_seed, center))
+        .all(|site| (center - site).as_vec2().length() > BASE_CLEARANCE);
     clear_of_bases.then_some(CrystalField { center, radius })
 }
 
-fn fields_reaching(map_seed: u64, chunk: IVec2) -> Vec<CrystalField> {
+/// The home field beside a generated starting site, set like a level base's: towards the level's middle.
+fn site_field(site: IVec2) -> CrystalField {
+    let base_middle = site.as_vec2() + Vec2::splat(1.5);
+    let towards_middle = (level_bounds().center_cells() - base_middle).signum() * HOME_FIELD_OFFSET;
+    CrystalField {
+        center: (base_middle + towards_middle).floor().as_ivec2(),
+        radius: HOME_FIELD_RADIUS,
+    }
+}
+
+fn fields_reaching(map_seed: u64, chunk: IVec2, sites: &[IVec2]) -> Vec<CrystalField> {
     let mut fields = home_fields();
+    fields.extend(sites.iter().map(|&site| site_field(site)));
     for dy in -1..=1 {
         for dx in -1..=1 {
             fields.extend(own_field(map_seed, chunk + IVec2::new(dx, dy)));
@@ -239,6 +262,8 @@ struct ChunkScenery<'a> {
     scenery: &'a mut SceneryLayout,
     map: &'a mut GameMap,
     fields: &'a [CrystalField],
+    /// Generated starting sites nearby, whose ground stays open.
+    sites: &'a [IVec2],
     first: IVec2,
     last: IVec2,
 }
@@ -253,6 +278,9 @@ impl ChunkScenery<'_> {
             && self.map.is_buildable(cell)
             && !near_base(cell)
             && !near_field(self.fields, cell)
+            && self.sites.iter().all(|site| {
+                (cell - (*site + IVec2::ONE)).as_vec2().length() >= BASE_CLEARANCE / 2.0
+            })
     }
 
     fn random_cell(&self, rng: &mut StdRng, margin: i32) -> IVec2 {

@@ -181,9 +181,14 @@ for ordinary network matches.
    benchmark the same, one side's fog 0.11 ms instead of 0.15 ms on 256 × 256 cells and 1.6 ms instead of
    1.4 ms on 2048 × 2048. Still to do: the view answering a widening while a match runs (terrain patches,
    minimap, fog texture), and saves of a widened world, whose grids are larger than the level's map.
-10. **Starting sites across the world.** Generated sites, each with a crystal field and buildable ground
-    nearby, spaced out; a new player gets the nearest free one, and the world generates a new ring of chunks
-    when the free sites run low. No mirror symmetry in world mode (duels keep it).
+10. **Starting sites across the world.** Done in the simulation (`world::sites`). A wilds world has at most
+    one starting site in every square of 64 × 64 cells, from the map seed and the square's coordinate alone,
+    on dry ground 40 cells or more from the level's own bases; each has a home field and open ground around
+    it. `claim_starting_site` gives a newcomer the free site nearest a point and, when fewer than three would
+    be left free, widens the world by a ring of squares first. The level's sides keep the bases it names. A
+    test gives out ten sites on a standard wilds map: all different, apart, on open ground, with crystal at
+    hand and reachable from the first base, the world having widened. Still to do: the view following a
+    widening during a match.
 11. **Sides as data.** Replace the four fixed teams with a side id: name, colour, allies; the interface,
     intel, fog and AI keep one entry per side present.
 

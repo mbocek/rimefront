@@ -307,24 +307,30 @@ pub struct DisplayPlugin;
 
 impl Plugin for DisplayPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(settings::load_settings())
-            .add_systems(Last, frame_pacing::pace_frames)
-            .add_systems(Update, graphics::fit_shadows_to_zoom)
-            .add_systems(Update, settings::apply_language)
-            .add_systems(
-                Update,
-                settings::persist_settings.run_if(in_state(match_flow::GameState::MainMenu)),
-            )
-            .add_plugins((
-                bevy::diagnostic::FrameTimeDiagnosticsPlugin::default(),
-                bevy::diagnostic::SystemInformationDiagnosticsPlugin,
-                bevy::diagnostic::EntityCountDiagnosticsPlugin::default(),
-                bevy::render::diagnostic::RenderDiagnosticsPlugin,
-                capture::CapturePlugin,
-                MaterialPlugin::<terrain_material::TerrainMaterial>::default(),
-                MaterialPlugin::<terrain_material::WaterMaterial>::default(),
-                MaterialPlugin::<motion_material::MovingMaterial>::default(),
-            ));
+        let settings = settings::load_settings();
+        // Audio takes the global volume only when it starts, so music started before the first update
+        // would keep playing at full volume, capture runs included.
+        app.insert_resource(bevy::audio::GlobalVolume::new(sound::master_volume(
+            &settings,
+        )))
+        .insert_resource(settings)
+        .add_systems(Last, frame_pacing::pace_frames)
+        .add_systems(Update, graphics::fit_shadows_to_zoom)
+        .add_systems(Update, settings::apply_language)
+        .add_systems(
+            Update,
+            settings::persist_settings.run_if(in_state(match_flow::GameState::MainMenu)),
+        )
+        .add_plugins((
+            bevy::diagnostic::FrameTimeDiagnosticsPlugin::default(),
+            bevy::diagnostic::SystemInformationDiagnosticsPlugin,
+            bevy::diagnostic::EntityCountDiagnosticsPlugin::default(),
+            bevy::render::diagnostic::RenderDiagnosticsPlugin,
+            capture::CapturePlugin,
+            MaterialPlugin::<terrain_material::TerrainMaterial>::default(),
+            MaterialPlugin::<terrain_material::WaterMaterial>::default(),
+            MaterialPlugin::<motion_material::MovingMaterial>::default(),
+        ));
     }
 }
 

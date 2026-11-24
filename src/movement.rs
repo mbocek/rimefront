@@ -7,6 +7,7 @@ use crate::levels::ActiveLevel;
 use crate::map::{CELL_SIZE, GameMap, cell_center, in_far_half, world_to_cell};
 use crate::sim_math;
 use crate::sorties::Sortie;
+use crate::spatial_index::SpatialIndex;
 
 const WAYPOINT_REACHED_DISTANCE: f32 = 0.2;
 /// Two vehicles heading for the same waypoint from opposite sides push each other off it for ever,
@@ -211,12 +212,20 @@ pub fn separate_units(
         })
         .collect();
     snapshot.sort_by_key(|unit| unit.0);
+    let mut nearby = SpatialIndex::default();
+    nearby.rebuild(
+        snapshot
+            .iter()
+            .map(|&(_, position, radius, ..)| (position, radius)),
+    );
     let dt = time.delta_secs();
 
     for (&id, mut transform, radius, mobile, is_harvester) in &mut units {
         let commuting = commuting_harvester(mobile, is_harvester);
         let mut push = Vec3::ZERO;
-        for &(other, other_position, other_radius, other_flies, other_commuting) in &snapshot {
+        for &(other, other_position, other_radius, other_flies, other_commuting) in
+            nearby.near(&snapshot, transform.translation, radius.0)
+        {
             if other == id || other_flies != mobile.flying || (commuting && other_commuting) {
                 continue;
             }

@@ -6,6 +6,7 @@
 | `map` | the cell grid (64, 96, 128 or 256 cells a side), terrain with a river and fords, crystals, A* pathfinding that refuses routes between unconnected areas without searching |
 | `spawn` | spawning units and buildings from the glTF models |
 | `movement` | path following, unit separation |
+| `spatial_index` | finding the units and structures near a point without checking all of them |
 | `combat` | target acquisition, chasing, turrets, projectiles, damage |
 | `economy` | credits, power, harvester state machine |
 | `production` | production queues and the rules for where structures and walls may stand |

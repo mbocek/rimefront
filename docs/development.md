@@ -57,6 +57,7 @@ cargo test --release --test missions   # campaign setups, objectives, multiple e
 cargo test --release --test fog        # fog of war: hidden enemies, exploration, spotting, saves
 cargo test --release --test sound      # the simulation asks for the right sounds at the right moments
 cargo test --release --test orders     # attack-move, patrol, waypoint queues, rally points
+cargo test --release --test crowd_bench -- --ignored --nocapture   # simulation time of up to 1920 fighting units
 ```
 
 The playability tests run the real simulation systems (`SimulationPlugin`) without a window: units cross the

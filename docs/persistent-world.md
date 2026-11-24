@@ -32,6 +32,21 @@ The first bridgehead mission as a custom level, 40 s capture runs on an Apple M5
 Four times the area costs about 12 % more CPU and 300 MB more memory with a handful of units: playable, but
 the cost grows with the area even where nothing happens, which is what the steps below remove.
 
+### Measured: the spatial index
+
+`tests/crowd_bench.rs` sets up fights of 80 against 80 units spread over a Vast map and simulates 20 s of
+fighting (two runs each, Apple M5 Pro):
+
+| Units | Before | With the index |
+| --- | --- | --- |
+| 160 (one fight) | 0.07 s, 0.05 s | 0.05 s, 0.04 s |
+| 640 (four fights) | 0.37 s, 0.35 s | 0.24 s, 0.21 s |
+| 1920 (twelve fights) | 2.71 s, 2.79 s | 0.91 s, 0.88 s |
+
+Below 256 bodies the index checks every one, as before: searching buckets for a crowd that small made the
+balance tool about 5 % slower; with the limit its CPU time is the same within noise (40.3 s against 40.0 s,
+averaged over six runs of `balance --matches 20`).
+
 ## Why lockstep cannot carry it
 
 A permanent world never ends, so its order history grows without limit, and a joining player cannot replay it.
@@ -45,9 +60,10 @@ for ordinary network matches.
 ### A. Cost follows activity, not area
 
 1. **Vast map size (256 cells).** Done: `MapSize::Vast`, in the random battle and battle editor.
-2. **Spatial index of units.** A grid of buckets (a few cells each) rebuilt once per tick, iterated in
-   `SimId` order; target choice, separation and the other searches for nearby units ask it for neighbours instead of
-   scanning every unit. Results stay identical, so the fingerprints must not change.
+2. **Spatial index of units.** Done: `SpatialIndex` sorts bodies by 8 m patches of ground once per tick and
+   answers "who may be near" in simulation order. Target choice, splash damage, mines, spotting camouflage
+   and unit separation ask it instead of checking every unit. It works without map bounds, and results are
+   identical: the balance report matches byte for byte and the fingerprints are unchanged.
 3. **Map bounds instead of a size.** Replace `map_cells()` with a `MapBounds` (minimum and maximum cell) that
    code asks for its extent, and stop assuming the map starts at cell zero or is square. The prerequisite for a
    world that can grow.

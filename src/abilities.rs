@@ -84,12 +84,14 @@ pub fn detonate_mines(
             continue;
         }
         let position = transform.translation;
-        let victim = targets.iter().find(|target| {
-            targets.hostile(target.team, mine.team)
-                && !target.is_building
-                && target.armor != ArmorClass::Aircraft
-                && surface_distance(position, target) <= MINE_TRIGGER_DISTANCE
-        });
+        let victim = targets
+            .near(position, MINE_TRIGGER_DISTANCE)
+            .find(|target| {
+                targets.hostile(target.team, mine.team)
+                    && !target.is_building
+                    && target.armor != ArmorClass::Aircraft
+                    && surface_distance(position, target) <= MINE_TRIGGER_DISTANCE
+            });
         let Some(victim) = victim else {
             continue;
         };
@@ -139,7 +141,7 @@ pub fn update_camouflage(
             camouflage.still_secs + dt
         };
         let position = transform.translation;
-        let spotted = targets.iter().any(|other| {
+        let spotted = targets.near(position, SPOTTING_DISTANCE).any(|other| {
             targets.hostile(other.team, team)
                 && surface_distance(position, other) <= SPOTTING_DISTANCE
         });

@@ -21,6 +21,7 @@ use crate::production::Production;
 use crate::research::{incoming_damage_factor, outgoing_damage_factor, reload_factor};
 use crate::sim_math;
 use crate::sound::{Sound, SoundCue};
+use crate::spatial_index::SpatialIndex;
 use crate::transport::Embarked;
 use crate::veterancy::{Rank, Veterancy};
 
@@ -70,6 +71,7 @@ impl TargetInfo {
 pub struct Targets {
     list: Vec<TargetInfo>,
     by_entity: HashMap<Entity, usize>,
+    nearby: SpatialIndex,
     diplomacy: Diplomacy,
 }
 
@@ -80,6 +82,12 @@ impl Targets {
 
     pub fn iter(&self) -> impl Iterator<Item = &TargetInfo> {
         self.list.iter()
+    }
+
+    /// Every target whose surface may lie within `reach` of `from`, in simulation order; a superset, so the
+    /// caller still measures the distance.
+    pub fn near(&self, from: Vec3, reach: f32) -> impl Iterator<Item = &TargetInfo> {
+        self.nearby.near(&self.list, from, reach)
     }
 
     pub fn hostile(&self, team: Team, other: Team) -> bool {
@@ -116,8 +124,7 @@ impl Targets {
                 - WOUNDED_PULL * (1.0 - target.health_fraction)
                 - DANGER_PULL * danger
         };
-        self.list
-            .iter()
+        self.near(from, max_reach)
             .filter(|t| self.hostile(t.team, team) && t.seen_by(team) && weapon.can_hit(t.armor))
             .map(|t| (t, surface_distance(from, t)))
             .filter(|&(_, distance)| distance <= max_reach)
@@ -241,6 +248,8 @@ pub fn snapshot_targets(
             }),
         });
     }
+    let Targets { list, nearby, .. } = &mut *targets;
+    nearby.rebuild(list.iter().map(|target| (target.position, target.radius)));
 }
 
 pub fn acquire_targets(
@@ -609,7 +618,7 @@ fn deal_impact_damage(
     let weapon = projectile.weapon;
     if weapon.splash_radius > 0.0 {
         for victim in targets
-            .iter()
+            .near(impact, weapon.splash_radius)
             .filter(|t| targets.hostile(t.team, projectile.team))
         {
             let distance = surface_distance(impact, victim);

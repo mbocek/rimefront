@@ -83,6 +83,7 @@ pub mod settings;
 pub mod sim_math;
 pub mod sorties;
 pub mod sound;
+pub mod spatial_index;
 pub mod spawn;
 pub mod structure_tools;
 pub mod structures;

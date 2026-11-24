@@ -6,7 +6,7 @@ use crate::catalog::{BuildingKind, Team};
 use crate::levels::{ActiveLevel, LevelDefinition};
 use crate::map::{GameMap, generate_map};
 use crate::map_edits::apply_map_edits;
-use crate::minimap::{PIXELS_PER_CELL, cell_pixel, pixel_image, resolution, terrain_pixels};
+use crate::minimap::{cell_pixel, cell_pixels, pixel_image, resolution, terrain_pixels};
 
 const BASE_OUTLINE: [u8; 3] = [15, 15, 15];
 
@@ -41,7 +41,7 @@ pub fn map_preview(level: &LevelDefinition) -> Image {
 fn mark_base(pixels: &mut [u8], origin: IVec2, team: Team) {
     let color = team.ui_color().to_srgba();
     let fill = [color.red, color.green, color.blue].map(|channel| (channel * 255.0) as u8);
-    let footprint = BuildingKind::CommandCenter.spec().footprint * PIXELS_PER_CELL;
+    let footprint = BuildingKind::CommandCenter.spec().footprint * cell_pixels();
     let corner = cell_pixel(origin);
     let size = resolution().as_ivec2();
     let margin = 2;
@@ -68,7 +68,7 @@ mod tests {
         let preview = map_preview(&level);
         assert_eq!(preview.size(), resolution());
         let pixels = preview.data.as_ref().unwrap();
-        let player_base = cell_pixel(level.player.site.origin()) + IVec2::splat(PIXELS_PER_CELL);
+        let player_base = cell_pixel(level.player.site.origin()) + cell_pixels();
         let at = ((player_base.y * resolution().x as i32 + player_base.x) * 4) as usize;
         let blue = Team::Player.ui_color().to_srgba();
         assert_eq!(pixels[at + 2], (blue.blue * 255.0) as u8);

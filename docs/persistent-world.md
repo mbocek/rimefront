@@ -147,8 +147,13 @@ for ordinary network matches.
 
    The joins still walk every chunk edge; joining only around the changed chunk is the next step if a
    world of 2048 cells sees many structures a second.
-7. **Minimap for a world.** The minimap shows the surroundings of the camera at a fixed scale, with a separate
-   overview downsampled from the chunks.
+7. **Minimap for a world.** Done, as a bounded picture rather than a second view: the minimap is at most
+   768 pixels a side, three pixels a cell up to a Vast map (so those look exactly as before) and less than a
+   pixel a cell beyond, sampling the cell under each pixel's centre. A refresh, five a second with 300
+   viewers revealing the fog, took 1.14 ms on a Vast map and 19.7 ms on 1024 × 1024 cells, uploading
+   38 MB each time; now 0.84 ms, 1.5 ms on 1024 and 2.5 ms on 2048, at most 2.4 MB. A minimap showing the
+   camera's surroundings at a fixed scale is still worth having once the world is large enough that a
+   pixel covers several units' worth of ground.
 
 ### B. A world rather than a stretched map
 

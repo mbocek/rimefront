@@ -17,13 +17,38 @@ use crate::neutral_sites::UnclaimedSite;
 use crate::terrain::GroundLayers;
 use crate::ui::SIDEBAR_WIDTH;
 
-pub const PIXELS_PER_CELL: i32 = 3;
+const MOST_PIXELS_PER_CELL: f32 = 3.0;
+/// The picture's longest side; a larger map gets less than a pixel a cell, so drawing it every refresh
+/// costs no more than a Vast map, the largest drawn at full detail.
+const MOST_PIXELS_PER_SIDE: f32 = 768.0;
+
+pub fn pixels_per_cell() -> f32 {
+    (MOST_PIXELS_PER_SIDE / map_bounds().longest_side() as f32).min(MOST_PIXELS_PER_CELL)
+}
+
 pub fn resolution() -> UVec2 {
-    (map_bounds().size * PIXELS_PER_CELL).as_uvec2()
+    (map_bounds().size.as_vec2() * pixels_per_cell())
+        .ceil()
+        .as_uvec2()
 }
 
 pub fn cell_pixel(cell: IVec2) -> IVec2 {
-    (cell - map_bounds().min) * PIXELS_PER_CELL
+    ((cell - map_bounds().min).as_vec2() * pixels_per_cell())
+        .floor()
+        .as_ivec2()
+}
+
+/// The pixels a cell covers on its own; at least one, so small things stay visible on a large map.
+pub fn cell_pixels() -> IVec2 {
+    IVec2::splat((pixels_per_cell().round() as i32).max(1))
+}
+
+/// The cell under a pixel's centre.
+fn cell_under_pixel(pixel: IVec2) -> IVec2 {
+    map_bounds().min
+        + ((pixel.as_vec2() + 0.5) / pixels_per_cell())
+            .floor()
+            .as_ivec2()
 }
 const REFRESH_SECS: f32 = 0.2;
 const WATER: [u8; 3] = [38, 78, 104];
@@ -55,7 +80,7 @@ pub fn create_minimap(
     });
 }
 
-/// The picture of a map's ground, water, obstacles and crystal, `PIXELS_PER_CELL` per cell.
+/// The picture of a map's ground, water, obstacles and crystal, `pixels_per_cell` per cell.
 pub fn pixel_image(pixels: Vec<u8>) -> Image {
     let mut image = Image::new(
         Extent3d {
@@ -77,11 +102,12 @@ pub fn terrain_pixels(map: &GameMap, level: &LevelDefinition) -> Vec<u8> {
     let ground = GroundLayers::new(landscape);
     let grass = level.season.minimap_grass();
     let map_corner = map_bounds().world_min();
-    let mut terrain = Vec::with_capacity((resolution().element_product() * 4) as usize);
-    for py in 0..resolution().y {
-        for px in 0..resolution().x {
-            let world = map_corner
-                + (Vec2::new(px as f32, py as f32) + 0.5) * (CELL_SIZE / PIXELS_PER_CELL as f32);
+    let metres_per_pixel = CELL_SIZE / pixels_per_cell();
+    let size = resolution();
+    let mut terrain = Vec::with_capacity((size.element_product() * 4) as usize);
+    for py in 0..size.y {
+        for px in 0..size.x {
+            let world = map_corner + (Vec2::new(px as f32, py as f32) + 0.5) * metres_per_pixel;
             let cell = (world / CELL_SIZE).floor().as_ivec2();
             let rgb = if landscape.water_depth(world.x / CELL_SIZE, world.y / CELL_SIZE) > 0.25 {
                 WATER
@@ -132,7 +158,7 @@ impl Canvas<'_> {
 }
 
 fn to_minimap(world: Vec3) -> Vec2 {
-    (world.xz() - map_bounds().world_min()) / CELL_SIZE * PIXELS_PER_CELL as f32
+    (world.xz() - map_bounds().world_min()) / CELL_SIZE * pixels_per_cell()
 }
 
 fn team_rgb(team: Team) -> [u8; 3] {
@@ -144,12 +170,53 @@ fn team_rgb(team: Team) -> [u8; 3] {
     ]
 }
 
+/// The cell under each column and each row of the picture, worked out once a refresh.
+struct CellsUnderPixels {
+    columns: Vec<i32>,
+    rows: Vec<i32>,
+}
+
+impl CellsUnderPixels {
+    fn new() -> Self {
+        let size = resolution().as_ivec2();
+        Self {
+            columns: (0..size.x)
+                .map(|x| cell_under_pixel(IVec2::new(x, 0)).x)
+                .collect(),
+            rows: (0..size.y)
+                .map(|y| cell_under_pixel(IVec2::new(0, y)).y)
+                .collect(),
+        }
+    }
+
+    fn at(&self, pixel: IVec2) -> IVec2 {
+        IVec2::new(self.columns[pixel.x as usize], self.rows[pixel.y as usize])
+    }
+}
+
+/// Marks each cell holding crystal: its middle pixel while a cell has pixels to spare, otherwise the pixels
+/// whose centre it lies under, so a large map costs no more than its picture.
+fn for_each_crystal_mark(under: &CellsUnderPixels, mut mark: impl FnMut(IVec2, IVec2)) {
+    if pixels_per_cell() >= 1.0 {
+        for cell in map_bounds().cells() {
+            mark(cell, cell_pixel(cell) + cell_pixels() / 2);
+        }
+        return;
+    }
+    for (y, _) in under.rows.iter().enumerate() {
+        for (x, _) in under.columns.iter().enumerate() {
+            let pixel = IVec2::new(x as i32, y as i32);
+            mark(under.at(pixel), pixel);
+        }
+    }
+}
+
 /// Black for unexplored ground, dimmed for explored ground the player cannot currently see.
-fn darken_by_fog(pixels: &mut [u8], fog: &FogOfWar) {
+fn darken_by_fog(pixels: &mut [u8], fog: &FogOfWar, under: &CellsUnderPixels) {
+    let width = under.columns.len() as i32;
     for (index, texel) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-        let width = resolution().x as i32;
         let pixel = IVec2::new(index as i32 % width, index as i32 / width);
-        let factor = match fog.sight_at(map_bounds().min + pixel / PIXELS_PER_CELL) {
+        let factor = match fog.sight_at(under.at(pixel)) {
             CellSight::Unexplored => 0.0,
             CellSight::Explored => EXPLORED_BRIGHTNESS,
             CellSight::Visible => continue,
@@ -186,21 +253,22 @@ pub fn redraw_minimap(
     };
     pixels.copy_from_slice(&minimap.terrain);
     let fog = view.sight();
-    darken_by_fog(pixels, fog);
+    let under = CellsUnderPixels::new();
+    darken_by_fog(pixels, fog, &under);
     let mut canvas = Canvas { pixels };
 
-    for cell in map_bounds().cells() {
+    for_each_crystal_mark(&under, |cell, pixel| {
         if map.crystal_at(cell) > 0 && fog.sight_at(cell) != CellSight::Unexplored {
-            canvas.fill(cell_pixel(cell) + 1, IVec2::ONE, CRYSTAL);
+            canvas.put(pixel, CRYSTAL);
         }
-    }
+    });
     for site in &unclaimed_sites {
         let footprint = site.kind.spec().footprint;
         if fog.sight_at(site.origin) == CellSight::Unexplored {
             continue;
         }
         for cell in footprint_cells(site.origin, footprint) {
-            canvas.fill(cell_pixel(cell), IVec2::splat(PIXELS_PER_CELL), UNCLAIMED);
+            canvas.fill(cell_pixel(cell), cell_pixels(), UNCLAIMED);
         }
     }
     for (building, &team, discovered) in &buildings {
@@ -208,11 +276,7 @@ pub fn redraw_minimap(
             continue;
         }
         for cell in footprint_cells(building.origin, building.kind.spec().footprint) {
-            canvas.fill(
-                cell_pixel(cell),
-                IVec2::splat(PIXELS_PER_CELL),
-                team_rgb(team),
-            );
+            canvas.fill(cell_pixel(cell), cell_pixels(), team_rgb(team));
         }
     }
     for (transform, &team) in &units {
@@ -305,6 +369,24 @@ fn jump_camera_to(hit: &HitData, cameras: &mut Query<&mut RtsCamera>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maps_up_to_vast_keep_three_pixels_a_cell_and_larger_ones_a_bounded_picture() {
+        use crate::map::{MapBounds, MapSize, set_map_bounds};
+        for size in MapSize::ALL {
+            set_map_bounds(MapBounds::square(size.cells()));
+            assert_eq!(resolution(), UVec2::splat(size.cells() as u32 * 3));
+            assert_eq!(cell_pixels(), IVec2::splat(3));
+        }
+        set_map_bounds(MapBounds {
+            min: IVec2::new(-30, 10),
+            size: IVec2::new(1024, 600),
+        });
+        assert_eq!(resolution(), UVec2::new(768, 450));
+        let last_pixel = resolution().as_ivec2() - IVec2::ONE;
+        assert_eq!(cell_under_pixel(IVec2::ZERO), map_bounds().min);
+        assert_eq!(cell_under_pixel(last_pixel), map_bounds().max());
+    }
 
     #[test]
     fn a_minimap_hit_points_at_the_same_spot_on_the_map() {

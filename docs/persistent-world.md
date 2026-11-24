@@ -212,7 +212,17 @@ for ordinary network matches.
     into nothing of drawing, sound, the interface or the network, and the network session and saving add
     their systems through the steps of a tick and of a match's start. It builds on Bevy without rendering,
     windows or audio, and the network has a crate of its own on top of it (`crates/net`), so the dedicated
-    server is 3 MB instead of 59 MB and links no renderer.
+    server links no renderer.
+    Done: `iron_tide_net::world_host::WorldHost` runs a wilds world (`world_level`) without drawing, on the
+    thread that made it, and takes its players through `WorldConnection`s: a network `Link`, or a
+    `local_connection` within one process. A player sends `EnterWorld` and gets `Entered` with their side:
+    the first takes the level's own side, everyone after a generated site of their own with the usual
+    starting force (`match_flow::deploy_newcomer`); `Orders` from a player run for that player's side only,
+    after the usual command delay. The level's opponents are the world's computer sides until step 16.
+    `iron-tide-server --world SEED` runs one beside the rooms, entered at `ws://host:port/world`; the server
+    is 10 MB now that it links the simulation's systems, and with nobody connected and the computer sides
+    building it used 0.16 s of processor time in 10 s. The game does not run a world yet: it needs the state
+    a client is sent (step 13) to draw one.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.
@@ -232,6 +242,11 @@ Taken on 2026-11-24:
 - **An absent player's base is protected and slowly decays**: no one can attack it while its player is away,
   and after a long absence it falls apart and frees its site (step 14).
 - **Players fight each other**, alone or in alliances; computer sides are only there to fill the world.
+- **The game runs a world too**, for playing alone or hosting friends: the same `WorldHost` on a thread of
+  its own, its player connected through a channel instead of the network, so playing alone goes through the
+  server's code. A world played alone stops when the game does and is saved for next time, so protection
+  and decay only matter for the computer sides there. Missions and skirmishes keep running the simulation
+  in the game itself.
 
 Still open: how many players at once, which sets the server's tick budget and whether the world must later
 be split across several simulations, and how long an absence is before a base starts to decay.

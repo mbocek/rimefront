@@ -17,6 +17,7 @@ use iron_tide_sim::sim::notifications::Notifications;
 use iron_tide_sim::sim::player_commands::{
     CommandQueue, CommandTiming, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
 };
+use iron_tide_sim::sim::sides::PerSide;
 
 pub use crate::link::{Arrival, Dialling, JoinTarget, Link, Side};
 
@@ -92,6 +93,19 @@ pub enum Message {
     },
     /// To a dedicated server: the player who opened the room starts the battle.
     Start,
+    /// To a world: this player wants to enter it.
+    EnterWorld {
+        version: String,
+    },
+    /// From a world: the side the player commands there, and the world's tick when they entered.
+    Entered {
+        team: Team,
+        tick: u64,
+    },
+    /// To a world: what its player ordered; the world decides when it runs.
+    Orders {
+        commands: Vec<PlayerCommand>,
+    },
     /// The other end will not have this connection, and why.
     Refused {
         reason: String,
@@ -135,6 +149,7 @@ pub enum SessionState {
 
 /// Which ticks' turns have arrived from one team, kept as the tick every turn up to which is known plus the few
 /// that arrived ahead of a gap.
+#[derive(Clone)]
 struct ReceivedTurns {
     all_through: u64,
     ahead: BTreeSet<u64>,
@@ -187,8 +202,7 @@ pub struct NetSession {
     remote_teams: Vec<Team>,
     /// This machine only watches: it sends no orders and no fingerprints.
     spectating: bool,
-    /// Indexed by `Team::index`.
-    remote_turns: [ReceivedTurns; Team::ALL.len()],
+    remote_turns: PerSide<ReceivedTurns>,
     local_checksums: BTreeMap<u64, u64>,
     remote_checksums: BTreeMap<(u64, usize), u64>,
     pub state: SessionState,
@@ -241,7 +255,7 @@ impl NetSession {
     pub fn known_through(&self) -> Option<u64> {
         self.remote_teams
             .iter()
-            .map(|team| self.remote_turns[team.index()].latest())
+            .map(|team| self.remote_turns.of(*team).latest())
             .min()
     }
 
@@ -368,7 +382,7 @@ impl NetSession {
             || self
                 .remote_teams
                 .iter()
-                .all(|team| self.remote_turns[team.index()].has(tick))
+                .all(|team| self.remote_turns.of(*team).has(tick))
     }
 
     fn broadcast(&mut self, message: &Message) {
@@ -406,11 +420,11 @@ impl NetSession {
                             command,
                         });
                     }
-                    self.remote_turns[team.index()].record(tick);
+                    self.remote_turns.of_mut(team).record(tick);
                 }
                 Message::CatchUp { through, turns } => {
                     for (team, last) in through {
-                        self.remote_turns[team.index()].record_all_through(last);
+                        self.remote_turns.of_mut(team).record_all_through(last);
                         self.turns_known_through.insert(team.index(), last);
                     }
                     for (team, tick, commands) in turns {
@@ -433,6 +447,9 @@ impl NetSession {
                 }
                 Message::Pong { nonce } => self.answered(nonce),
                 Message::Ping { .. }
+                | Message::EnterWorld { .. }
+                | Message::Entered { .. }
+                | Message::Orders { .. }
                 | Message::Offer { .. }
                 | Message::Ready
                 | Message::Go

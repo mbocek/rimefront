@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::levels::{ActiveLevel, ForceSetup};
+use crate::levels::{ActiveLevel, BaseSite, ForceSetup};
 use crate::sim::ai::{AiCommander, AiCommanders, find_building_site};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::combat::Targets;
@@ -12,9 +12,11 @@ use crate::sim::notifications::{LastAlert, Notifications};
 use crate::sim::outcome::GameOutcome;
 use crate::sim::player_commands::{CommandQueue, SimulationTick};
 use crate::sim::production::{BuildItem, PlacementContext, Production, construct_building};
+use crate::sim::sides::admit_side;
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::sim::veterancy::LastHits;
-use crate::world::map::{GameMap, cell_center, in_far_half};
+use crate::world::map::{GameMap, cell_center, in_far_half, level_bounds};
+use crate::world::sites::claim_starting_site;
 
 #[derive(States, Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GameState {
@@ -131,8 +133,50 @@ fn forbidden_items(level: &crate::levels::LevelDefinition) -> Vec<BuildItem> {
     units.chain(buildings).collect()
 }
 
+/// Where a force stands: its Command Center, where its units line up, and which way they face.
+struct Deployment {
+    base: IVec2,
+    rally_offset: IVec2,
+    facing: f32,
+}
+
+impl Deployment {
+    fn on_level_site(force: &ForceSetup) -> Self {
+        Self {
+            base: force.site.origin(),
+            rally_offset: force.site.rally_offset(),
+            facing: force.site.facing(),
+        }
+    }
+
+    /// On a generated site, lined up like the level base on the same side of the level's centre.
+    fn on_generated_site(base: IVec2) -> Self {
+        let west_of_centre = (base.x as f32) < level_bounds().center_cells().x;
+        let like = if west_of_centre {
+            BaseSite::SouthWest
+        } else {
+            BaseSite::NorthEast
+        };
+        Self {
+            base,
+            rally_offset: like.rally_offset(),
+            facing: like.facing(),
+        }
+    }
+}
+
 fn deploy_force(commands: &mut Commands, map: &mut GameMap, team: Team, force: &ForceSetup) {
-    let base = force.site.origin();
+    deploy_force_at(commands, map, team, force, Deployment::on_level_site(force));
+}
+
+fn deploy_force_at(
+    commands: &mut Commands,
+    map: &mut GameMap,
+    team: Team,
+    force: &ForceSetup,
+    deployment: Deployment,
+) {
+    let base = deployment.base;
     spawn_building(commands, map, BuildingKind::CommandCenter, team, base);
     let mut own_buildings = vec![(base, BuildingKind::CommandCenter.spec().footprint)];
     for &kind in &force.buildings {
@@ -150,7 +194,7 @@ fn deploy_force(commands: &mut Commands, map: &mut GameMap, team: Team, force: &
         own_buildings.push((origin, kind.spec().footprint));
     }
 
-    let rally = base + force.site.rally_offset();
+    let rally = base + deployment.rally_offset;
     let columns = 3;
     let lines_up_westward = in_far_half(base, BuildingKind::CommandCenter.spec().footprint);
     let direction = if lines_up_westward { -1 } else { 1 };
@@ -158,8 +202,24 @@ fn deploy_force(commands: &mut Commands, map: &mut GameMap, team: Team, force: &
         let slot = IVec2::new(i as i32 % columns, i as i32 / columns);
         let wanted = rally + slot * direction;
         let cell = map.nearest_passable(wanted).unwrap_or(wanted);
-        spawn_unit(commands, kind, team, cell_center(cell), force.site.facing());
+        spawn_unit(commands, kind, team, cell_center(cell), deployment.facing);
     }
+}
+
+/// A newcomer to a wilds world: a side of its own, in a camp of its own, on the free starting site nearest
+/// `near`, with the usual starting force and credits. `None` when the world is not a wilds world.
+pub fn deploy_newcomer(world: &mut World, near: IVec2) -> Option<Team> {
+    let site = claim_starting_site(world, near)?;
+    let team = admit_side(world);
+    let force = ForceSetup::default();
+    world.resource_mut::<Economies>().of_mut(team).credits = force.credits;
+    world.resource_scope(|world, mut map: Mut<GameMap>| {
+        let mut commands = world.commands();
+        let deployment = Deployment::on_generated_site(site);
+        deploy_force_at(&mut commands, &mut map, team, &force, deployment);
+    });
+    world.flush();
+    Some(team)
 }
 
 /// Builds the opening position of the active level: bases, armies, money, opponents and tech limits.

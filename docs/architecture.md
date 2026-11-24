@@ -8,9 +8,9 @@ The code is a Cargo workspace of three crates:
   drawing, sound, the interface or the network, and builds on Bevy without them (`cargo build -p
   iron_tide_sim` compiles no renderer); the compiler keeps it so.
 - **`crates/net` (`iron_tide_net`)** — network battles: the lockstep session (`network`), one connection
-  (`link`), the relay, the lobby and the dedicated server with its binary `iron-tide-server`. It depends on
-  the simulation only, so `cargo build -p iron_tide_net --bin iron-tide-server` builds a 3 MB server with no
-  renderer (a workspace build unifies Bevy's features and makes it as large as the game).
+  (`link`), the relay, the lobby, a persistent world (`world_host`) and the dedicated server with its binary
+  `iron-tide-server`. It depends on the simulation only, so `cargo build -p iron_tide_net --bin
+  iron-tide-server` builds a 10 MB server with no renderer (a workspace build unifies Bevy's features and makes it as large as the game).
 - **the game (`iron_tide`, `src/`)** — everything around it, one directory per domain, and `GamePlugin`. It
   re-exports the simulation's and the network's modules where they always were (`crate::sim`,
   `crate::world`, `missions::levels`, `app::i18n`, `net::network`, …), and the lockstep session (`net::network::LockstepPlugin`) and saving
@@ -79,6 +79,7 @@ The code is a Cargo workspace of three crates:
 | `link` | one WebSocket connection, plain or over TLS, its threads, and the join address |
 | `relay` | the hub of a network battle: passing messages on, the order history, late guests and rejoining players ([server.md](server.md)) |
 | `server` | the dedicated server's rooms: gathering players around an owner's battle, then one relay per room |
+| `world_host` | a persistent world run without drawing: players entering it and their orders, over the network or a channel |
 | `lobby` | hosting and joining a network battle from the main menu |
 
 ## `view` — drawing the battle

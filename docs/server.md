@@ -1,8 +1,10 @@
 # Dedicated server
 
 `iron-tide-server` (`crates/net/src/bin/server.rs`, `make server`) is a dedicated server for network battles: every player
-connects to it, so nobody forwards a port and no player's computer is the hub. It runs no simulation. Hosting
-from the game on a local network works as before.
+connects to it, so nobody forwards a port and no player's computer is the hub. Its battle rooms run no
+simulation. Hosting from the game on a local network works as before. With `--world SEED` it also runs a
+persistent world, entered at `ws://server:47300/world` (see [persistent-world.md](persistent-world.md); the
+game cannot show one yet).
 
 ## Playing through it
 
@@ -39,15 +41,17 @@ before the battle, or when its battle loses a player for good or everyone has go
 reason the game shows translated: no room in the address, a full room, a room name already open, another version.
 
 `tests/server.rs` runs a server on a thread and plays through it from real lobbies: a duel, two rooms kept
-apart, a late spectator and a returning player catching up, an address without a room refused.
+apart, a late spectator and a returning player catching up, an address without a room refused, a player entering the server's world.
 
 ## Still to do
 
 - **Checksums.** Each machine compares the checksums it receives with its own; the server sees all of them and
   could decide alone.
-- **Limits.** Rooms per server and idle rooms. The binary is small (3 MB) when built on its own,
+- **Limits.** Rooms per server and idle rooms. The binary is small (10 MB) when built on its own,
   `cargo build --release -p iron_tide_net --bin iron-tide-server`; a workspace build gives it the game's
   Bevy features and the game's size.
+- **A world on its own thread.** A world lives on the thread that made it (map queries are per thread), so
+  `Server::with_world` must be called on the thread that steps the server.
 - **The owner changing the battle** after opening the room, as a host in the game can.
 
 ## Deployment sketch

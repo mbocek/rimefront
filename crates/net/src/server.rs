@@ -1,22 +1,28 @@
 use std::collections::HashMap;
 use std::net::TcpListener;
+use std::time::Instant;
 
 use crate::lobby::MOST_PLAYERS;
 use crate::network::{Arrival, Link, MOST_SPECTATORS, Message};
 use crate::relay::Relay;
+use crate::world_host::WorldHost;
 use iron_tide_sim::levels::LevelDefinition;
 use iron_tide_sim::sim::catalog::Team;
 
 const ROOM_PATH: &str = "/room/";
+const WORLD_PATH: &str = "/world";
 
 /// A dedicated server: every player connects to it and it runs one `Relay` per room, so nobody forwards a
 /// port and no player's computer is the hub. A room is named by the path players connect to,
-/// `ws://host/room/NAME`; whoever sends it a battle first owns it. See docs/server.md.
+/// `ws://host/room/NAME`; whoever sends it a battle first owns it. It may also run a persistent world, which
+/// players enter at `ws://host/world`. See docs/server.md.
 pub struct Server {
     listener: TcpListener,
     /// Connections whose handshake has not yet said which room they want.
     arriving: Vec<Link>,
     rooms: HashMap<String, Room>,
+    world: Option<WorldHost>,
+    last_step: Instant,
 }
 
 enum Room {
@@ -52,7 +58,16 @@ impl Server {
             listener,
             arriving: Vec::new(),
             rooms: HashMap::new(),
+            world: None,
+            last_step: Instant::now(),
         })
+    }
+
+    /// Runs a world grown from `map_seed` beside the rooms.
+    pub fn with_world(listener: TcpListener, map_seed: u64) -> std::io::Result<Self> {
+        let mut server = Self::new(listener)?;
+        server.world = Some(WorldHost::new(map_seed));
+        Ok(server)
     }
 
     pub fn room_count(&self) -> usize {
@@ -61,6 +76,11 @@ impl Server {
 
     /// Takes in new connections and moves every room along; call it often.
     pub fn step(&mut self) {
+        let elapsed = self.last_step.elapsed();
+        self.last_step = Instant::now();
+        if let Some(world) = &mut self.world {
+            world.step(elapsed);
+        }
         while let Ok((stream, _)) = self.listener.accept() {
             if stream.set_nonblocking(false).is_ok()
                 && let Ok(link) = Link::host_side(stream)
@@ -99,6 +119,13 @@ impl Server {
     }
 
     fn route(&mut self, link: Link, path: &str) {
+        if path == WORLD_PATH {
+            match &mut self.world {
+                Some(world) => world.connect(Box::new(link)),
+                None => link.refuse("This server runs no world"),
+            }
+            return;
+        }
         let Some(name) = path.strip_prefix(ROOM_PATH).filter(|name| !name.is_empty()) else {
             link.refuse("Join a room: ws://server/room/NAME");
             return;

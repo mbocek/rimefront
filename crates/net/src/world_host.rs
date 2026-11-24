@@ -1,0 +1,301 @@
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::time::Duration;
+
+use bevy::prelude::*;
+use bevy::time::TimeUpdateStrategy;
+
+use crate::network::{Arrival, Link, Message};
+use iron_tide_sim::SimulationPlugin;
+use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
+use iron_tide_sim::match_flow::{GameState, deploy_newcomer};
+use iron_tide_sim::sim::catalog::Team;
+use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
+use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
+use iron_tide_sim::world::map::{GameMap, base_sites};
+use iron_tide_sim::world::terrain::Landscape;
+
+/// A connection to one player of a world: a network link, or a channel when the game runs the world itself.
+pub trait WorldConnection: Send {
+    /// False once the connection has gone.
+    fn send(&self, message: &Message) -> bool;
+    fn drain(&mut self) -> Vec<Arrival>;
+}
+
+impl WorldConnection for Link {
+    fn send(&self, message: &Message) -> bool {
+        Link::send(self, message)
+    }
+
+    fn drain(&mut self) -> Vec<Arrival> {
+        Link::drain(self)
+    }
+}
+
+/// One end of a connection within this machine, for a world the game runs on a thread of its own.
+pub struct LocalConnection {
+    outbox: Sender<Message>,
+    inbox: Receiver<Message>,
+}
+
+/// Two ends of a connection within this machine: one for the player, one for the world.
+pub fn local_connection() -> (LocalConnection, LocalConnection) {
+    let (to_world, from_player) = channel();
+    let (to_player, from_world) = channel();
+    (
+        LocalConnection {
+            outbox: to_world,
+            inbox: from_world,
+        },
+        LocalConnection {
+            outbox: to_player,
+            inbox: from_player,
+        },
+    )
+}
+
+impl WorldConnection for LocalConnection {
+    fn send(&self, message: &Message) -> bool {
+        self.outbox.send(message.clone()).is_ok()
+    }
+
+    fn drain(&mut self) -> Vec<Arrival> {
+        let mut arrivals: Vec<Arrival> = self.inbox.try_iter().map(Arrival::Message).collect();
+        if matches!(
+            self.inbox.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Disconnected)
+        ) {
+            arrivals.push(Arrival::ConnectionLost);
+        }
+        arrivals
+    }
+}
+
+struct WorldPlayer {
+    connection: Box<dyn WorldConnection>,
+    /// None until the player has asked to enter.
+    team: Option<Team>,
+}
+
+/// A persistent world: the simulation of a wilds world run without drawing anything, its players' orders
+/// taken from their connections. The dedicated server runs one, and the game runs one on a thread of its own
+/// for a world played alone. Map queries are per thread, so a world lives on the thread that made it.
+pub struct WorldHost {
+    app: App,
+    players: Vec<WorldPlayer>,
+    level_side_taken: bool,
+}
+
+impl WorldHost {
+    pub fn new(map_seed: u64) -> Self {
+        let level = world_level(map_seed);
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::ZERO))
+            .insert_resource(ActiveLevel(level))
+            .add_plugins(SimulationPlugin::default());
+        run_schedules_on_one_thread(&mut app);
+        let startup_frame_limit = 10;
+        for _ in 0..startup_frame_limit {
+            let state = *app.world().resource::<State<GameState>>().get();
+            if state == GameState::Playing && app.world().contains_resource::<GameMap>() {
+                break;
+            }
+            app.world_mut()
+                .resource_mut::<NextState<GameState>>()
+                .set(GameState::Playing);
+            app.update();
+        }
+        assert!(
+            app.world().contains_resource::<GameMap>(),
+            "the world never started"
+        );
+        Self {
+            app,
+            players: Vec::new(),
+            level_side_taken: false,
+        }
+    }
+
+    pub fn world(&mut self) -> &mut World {
+        self.app.world_mut()
+    }
+
+    pub fn tick(&self) -> u64 {
+        self.app.world().resource::<SimulationTick>().0
+    }
+
+    pub fn player_count(&self) -> usize {
+        self.players.len()
+    }
+
+    pub fn connect(&mut self, connection: Box<dyn WorldConnection>) {
+        self.players.push(WorldPlayer {
+            connection,
+            team: None,
+        });
+    }
+
+    /// Takes in what the players sent, then lets `elapsed` of time pass in the world.
+    pub fn step(&mut self, elapsed: Duration) {
+        self.receive();
+        self.app
+            .insert_resource(TimeUpdateStrategy::ManualDuration(elapsed));
+        self.app.update();
+    }
+
+    fn receive(&mut self) {
+        let mut players = std::mem::take(&mut self.players);
+        players.retain_mut(|player| {
+            let mut connected = true;
+            for arrival in player.connection.drain() {
+                match arrival {
+                    Arrival::Message(message) => self.answer(player, message),
+                    Arrival::ConnectionLost => connected = false,
+                }
+            }
+            connected
+        });
+        self.players = players;
+    }
+
+    fn answer(&mut self, player: &mut WorldPlayer, message: Message) {
+        match (message, player.team) {
+            (Message::EnterWorld { version }, None) => {
+                if version != env!("CARGO_PKG_VERSION") {
+                    player.connection.send(&Message::Refused {
+                        reason: format!("The world runs version {}", env!("CARGO_PKG_VERSION")),
+                    });
+                    return;
+                }
+                let Some(team) = self.side_for_newcomer() else {
+                    player.connection.send(&Message::Refused {
+                        reason: "The world has no room for you".into(),
+                    });
+                    return;
+                };
+                player.team = Some(team);
+                player.connection.send(&Message::Entered {
+                    team,
+                    tick: self.tick(),
+                });
+            }
+            (Message::Orders { commands }, Some(team)) => {
+                let world = self.app.world_mut();
+                let now = *world.resource::<SimulationTick>();
+                let mut queue = world.resource_mut::<CommandQueue>();
+                for command in commands {
+                    queue.issue(now, team, command);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The first player takes the level's own side; everyone after a generated site of their own.
+    fn side_for_newcomer(&mut self) -> Option<Team> {
+        if !self.level_side_taken {
+            self.level_side_taken = true;
+            return Some(Team::Player);
+        }
+        let first_base = base_sites()[0];
+        deploy_newcomer(self.app.world_mut(), first_base)
+    }
+}
+
+/// The level a world grows from: a wilds landscape around the usual four bases.
+pub fn world_level(map_seed: u64) -> LevelDefinition {
+    LevelDefinition {
+        name: "World".into(),
+        map_seed,
+        landscape: Landscape::Wilds,
+        ..LevelDefinition::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iron_tide_sim::SIMULATION_TICK;
+    use iron_tide_sim::sim::catalog::UnitKind;
+    use iron_tide_sim::sim::components::Unit;
+    use iron_tide_sim::sim::determinism::SimId;
+    use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
+
+    fn entered(player: &mut LocalConnection) -> Option<Team> {
+        player
+            .drain()
+            .into_iter()
+            .find_map(|arrival| match arrival {
+                Arrival::Message(Message::Entered { team, .. }) => Some(team),
+                _ => None,
+            })
+    }
+
+    fn enter(host: &mut WorldHost) -> (LocalConnection, Team) {
+        let (mut player, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        player.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+        });
+        host.step(SIMULATION_TICK);
+        let team = entered(&mut player).expect("the world let the player in");
+        (player, team)
+    }
+
+    #[test]
+    fn players_enter_a_world_on_sides_of_their_own_and_command_them() {
+        let mut host = WorldHost::new(29);
+        let (_first, first_team) = enter(&mut host);
+        let (second, second_team) = enter(&mut host);
+        assert_eq!(first_team, Team::Player);
+        assert_eq!(second_team, Team::from_index(4));
+
+        let world = host.world();
+        let (tank, id, start) = world
+            .query::<(Entity, &Unit, &Team, &SimId, &Transform)>()
+            .iter(world)
+            .find(|(_, unit, team, ..)| **team == second_team && unit.0 == UnitKind::Tank)
+            .map(|(entity, _, _, id, transform)| (entity, *id, transform.translation))
+            .expect("the newcomer has a starting tank");
+        let goal = iron_tide_sim::world::map::world_to_cell(start) + IVec2::new(0, 6);
+        second.send(&Message::Orders {
+            commands: vec![PlayerCommand::Ground {
+                units: vec![id],
+                goal,
+                order: GroundOrder::Move,
+                queued: false,
+                refinery: None,
+            }],
+        });
+        for _ in 0..100 {
+            host.step(SIMULATION_TICK);
+        }
+        let moved = host.world().get::<Transform>(tank).unwrap().translation;
+        assert!(moved.distance(start) > 3.0, "the tank stayed at {start}");
+    }
+
+    #[test]
+    fn a_player_of_another_version_is_turned_away() {
+        let mut host = WorldHost::new(29);
+        let (mut player, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        player.send(&Message::EnterWorld {
+            version: "0.0.1".into(),
+        });
+        host.step(SIMULATION_TICK);
+        let refused = player
+            .drain()
+            .into_iter()
+            .any(|arrival| matches!(arrival, Arrival::Message(Message::Refused { .. })));
+        assert!(refused);
+    }
+
+    #[test]
+    fn a_player_who_leaves_is_let_go() {
+        let mut host = WorldHost::new(29);
+        let (player, _) = enter(&mut host);
+        drop(player);
+        host.step(SIMULATION_TICK);
+        assert_eq!(host.player_count(), 0);
+    }
+}

@@ -1,6 +1,6 @@
 mod common;
 
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use common::Battle;
 use iron_tide::missions::levels::{ActiveLevel, LevelDefinition};
 use iron_tide::net::lobby::{BattleStart, NetLobby};
-use iron_tide::net::network::SessionState;
+use iron_tide::net::network::{Arrival, Dialling, Link, Message, SessionState};
 use iron_tide::net::server::Server;
 use iron_tide::sim::catalog::{Team, UnitKind};
 use iron_tide::sim::determinism::simulation_checksum;
@@ -27,10 +27,10 @@ impl RunningServer {
     fn start() -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap().to_string();
-        let mut server = Server::new(listener).unwrap();
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = Arc::clone(&stop);
         std::thread::spawn(move || {
+            let mut server = Server::new(listener).unwrap();
             while !stopping.load(Ordering::Relaxed) {
                 server.step();
                 std::thread::sleep(Duration::from_millis(1));
@@ -254,4 +254,40 @@ fn an_address_without_a_room_is_refused_with_a_reason() {
         }
     }
     panic!("no refusal: {:?}", lobby.status(clock));
+}
+
+#[test]
+fn a_player_enters_the_world_a_server_runs() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stopping = Arc::clone(&stop);
+    std::thread::spawn(move || {
+        let mut server = Server::with_world(listener, 29).unwrap();
+        while !stopping.load(Ordering::Relaxed) {
+            server.step();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    });
+    let dialling = Dialling {
+        url: format!("ws://{address}/world"),
+        trusted: None,
+    };
+    let mut link = Link::guest_side_to(TcpStream::connect(&address).unwrap(), dialling).unwrap();
+    link.send(&Message::EnterWorld {
+        version: env!("CARGO_PKG_VERSION").into(),
+    });
+    let mut entered = None;
+    for _ in 0..5_000 {
+        entered = link.drain().into_iter().find_map(|arrival| match arrival {
+            Arrival::Message(Message::Entered { team, .. }) => Some(team),
+            _ => None,
+        });
+        if entered.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    stop.store(true, Ordering::Relaxed);
+    assert_eq!(entered, Some(Team::Player));
 }

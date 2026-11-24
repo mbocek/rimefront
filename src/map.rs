@@ -33,16 +33,23 @@ pub enum MapSize {
     Standard,
     Large,
     Huge,
+    Vast,
 }
 
 impl MapSize {
-    pub const ALL: [MapSize; 3] = [MapSize::Standard, MapSize::Large, MapSize::Huge];
+    pub const ALL: [MapSize; 4] = [
+        MapSize::Standard,
+        MapSize::Large,
+        MapSize::Huge,
+        MapSize::Vast,
+    ];
 
     pub fn cells(self) -> i32 {
         match self {
             MapSize::Standard => STANDARD_MAP_CELLS,
             MapSize::Large => 96,
             MapSize::Huge => 128,
+            MapSize::Vast => 256,
         }
     }
 }

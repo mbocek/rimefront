@@ -212,7 +212,7 @@ mod tests {
             let options = RandomBattleOptions {
                 opponents: 1 + seed as usize % 3,
                 credits: 12_000,
-                map_size: MapSize::ALL[seed as usize % 3],
+                map_size: MapSize::ALL[seed as usize % MapSize::ALL.len()],
                 ..default()
             };
             let level = generate(&options, seed);

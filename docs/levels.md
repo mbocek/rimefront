@@ -124,7 +124,8 @@ A level file is plain JSON; omitted fields take defaults:
 Landscapes: `River` (a winding river with three fords), `Lake` (a long lake between the bases with one
 causeway across its middle) and `Plains` (open ground without water); all of them are point-symmetric.
 Weather: `Clear` or `Rain` (falling rain, a dimmer sun and sky).
-Map sizes: `Standard` (64 × 64 cells, every campaign mission), `Large` (96 × 96) and `Huge` (128 × 128), also
+Map sizes: `Standard` (64 × 64 cells, every campaign mission), `Large` (96 × 96), `Huge` (128 × 128) and
+`Vast` (256 × 256), also
 in the battle editor. Landscapes, roads and crystal fields are authored for the standard map: on bigger maps
 the bases stay in the corners, crystal fields and road bends near a base keep their distance from it, and
 everything else spreads out from the centre (the fords move apart, the lake grows longer), while the river

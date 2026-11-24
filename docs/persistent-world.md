@@ -47,6 +47,20 @@ Below 256 bodies the index checks every one, as before: searching buckets for a 
 balance tool about 5 % slower; with the limit its CPU time is the same within noise (40.3 s against 40.0 s,
 averaged over six runs of `balance --matches 20`).
 
+### Measured: the fog of war
+
+Recomputing one side's fog from 300 viewers stays cheap at any size (`tests/crowd_bench.rs`): 0.08 ms on
+256 × 256 cells, 0.10 ms on 1024 × 1024, 0.17 ms on 2048 × 2048. Painting the blurred fog texture, four
+texels a cell, did not: the whole texture was painted on every change, up to five times a second. With 300
+viewers moving, per paint:
+
+| Map | Whole texture | Changed chunks |
+| --- | --- | --- |
+| 128 × 128 cells | 1.8 ms | 0.97 ms |
+| 256 × 256 (Vast) | 7.8 ms | 1.18 ms |
+| 512 × 512 | 40.3 ms | 1.03 ms |
+| 1024 × 1024 | 176.5 ms | 1.03 ms |
+
 ## Why lockstep cannot carry it
 
 A permanent world never ends, so its order history grows without limit, and a joining player cannot replay it.
@@ -70,9 +84,13 @@ for ordinary network matches.
    zero nor be square. Unit tests play a shifted, oblong map. Levels still pick a square `MapSize` at the
    origin, and the landscapes are still authored for a square: generation by chunk (step 8) replaces that.
    Results are identical: same fingerprints, same balance report.
-4. **Chunked grids.** `GameMap`, `FogOfWar` and the crystal amounts are stored in chunks of 32 × 32 cells
-   behind the same per-cell API; the fog recomputes only chunks a viewer's sight touches, and remembers which
-   chunks changed so the fog texture uploads only those.
+4. **Changes tracked by chunk.** Done: the map is divided into chunks of 32 × 32 cells (`CHUNK_CELLS`,
+   `MapBounds::chunk_index`), the fog of war remembers the revision each chunk last changed at, and the fog
+   texture repaints only the chunks that changed since it was last painted, exactly as a full repaint would.
+   The grids themselves stay dense over the map bounds: recomputing one side's fog over 2048 × 2048 cells
+   takes 0.17 ms, and a dense grid that size is a few tens of MB, so storing chunks separately pays only once
+   the world must grow while it runs. Still whole: the fog texture's upload to the GPU (16 MB at 1024 cells,
+   part of step 5) and the minimap's fog pass (step 7).
 5. **Terrain and scenery in chunks.** One terrain mesh per chunk with coarser levels of detail by distance,
    culled outside the view; scenery and crystal meshes merged per chunk instead of per map. The far ring stays
    as the backdrop beyond the world's edge.

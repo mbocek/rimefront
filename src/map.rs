@@ -139,6 +139,47 @@ impl MapBounds {
     pub fn spread(self) -> Vec2 {
         (self.size - IVec2::ONE).as_vec2() / (STANDARD_MAP_CELLS - 1) as f32
     }
+
+    fn first_chunk(self) -> IVec2 {
+        chunk_of(self.min)
+    }
+
+    /// How many chunks the map spans along each axis; the last ones may be cut short by the edge.
+    pub fn chunk_span(self) -> IVec2 {
+        chunk_of(self.max()) - self.first_chunk() + IVec2::ONE
+    }
+
+    pub fn chunk_count(self) -> usize {
+        let span = self.chunk_span();
+        (span.x * span.y) as usize
+    }
+
+    pub fn chunk_index(self, chunk: IVec2) -> Option<usize> {
+        let local = chunk - self.first_chunk();
+        let span = self.chunk_span();
+        let inside = local.cmpge(IVec2::ZERO).all() && local.cmplt(span).all();
+        inside.then(|| (local.y * span.x + local.x) as usize)
+    }
+
+    pub fn chunk_at(self, index: usize) -> IVec2 {
+        let index = index as i32;
+        let span = self.chunk_span();
+        self.first_chunk() + IVec2::new(index % span.x, index / span.x)
+    }
+
+    /// The first and last cell of a chunk that lie on the map.
+    pub fn cells_of_chunk(self, chunk: IVec2) -> (IVec2, IVec2) {
+        let first = (chunk * CHUNK_CELLS).max(self.min);
+        let last = (chunk * CHUNK_CELLS + IVec2::splat(CHUNK_CELLS - 1)).min(self.max());
+        (first, last)
+    }
+}
+
+/// Cells along each side of a chunk, the square of map that changes are tracked by.
+pub const CHUNK_CELLS: i32 = 32;
+
+pub fn chunk_of(cell: IVec2) -> IVec2 {
+    cell.div_euclid(IVec2::splat(CHUNK_CELLS))
 }
 
 // The bounds of the map being played. Cell maths runs everywhere, so they are ambient rather than passed
@@ -854,6 +895,27 @@ mod tests {
         assert!(bounds.contains_point(cell_center(bounds.min).xz()));
         assert!(bounds.contains_point(cell_center(bounds.max()).xz()));
         assert!(!bounds.contains_point(bounds.world_max()));
+    }
+
+    #[test]
+    fn chunks_tile_a_shifted_map_without_gaps_or_overlaps() {
+        let bounds = SHIFTED_BOUNDS;
+        let mut covered = vec![0; bounds.area()];
+        for index in 0..bounds.chunk_count() {
+            let chunk = bounds.chunk_at(index);
+            assert_eq!(bounds.chunk_index(chunk), Some(index));
+            let (first, last) = bounds.cells_of_chunk(chunk);
+            for cell in (MapBounds {
+                min: first,
+                size: last - first + IVec2::ONE,
+            })
+            .cells()
+            {
+                assert_eq!(chunk_of(cell), chunk);
+                covered[bounds.index(cell).unwrap()] += 1;
+            }
+        }
+        assert!(covered.iter().all(|&times| times == 1));
     }
 
     #[test]

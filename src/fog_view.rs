@@ -70,17 +70,52 @@ fn shade(sight: CellSight) -> u8 {
     }
 }
 
-/// Softens the blocky cell grid with a separable box blur so the fog edge reads as a gradient.
-fn blurred_shades(fog: &FogOfWar) -> Vec<u8> {
+/// Repaints the texels from `first` to `last`, softening the blocky cell grid with a separable box blur so the
+/// fog edge reads as a gradient. Reading `BLUR_RADIUS` texels around them is enough for them to come out
+/// exactly as when the whole texture is painted.
+fn paint_texels(fog: &FogOfWar, pixels: &mut [u8], first: IVec2, last: IVec2) {
     let size = resolution().as_ivec2();
+    let read_first = (first - IVec2::splat(BLUR_RADIUS)).max(IVec2::ZERO);
+    let read_last = (last + IVec2::splat(BLUR_RADIUS)).min(size - IVec2::ONE);
+    let read_size = read_last - read_first + IVec2::ONE;
     let first_cell = map_bounds().min;
-    let raw: Vec<u32> = (0..size.element_product())
+    let raw: Vec<u32> = (0..read_size.element_product())
         .map(|i| {
-            let texel = IVec2::new(i % size.x, i / size.x);
+            let texel = read_first + IVec2::new(i % read_size.x, i / read_size.x);
             shade(fog.sight_at(first_cell + texel / TEXELS_PER_CELL)) as u32
         })
         .collect();
-    box_blur(&raw, size.as_uvec2())
+    let blurred = box_blur(&raw, read_size.as_uvec2());
+    for y in first.y..=last.y {
+        for x in first.x..=last.x {
+            let read = IVec2::new(x, y) - read_first;
+            let shade = blurred[(read.y * read_size.x + read.x) as usize];
+            let at = ((y * size.x + x) * 4) as usize;
+            pixels[at..at + 3].fill(shade);
+        }
+    }
+}
+
+fn paint_everything(fog: &FogOfWar, pixels: &mut [u8]) {
+    paint_texels(
+        fog,
+        pixels,
+        IVec2::ZERO,
+        resolution().as_ivec2() - IVec2::ONE,
+    );
+}
+
+/// Repaints the chunks that changed after `revision`, and the blur they spill into their neighbours.
+fn paint_changes(fog: &FogOfWar, revision: u64, pixels: &mut [u8]) {
+    let bounds = map_bounds();
+    let last_texel = resolution().as_ivec2() - IVec2::ONE;
+    for chunk in fog.chunks_changed_since(revision) {
+        let (first_cell, last_cell) = bounds.cells_of_chunk(chunk);
+        let first = (first_cell - bounds.min) * TEXELS_PER_CELL - IVec2::splat(BLUR_RADIUS);
+        let last = (last_cell - bounds.min + IVec2::ONE) * TEXELS_PER_CELL - IVec2::ONE
+            + IVec2::splat(BLUR_RADIUS);
+        paint_texels(fog, pixels, first.max(IVec2::ZERO), last.min(last_texel));
+    }
 }
 
 /// Each output averages the `2 * BLUR_RADIUS + 1` inputs around it along a row, then along a column, the edge
@@ -123,34 +158,44 @@ fn sliding_sums(values: &[u32], sums: &mut [u32]) {
     }
 }
 
+/// Which fog the texture shows and how far it is painted.
+#[derive(Clone, Copy, PartialEq)]
+pub struct PaintedFog {
+    lineage: u64,
+    revision: u64,
+}
+
 pub fn paint_fog_texture(
     view: LocalView,
     texture: Res<FogTexture>,
-    mut painted_revision: Local<u64>,
+    mut painted: Local<Option<PaintedFog>>,
     mut images: ResMut<Assets<Image>>,
 ) {
     let fog = view.sight();
-    if *painted_revision == fog.revision {
+    let now = PaintedFog {
+        lineage: fog.lineage(),
+        revision: fog.revision,
+    };
+    if *painted == Some(now) {
         return;
     }
     let Some(mut image) = images.get_mut(&texture.0) else {
         return;
     };
-    if image.texture_descriptor.size != texture_extent() {
+    let resized = image.texture_descriptor.size != texture_extent();
+    if resized {
         image.resize(texture_extent());
     }
     let Some(pixels) = image.data.as_mut() else {
         return;
     };
-    for (texel, shade) in pixels
-        .as_chunks_mut::<4>()
-        .0
-        .iter_mut()
-        .zip(blurred_shades(fog))
-    {
-        texel[..3].fill(shade);
+    match *painted {
+        Some(before) if before.lineage == now.lineage && !resized => {
+            paint_changes(fog, before.revision, pixels);
+        }
+        _ => paint_everything(fog, pixels),
     }
-    *painted_revision = fog.revision;
+    *painted = Some(now);
 }
 
 /// Hides scenery and crystals on ground the player has not explored yet.
@@ -254,6 +299,7 @@ pub fn show_seen_enemies(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map::{MapBounds, cell_center, set_map_bounds};
 
     fn box_blur_tap_by_tap(raw: &[u32], size: UVec2) -> Vec<u8> {
         let size = size.as_ivec2();
@@ -277,6 +323,34 @@ mod tests {
                     / taps) as u8
             })
             .collect()
+    }
+
+    #[test]
+    fn repainting_the_changed_chunks_matches_painting_everything() {
+        let bounds = MapBounds {
+            min: IVec2::new(-20, 7),
+            size: IVec2::new(100, 70),
+        };
+        set_map_bounds(bounds);
+        let texel_bytes = resolution().element_product() as usize * 4;
+        let viewers = |shift: i32| {
+            [IVec2::new(-10, 20), IVec2::new(30, 40), IVec2::new(77, 74)]
+                .map(|cell| (cell_center(cell + IVec2::new(shift, 0)), 9.0))
+        };
+        let mut fog = FogOfWar::new(true);
+        fog.reveal_around(viewers(0));
+        let mut kept_up = vec![0u8; texel_bytes];
+        paint_everything(&fog, &mut kept_up);
+        let painted = fog.revision;
+
+        fog.reveal_around(viewers(3));
+        paint_changes(&fog, painted, &mut kept_up);
+
+        let mut fresh = vec![0u8; texel_bytes];
+        paint_everything(&fog, &mut fresh);
+        assert!(kept_up == fresh, "a partly repainted texture differs");
+        let changed = fog.chunks_changed_since(painted).count();
+        assert!(changed > 0 && changed < bounds.chunk_count());
     }
 
     #[test]

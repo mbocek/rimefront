@@ -53,3 +53,31 @@ fn simulation_time_of_spread_out_fights() {
         );
     }
 }
+
+/// How long one side's fog of war takes to follow 300 moving viewers on maps of growing size:
+/// `cargo test --release --test crowd_bench -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn fog_update_time_on_growing_maps() {
+    use iron_tide::fog::FogOfWar;
+    use iron_tide::map::{MapBounds, set_map_bounds};
+    const VIEWERS: i32 = 300;
+    const UPDATES: i32 = 50;
+    for cells in [256, 1024, 2048] {
+        set_map_bounds(MapBounds::square(cells));
+        let mut fog = FogOfWar::new(true);
+        let started = std::time::Instant::now();
+        for update in 0..UPDATES {
+            let viewers = (0..VIEWERS).map(|i| {
+                let spot = IVec2::new(20 + (i % 20) * 9 + update, 20 + (i / 20) * 9);
+                (iron_tide::map::cell_center(spot), 12.0)
+            });
+            fog.reveal_around(viewers);
+        }
+        let per_update = started.elapsed().as_secs_f32() / UPDATES as f32;
+        eprintln!(
+            "{cells} x {cells} cells: {:.3} ms per update",
+            per_update * 1000.0
+        );
+    }
+}

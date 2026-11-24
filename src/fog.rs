@@ -1,7 +1,11 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::map::{CELL_SIZE, map_bounds, world_to_cell};
+use crate::map::{CELL_SIZE, chunk_of, map_bounds, world_to_cell};
+
+static NEXT_LINEAGE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub enum CellSight {
@@ -12,12 +16,27 @@ pub enum CellSight {
 }
 
 /// What one side knows about each map cell; `Intel` keeps one per team.
-#[derive(Clone)]
 pub struct FogOfWar {
     enabled: bool,
     cells: Vec<CellSight>,
     /// Bumped whenever any cell changes, so presentation systems can skip unchanged frames.
     pub revision: u64,
+    /// The revision each chunk last changed at, so presentation can redraw only those.
+    chunk_revisions: Vec<u64>,
+    /// Tells this fog from every other one, copies included, so a painter that switches fogs starts afresh.
+    lineage: u64,
+}
+
+impl Clone for FogOfWar {
+    fn clone(&self) -> Self {
+        Self {
+            enabled: self.enabled,
+            cells: self.cells.clone(),
+            revision: self.revision,
+            chunk_revisions: self.chunk_revisions.clone(),
+            lineage: NEXT_LINEAGE.fetch_add(1, Ordering::Relaxed),
+        }
+    }
 }
 
 /// Radius in meters an entity reveals around itself.
@@ -31,15 +50,32 @@ impl FogOfWar {
         } else {
             CellSight::Visible
         };
+        let revision = 1;
         Self {
             enabled,
             cells: vec![state; map_bounds().area()],
-            revision: 1,
+            revision,
+            chunk_revisions: vec![revision; map_bounds().chunk_count()],
+            lineage: NEXT_LINEAGE.fetch_add(1, Ordering::Relaxed),
         }
     }
 
     pub fn enabled(&self) -> bool {
         self.enabled
+    }
+
+    pub fn lineage(&self) -> u64 {
+        self.lineage
+    }
+
+    /// The chunks with a cell that changed after `revision`.
+    pub fn chunks_changed_since(&self, revision: u64) -> impl Iterator<Item = IVec2> {
+        let bounds = map_bounds();
+        self.chunk_revisions
+            .iter()
+            .enumerate()
+            .filter(move |&(_, &changed)| changed > revision)
+            .map(move |(index, _)| bounds.chunk_at(index))
     }
 
     fn index(cell: IVec2) -> Option<usize> {
@@ -77,6 +113,7 @@ impl FogOfWar {
             }
         }
         self.revision += 1;
+        self.chunk_revisions.fill(self.revision);
     }
 
     /// Recomputes visibility from the given viewers (position and sight radius).
@@ -109,9 +146,21 @@ impl FogOfWar {
                 }
             }
         }
-        if next != self.cells {
+        let bounds = map_bounds();
+        let revision = self.revision + 1;
+        let mut changed = false;
+        for (index, (old, new)) in self.cells.iter().zip(&next).enumerate() {
+            if old != new {
+                changed = true;
+                let chunk = chunk_of(bounds.cell_at(index));
+                if let Some(chunk_index) = bounds.chunk_index(chunk) {
+                    self.chunk_revisions[chunk_index] = revision;
+                }
+            }
+        }
+        if changed {
             self.cells = next;
-            self.revision += 1;
+            self.revision = revision;
         }
     }
 }

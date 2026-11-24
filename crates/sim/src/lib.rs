@@ -152,6 +152,7 @@ impl Plugin for SimulationPlugin {
             .add_message::<combat::Impact>()
             .add_message::<cues::BlastCue>()
             .add_message::<cues::SoundCue>()
+            .add_message::<world::wilds::WorldWidened>()
             .add_message::<structures::StructureOrder>()
             .add_message::<level_events::MissionMessage>()
             .init_resource::<level_events::EventsFired>()

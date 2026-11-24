@@ -76,6 +76,12 @@ fn own_fields_among(
     chunks.filter_map(move |chunk| own_field(map_seed, chunk))
 }
 
+/// The world widened during a match; whatever shows it covers the new ground.
+#[derive(Message, Clone, Copy, Debug)]
+pub struct WorldWidened {
+    pub bounds: MapBounds,
+}
+
 /// Widens the world to `wider`, which contains it and like it starts and ends on chunk edges: the map and every
 /// side's fog cover the new ground, and each new chunk is generated as `generate_chunk` makes it.
 pub fn widen_world(world: &mut World, wider: MapBounds) {
@@ -99,11 +105,17 @@ pub fn widen_world(world: &mut World, wider: MapBounds) {
             map.widen(wider);
             let mut commands = world.commands();
             for &chunk in &new_chunks {
-                map.open_chunk(chunk);
                 let (first, last) = wider.cells_of_chunk(chunk);
+                scenery.clear_area(Rect::from_corners(
+                    first.as_vec2() * CELL_SIZE,
+                    (last + IVec2::ONE).as_vec2() * CELL_SIZE,
+                ));
+                map.open_chunk(chunk);
                 block_water_among(&mut map, Landscape::Wilds, cells_between(first, last));
                 generate_chunk(&mut commands, &mut map, &mut scenery, map_seed, chunk);
             }
+            let mut outlands = coordinate_rng(map_seed ^ OUTLANDS_SALT, wider.size);
+            cover_mountains(&mut scenery, Landscape::Wilds, &mut outlands);
         });
     });
     world.flush();
@@ -115,6 +127,9 @@ pub fn widen_world(world: &mut World, wider: MapBounds) {
     let mut new_fields: Vec<CrystalField> = new_sites.map(site_field).collect();
     new_fields.extend(own_fields_among(map_seed, new_chunks.into_iter()));
     world.resource_mut::<CrystalFields>().0.extend(new_fields);
+    if let Some(mut widened) = world.get_resource_mut::<Messages<WorldWidened>>() {
+        widened.write(WorldWidened { bounds: wider });
+    }
 }
 
 /// The crystal and scenery of one chunk; it changes no cell outside the chunk.

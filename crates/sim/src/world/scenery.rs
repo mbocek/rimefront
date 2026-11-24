@@ -515,6 +515,11 @@ impl SceneryLayout {
         }
     }
 
+    /// Removes everything standing in `area`, such as the outlands' trees where the world has widened.
+    pub(crate) fn clear_area(&mut self, area: Rect) {
+        self.remove_in(area, |_| true);
+    }
+
     /// Removes everything standing on `cell`, as the map editor's brush does before painting it.
     pub fn clear_cell(&mut self, cell: IVec2) {
         let corner = cell.as_vec2() * CELL_SIZE;

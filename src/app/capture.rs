@@ -54,6 +54,9 @@ const CAPTURE_MAIN_MENU_VAR: &str = "IRON_TIDE_CAPTURE_MAIN_MENU";
 const CAPTURE_JOIN_VAR: &str = "IRON_TIDE_CAPTURE_JOIN";
 /// `IRON_TIDE_CAPTURE_OPEN_ROOM=ws://host:port/room/NAME` opens a two-player room on a dedicated server.
 const CAPTURE_OPEN_ROOM_VAR: &str = "IRON_TIDE_CAPTURE_OPEN_ROOM";
+/// `IRON_TIDE_CAPTURE_CLAIM_SITES=6` gives out that many starting sites of a wilds level two seconds in,
+/// widening the world as it would for newcomers.
+const CAPTURE_CLAIM_SITES_VAR: &str = "IRON_TIDE_CAPTURE_CLAIM_SITES";
 const LOAD_AFTER_SECS: f32 = 1.5;
 /// A hosting capture run starts the battle only after this, so spectators can join too.
 const HOST_WAITS_FOR_GUESTS_SECS: f32 = 10.0;
@@ -124,6 +127,7 @@ impl Plugin for CapturePlugin {
                 zoom_camera,
                 open_requested_menu_page,
                 decide_requested_outcome,
+                claim_requested_sites,
             )
                 .run_if(in_state(GameState::Playing)),
         );
@@ -335,6 +339,28 @@ fn decide_requested_outcome(
     };
     if clock.elapsed_secs > 2.0 && *outcome == GameOutcome::Ongoing {
         *outcome = wanted;
+    }
+}
+
+fn claim_requested_sites(world: &mut World) {
+    let Some(sites) = std::env::var(CAPTURE_CLAIM_SITES_VAR)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+    else {
+        return;
+    };
+    let clock = world
+        .resource::<crate::app::match_flow::MatchClock>()
+        .elapsed_secs;
+    let claimed = world
+        .get_resource::<crate::world::sites::StartingSites>()
+        .map_or(0, |given| given.claimed.len());
+    if clock < 2.0 || claimed >= sites {
+        return;
+    }
+    let home = crate::world::map::base_sites()[0];
+    for _ in claimed..sites {
+        crate::world::sites::claim_starting_site(world, home);
     }
 }
 

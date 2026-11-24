@@ -49,6 +49,15 @@ impl Plugin for BattleViewPlugin {
             .init_resource::<minimap::MinimapOrder>()
             .init_resource::<crystal_models::CrystalModelLibrary>()
             .init_resource::<animation::AnimationLibrary>()
+            .add_systems(
+                Update,
+                (
+                    terrain_chunks::follow_widened_ground,
+                    minimap::follow_widened_world,
+                    ambience::light_widened_fields,
+                )
+                    .run_if(in_state(match_flow::GameState::Playing)),
+            )
             .init_resource::<placement::Placement>()
             .init_resource::<control_groups::ControlGroups>()
             .init_gizmo_group::<overlay::HealthBarGizmos>()

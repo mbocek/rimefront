@@ -12,6 +12,7 @@ use crate::view::terrain_material::{TerrainSurface, WaterMaterial, WaterSurface,
 use crate::world::map::{CELL_SIZE, CHUNK_CELLS, GameMap, map_bounds};
 use crate::world::terrain::WATER_LEVEL;
 use crate::world::terrain::{FAR_RING_WIDTH, GroundLayers, LandscapeContext, OUTLANDS_WIDTH};
+use crate::world::wilds::WorldWidened;
 
 const PATCH_METRES: f32 = CHUNK_CELLS as f32 * CELL_SIZE;
 
@@ -336,7 +337,22 @@ pub fn spawn_terrain_visuals(
         ..default()
     });
     plan_terrain(&mut commands, &level, placeholder);
+    spawn_water(
+        &mut commands,
+        &mut meshes,
+        &mut images,
+        &mut water_materials,
+        &fog,
+    );
+}
 
+fn spawn_water(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    images: &mut Assets<Image>,
+    water_materials: &mut Assets<WaterMaterial>,
+    fog: &FogTexture,
+) {
     let bounds = map_bounds();
     let water_span = bounds.world_size() + Vec2::splat(2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH));
     let water_middle = bounds.world_center();
@@ -349,9 +365,38 @@ pub fn spawn_terrain_visuals(
     commands.spawn((
         WaterSurface,
         Mesh3d(meshes.add(water_mesh)),
-        MeshMaterial3d(water_materials.add(water_material(&mut images, fog.0.clone()))),
+        MeshMaterial3d(water_materials.add(water_material(images, fog.0.clone()))),
         Transform::from_xyz(water_middle.x, WATER_LEVEL, water_middle.y),
     ));
+}
+
+/// The ground and the water follow a world that widened during the match.
+pub fn follow_widened_ground(
+    mut widened: MessageReader<WorldWidened>,
+    mut commands: Commands,
+    plan: Option<Res<GroundPlan>>,
+    level: Res<ActiveLevel>,
+    chunks: Query<Entity, With<TerrainChunk>>,
+    waters: Query<Entity, With<WaterSurface>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut images: ResMut<Assets<Image>>,
+    mut water_materials: ResMut<Assets<WaterMaterial>>,
+    fog: Res<FogTexture>,
+) {
+    let (Some(_), Some(plan)) = (widened.read().last(), plan) else {
+        return;
+    };
+    for entity in chunks.iter().chain(&waters) {
+        commands.entity(entity).despawn();
+    }
+    plan_terrain(&mut commands, &level, plan.placeholder.clone());
+    spawn_water(
+        &mut commands,
+        &mut meshes,
+        &mut images,
+        &mut water_materials,
+        &fog,
+    );
 }
 
 #[cfg(test)]

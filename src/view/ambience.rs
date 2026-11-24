@@ -10,6 +10,7 @@ use crate::sim::fog::CellSight;
 use crate::view::effects::{EffectAssets, spawn_sparkle};
 use crate::view::local_view::LocalView;
 use crate::world::map::{CrystalFields, GameMap, cell_center, cells_by_distance, world_to_cell};
+use crate::world::wilds::WorldWidened;
 
 const CRYSTAL_GLOW_COLOR: Color = Color::srgb(0.35, 1.0, 0.9);
 const CRYSTAL_GLOW_INTENSITY: f32 = 120_000.0;
@@ -40,12 +41,33 @@ fn field_crystal(map: &GameMap, fields: &CrystalFields, field_index: usize) -> u
 }
 
 pub fn light_crystal_fields(mut commands: Commands, map: Res<GameMap>, fields: Res<CrystalFields>) {
+    light_fields(&mut commands, &map, &fields);
+}
+
+/// Fields of a world that widened during the match glow too.
+pub fn light_widened_fields(
+    mut widened: MessageReader<WorldWidened>,
+    mut commands: Commands,
+    map: Res<GameMap>,
+    fields: Res<CrystalFields>,
+    glows: Query<Entity, With<CrystalGlow>>,
+) {
+    if widened.read().last().is_none() {
+        return;
+    }
+    for glow in &glows {
+        commands.entity(glow).despawn();
+    }
+    light_fields(&mut commands, &map, &fields);
+}
+
+fn light_fields(commands: &mut Commands, map: &GameMap, fields: &CrystalFields) {
     for (field_index, field) in fields.0.iter().enumerate() {
         commands.spawn((
             CrystalGlow {
                 field_index,
                 phase: field_index as f32 * 1.7,
-                initial_crystal: field_crystal(&map, &fields, field_index).max(1),
+                initial_crystal: field_crystal(map, fields, field_index).max(1),
             },
             PointLight {
                 color: CRYSTAL_GLOW_COLOR,

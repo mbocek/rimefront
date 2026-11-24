@@ -179,16 +179,20 @@ for ordinary network matches.
    Simulation results are unchanged (fingerprints, balance report byte for byte) and so is the speed within
    noise: the balance tool took 42.8 s of CPU against 42.1 s (three runs each in rotating order), the crowd
    benchmark the same, one side's fog 0.11 ms instead of 0.15 ms on 256 × 256 cells and 1.6 ms instead of
-   1.4 ms on 2048 × 2048. Still to do: the view answering a widening while a match runs (terrain patches,
-   minimap, fog texture), and saves of a widened world, whose grids are larger than the level's map.
+   1.4 ms on 2048 × 2048. Still to do: saves of a widened world, whose grids are larger than the level's
+   map (the view follows a widening since step 10).
 10. **Starting sites across the world.** Done in the simulation (`world::sites`). A wilds world has at most
     one starting site in every square of 64 × 64 cells, from the map seed and the square's coordinate alone,
     on dry ground 40 cells or more from the level's own bases; each has a home field and open ground around
     it. `claim_starting_site` gives a newcomer the free site nearest a point and, when fewer than three would
     be left free, widens the world by a ring of squares first. The level's sides keep the bases it names. A
     test gives out ten sites on a standard wilds map: all different, apart, on open ground, with crystal at
-    hand and reachable from the first base, the world having widened. Still to do: the view following a
-    widening during a match.
+    hand and reachable from the first base, the world having widened. A widening sends `WorldWidened`, and
+    the view follows it during a match: the ground patches and the water are planned again, the minimap
+    redrawn in the same image, the crystal fields lit, the outlands' trees cleared from the new ground and
+    planted along the new edge; the fog texture, the ground material and the camera follow the bounds by
+    themselves. `IRON_TIDE_CAPTURE_CLAIM_SITES=6` gives out sites two seconds into a capture run, to look
+    at it.
 11. **Sides as data.** Replace the four fixed teams with a side id: name, colour, allies; the interface,
     intel, fog and AI keep one entry per side present.
 

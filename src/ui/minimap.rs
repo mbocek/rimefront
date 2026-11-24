@@ -16,6 +16,7 @@ use crate::view::fog_view::Discovered;
 use crate::view::local_view::LocalView;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_cells, map_bounds};
 use crate::world::terrain::GroundLayers;
+use crate::world::wilds::WorldWidened;
 
 const MOST_PIXELS_PER_CELL: f32 = 3.0;
 /// The picture's longest side; a larger map gets less than a pixel a cell, so drawing it every refresh
@@ -78,6 +79,24 @@ pub fn create_minimap(
         terrain,
         refresh_timer: 0.0,
     });
+}
+
+/// The picture follows a world that widened during the match, in the same image the sidebar shows.
+pub fn follow_widened_world(
+    mut widened: MessageReader<WorldWidened>,
+    map: Res<GameMap>,
+    level: Res<ActiveLevel>,
+    mut minimap: ResMut<Minimap>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    if widened.read().last().is_none() {
+        return;
+    }
+    minimap.terrain = terrain_pixels(&map, &level.0);
+    if let Some(mut image) = images.get_mut(&minimap.image) {
+        *image = pixel_image(minimap.terrain.clone());
+    }
+    minimap.refresh_timer = 0.0;
 }
 
 /// The picture of a map's ground, water, obstacles and crystal, `pixels_per_cell` per cell.

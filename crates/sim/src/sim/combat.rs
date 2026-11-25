@@ -62,6 +62,10 @@ impl TargetInfo {
     pub fn seen_by(&self, viewer: Team) -> bool {
         self.seen_by.contains(viewer)
     }
+
+    pub fn seen_by_sides(&self) -> SideSet {
+        self.seen_by
+    }
 }
 
 /// Per-frame copy of every damageable entity, so systems can look up targets without query conflicts.
@@ -233,6 +237,7 @@ pub fn snapshot_targets(
     targets.list.clear();
     targets.by_entity.clear();
     targets.diplomacy.clone_from(&diplomacy);
+    let mut allies_of: HashMap<Team, SideSet> = HashMap::new();
     targets.shelter = *shelter;
     for (_, entity, &team, transform, radius, armor, is_building, camouflage, health, weapon) in
         in_simulation_order(damageable, |target| *target.0)
@@ -249,17 +254,46 @@ pub fn snapshot_targets(
             is_building,
             health_fraction: health.fraction(),
             weapon: weapon.map(|weapon| weapon.spec),
-            seen_by: intel
-                .viewers()
-                .filter(|&viewer| {
-                    !diplomacy.hostile(team, viewer)
-                        || (!concealed && intel.vision(viewer).is_visible(transform.translation))
-                })
-                .collect(),
+            seen_by: seen_by(
+                &intel,
+                &diplomacy,
+                &mut allies_of,
+                team,
+                transform,
+                concealed,
+            ),
         });
     }
     let Targets { list, nearby, .. } = &mut *targets;
     nearby.rebuild(list.iter().map(|target| (target.position, target.radius)));
+}
+
+/// The sides that see a target: its own and its allies always, and those whose vision shows its cell
+/// unless it is concealed; only the sides seeing into its chunk at all are asked.
+fn seen_by(
+    intel: &Intel,
+    diplomacy: &Diplomacy,
+    allies_of: &mut HashMap<Team, SideSet>,
+    team: Team,
+    transform: &Transform,
+    concealed: bool,
+) -> SideSet {
+    let allies = *allies_of.entry(team).or_insert_with(|| {
+        intel
+            .viewers()
+            .filter(|&viewer| !diplomacy.hostile(team, viewer))
+            .collect()
+    });
+    if concealed {
+        return allies;
+    }
+    let position = transform.translation;
+    let seeing: SideSet = intel
+        .viewers_seeing_into(position)
+        .iter()
+        .filter(|&viewer| intel.vision(viewer).is_visible(position))
+        .collect();
+    allies.union(seeing)
 }
 
 pub fn acquire_targets(

@@ -10,11 +10,12 @@ use iron_tide_sim::sim::components::{Building, HarvestState, Harvester, Health, 
 use iron_tide_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
 use iron_tide_sim::sim::determinism::{SimEntities, SimId};
 use iron_tide_sim::sim::economy::Economies;
-use iron_tide_sim::sim::fog::Sight;
+use iron_tide_sim::sim::fog::{FogOfWar, Sight};
 use iron_tide_sim::sim::intel::Intel;
 use iron_tide_sim::sim::notifications::{News, SideNews};
 use iron_tide_sim::sim::production::{BuildItem, Lane, Production};
 use iron_tide_sim::sim::research::Upgrade;
+use iron_tide_sim::sim::sides::SideSet;
 use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
 use iron_tide_sim::sim::transport::Embarked;
 use iron_tide_sim::world::map::{GameMap, MapBounds, chunk_of, map_bounds, world_to_cell};
@@ -369,84 +370,130 @@ impl ViewChange {
     }
 }
 
-/// The chunks a side and its allies see into: every chunk within sight of one of their units or structures.
-pub fn chunks_in_sight(world: &mut World, viewer: Team) -> HashSet<IVec2> {
-    let diplomacy = world.resource::<Diplomacy>().clone();
-    let mut chunks = HashSet::new();
-    let mut eyes = world.query::<(&Team, &Transform, &Sight)>();
-    for (&team, transform, sight) in eyes.iter(world) {
-        if diplomacy.hostile(team, viewer) {
-            continue;
-        }
-        let reach = IVec2::splat(sight.0.ceil() as i32);
-        let cell = world_to_cell(transform.translation);
-        let first = chunk_of(cell - reach);
-        let last = chunk_of(cell + reach);
-        for y in first.y..=last.y {
-            for x in first.x..=last.x {
-                chunks.insert(IVec2::new(x, y));
+/// What players of a world may be shown this tick, gathered once for all of them: every unit and structure
+/// by chunk, with the sides that see it, and the chunks each side's eyes reach.
+pub struct WorldSnapshot {
+    bounds: MapBounds,
+    diplomacy: Diplomacy,
+    things_by_chunk: HashMap<IVec2, Vec<SnapshotThing>>,
+    chunks_seen_by: HashMap<Team, HashSet<IVec2>>,
+}
+
+struct SnapshotThing {
+    state: ThingState,
+    /// `None` for a neutral site, shown to whoever explored its ground.
+    seen_by: Option<SideSet>,
+    position: Vec3,
+}
+
+impl WorldSnapshot {
+    pub fn of(world: &mut World) -> Self {
+        let mut chunks_seen_by: HashMap<Team, HashSet<IVec2>> = HashMap::new();
+        let mut eyes = world.query::<(&Team, &Transform, &Sight)>();
+        for (&team, transform, sight) in eyes.iter(world) {
+            let reach = IVec2::splat(sight.0.ceil() as i32);
+            let cell = world_to_cell(transform.translation);
+            let (first, last) = (chunk_of(cell - reach), chunk_of(cell + reach));
+            let seen = chunks_seen_by.entry(team).or_default();
+            for y in first.y..=last.y {
+                for x in first.x..=last.x {
+                    seen.insert(IVec2::new(x, y));
+                }
             }
         }
+        let mut things_by_chunk: HashMap<IVec2, Vec<SnapshotThing>> = HashMap::new();
+        let mut things = world.query_filtered::<(
+            Entity,
+            &SimId,
+            Option<&Team>,
+            &Transform,
+            &Health,
+            Option<&Unit>,
+            Option<&Building>,
+        ), Without<Embarked>>();
+        let targets = world.resource::<Targets>();
+        for (entity, &id, team, transform, health, unit, building) in things.iter(world) {
+            let thing = match (unit, building) {
+                (Some(unit), _) => Thing::Unit(unit.0),
+                (None, Some(building)) => Thing::Building {
+                    kind: building.kind,
+                    origin: building.origin,
+                },
+                (None, None) => continue,
+            };
+            let seen_by = match team {
+                Some(_) => match targets.get(entity) {
+                    Some(target) => Some(target.seen_by_sides()),
+                    None => continue,
+                },
+                None => None,
+            };
+            let (facing, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let position = transform.translation;
+            things_by_chunk
+                .entry(chunk_of(world_to_cell(position)))
+                .or_default()
+                .push(SnapshotThing {
+                    state: ThingState {
+                        id,
+                        thing,
+                        team: team.copied(),
+                        position: Spot::at(position),
+                        facing: (facing * FACING_STEPS).round() as i32,
+                        health_percent: (health.fraction() * 100.0).round() as u8,
+                    },
+                    seen_by,
+                    position,
+                });
+        }
+        Self {
+            bounds: map_bounds(),
+            diplomacy: world.resource::<Diplomacy>().clone(),
+            things_by_chunk,
+            chunks_seen_by,
+        }
     }
-    chunks
+
+    /// The chunks a side and its allies see into: every chunk within sight of one of their units or
+    /// structures.
+    pub fn chunks_in_sight(&self, viewer: Team) -> HashSet<IVec2> {
+        let mut chunks = HashSet::new();
+        for (&team, seen) in &self.chunks_seen_by {
+            if !self.diplomacy.hostile(team, viewer) {
+                chunks.extend(seen);
+            }
+        }
+        chunks
+    }
+
+    /// What `viewer` may see in `chunks`: what the fog does not hide from it there.
+    fn things_in(
+        &self,
+        chunks: &HashSet<IVec2>,
+        viewer: Team,
+        vision: &FogOfWar,
+    ) -> BTreeMap<SimId, ThingState> {
+        let mut shown = BTreeMap::new();
+        for chunk in chunks {
+            for thing in self.things_by_chunk.get(chunk).into_iter().flatten() {
+                let seen = match thing.seen_by {
+                    Some(sides) => sides.contains(viewer),
+                    None => vision.is_explored(thing.position),
+                };
+                if seen {
+                    shown.insert(thing.state.id, thing.state);
+                }
+            }
+        }
+        shown
+    }
 }
 
 /// Everything `viewer` may see right now: in a chunk its side looks into and not hidden from it by the fog.
 pub fn things_in_view(world: &mut World, viewer: Team) -> BTreeMap<SimId, ThingState> {
-    let chunks = chunks_in_sight(world, viewer);
-    things_in_chunks(world, viewer, &chunks)
-}
-
-fn things_in_chunks(
-    world: &mut World,
-    viewer: Team,
-    chunks: &HashSet<IVec2>,
-) -> BTreeMap<SimId, ThingState> {
-    let in_sight_chunk = |position: Vec3| chunks.contains(&chunk_of(world_to_cell(position)));
-    let mut shown = BTreeMap::new();
-    let mut things = world.query_filtered::<(
-        Entity,
-        &SimId,
-        Option<&Team>,
-        &Transform,
-        &Health,
-        Option<&Unit>,
-        Option<&Building>,
-    ), Without<Embarked>>();
-    let targets = world.resource::<Targets>();
-    let vision = world.resource::<Intel>().vision(viewer);
-    for (entity, &id, team, transform, health, unit, building) in things.iter(world) {
-        let thing = match (unit, building) {
-            (Some(unit), _) => Thing::Unit(unit.0),
-            (None, Some(building)) => Thing::Building {
-                kind: building.kind,
-                origin: building.origin,
-            },
-            (None, None) => continue,
-        };
-        let seen = match team {
-            Some(_) => targets
-                .get(entity)
-                .is_some_and(|target| target.seen_by(viewer)),
-            None => vision.is_explored(transform.translation),
-        };
-        if !seen || !in_sight_chunk(transform.translation) {
-            continue;
-        }
-        let (facing, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
-        shown.insert(
-            id,
-            ThingState {
-                id,
-                thing,
-                team: team.copied(),
-                position: Spot::at(transform.translation),
-                facing: (facing * FACING_STEPS).round() as i32,
-                health_percent: (health.fraction() * 100.0).round() as u8,
-            },
-        );
-    }
-    shown
+    let snapshot = WorldSnapshot::of(world);
+    let chunks = snapshot.chunks_in_sight(viewer);
+    snapshot.things_in(&chunks, viewer, world.resource::<Intel>().vision(viewer))
 }
 
 /// What one player of a world was last sent, so the next view carries only what changed.
@@ -463,12 +510,14 @@ impl SentView {
     /// What changed since the last view; `None` when nothing did.
     pub fn next(
         &mut self,
-        world: &mut World,
+        world: &World,
+        snapshot: &WorldSnapshot,
         viewer: Team,
         news: &WorldNews,
     ) -> Option<ViewChange> {
-        let chunks = chunks_in_sight(world, viewer);
-        let mut now = things_in_chunks(world, viewer, &chunks);
+        let chunks = snapshot.chunks_in_sight(viewer);
+        let vision = world.resource::<Intel>().vision(viewer);
+        let mut now = snapshot.things_in(&chunks, viewer, vision);
         self.keep_known_structures(world, viewer, &mut now);
         let mut shown = Vec::new();
         let mut moved = Vec::new();
@@ -488,8 +537,8 @@ impl SentView {
             .filter(|id| !now.contains_key(id))
             .copied()
             .collect();
-        let bounds = Some(map_bounds()).filter(|&bounds| self.bounds != Some(bounds));
-        self.bounds = Some(map_bounds());
+        let bounds = Some(snapshot.bounds).filter(|&bounds| self.bounds != Some(bounds));
+        self.bounds = Some(snapshot.bounds);
         self.things = now;
         let credits = world.resource::<Economies>().of(viewer).credits;
         let credits = (self.credits.replace(credits) != Some(credits)).then_some(credits);

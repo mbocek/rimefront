@@ -1,10 +1,11 @@
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::world::chunked_grid::ChunkedGrid;
-use crate::world::map::{CELL_SIZE, MapBounds, map_bounds, world_to_cell};
+use crate::world::map::{CELL_SIZE, MapBounds, chunk_of, map_bounds, world_to_cell};
 
 static NEXT_LINEAGE: AtomicU64 = AtomicU64::new(1);
 
@@ -26,6 +27,9 @@ pub struct FogOfWar {
     chunk_revisions: Vec<u64>,
     /// Tells this fog from every other one, copies included, so a painter that switches fogs starts afresh.
     lineage: u64,
+    /// The chunks the last reveal made a cell visible in, so the next one dims only those rather than the
+    /// whole map.
+    lit_chunks: Vec<IVec2>,
 }
 
 impl Clone for FogOfWar {
@@ -36,6 +40,7 @@ impl Clone for FogOfWar {
             revision: self.revision,
             chunk_revisions: self.chunk_revisions.clone(),
             lineage: NEXT_LINEAGE.fetch_add(1, Ordering::Relaxed),
+            lit_chunks: self.lit_chunks.clone(),
         }
     }
 }
@@ -63,6 +68,7 @@ impl FogOfWar {
             revision,
             chunk_revisions: vec![revision; map_bounds().chunk_count()],
             lineage: NEXT_LINEAGE.fetch_add(1, Ordering::Relaxed),
+            lit_chunks: Vec::new(),
         }
     }
 
@@ -183,19 +189,28 @@ impl FogOfWar {
         self.chunk_revisions.fill(self.revision);
     }
 
-    /// Recomputes visibility from the given viewers (position and sight radius).
+    /// Recomputes visibility from the given viewers (position and sight radius): what they see is visible,
+    /// what was visible before and is not any more is explored. It works on the chunks that held a visible
+    /// cell before or do now, whole chunks at a time, so its cost follows what the viewers see rather than
+    /// the size of the map.
     pub fn reveal_around(&mut self, viewers: impl IntoIterator<Item = (Vec3, f32)>) {
         if !self.enabled {
             return;
         }
-        let before = self.cells.clone();
-        self.cells.update_all(|sight| {
-            if sight == CellSight::Unexplored {
-                sight
-            } else {
-                CellSight::Explored
+        let lit_before = std::mem::take(&mut self.lit_chunks);
+        let mut before = Vec::with_capacity(lit_before.len());
+        for &chunk in &lit_before {
+            if let Some(cells) = self.cells.chunk_cells_mut(chunk) {
+                before.push((chunk, cells.to_vec()));
+                for sight in cells.iter_mut() {
+                    if *sight == CellSight::Visible {
+                        *sight = CellSight::Explored;
+                    }
+                }
             }
-        });
+        }
+        let mut lit = HashSet::new();
+        let mut last_lit = None;
         for (position, radius) in viewers {
             let center = world_to_cell(position);
             let reach = (radius / CELL_SIZE).ceil() as i32;
@@ -208,11 +223,25 @@ impl FogOfWar {
                     }
                     if let Some(sight) = self.cells.get_mut(cell) {
                         *sight = CellSight::Visible;
+                        let chunk = chunk_of(cell);
+                        if last_lit != Some(chunk) {
+                            last_lit = Some(chunk);
+                            lit.insert(chunk);
+                        }
                     }
                 }
             }
         }
-        let changed = self.cells.chunks_differing_from(&before);
+        let newly_lit = lit
+            .iter()
+            .copied()
+            .filter(|chunk| !lit_before.contains(chunk));
+        let redrawn = before
+            .iter()
+            .filter(|(chunk, cells)| self.cells.chunk_cells(*chunk) != Some(cells.as_slice()))
+            .map(|(chunk, _)| *chunk);
+        let changed: Vec<IVec2> = newly_lit.chain(redrawn).collect();
+        self.lit_chunks = lit.into_iter().collect();
         if changed.is_empty() {
             return;
         }
@@ -223,6 +252,11 @@ impl FogOfWar {
                 self.chunk_revisions[index] = self.revision;
             }
         }
+    }
+
+    /// The chunks holding a cell the last reveal made visible.
+    pub fn visible_chunks(&self) -> &[IVec2] {
+        &self.lit_chunks
     }
 }
 

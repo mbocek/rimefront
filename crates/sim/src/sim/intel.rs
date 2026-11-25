@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use bevy::prelude::*;
 
@@ -8,7 +8,8 @@ use crate::sim::catalog::{Diplomacy, Team};
 use crate::sim::components::{Building, Unit};
 use crate::sim::determinism::SimId;
 use crate::sim::fog::{FogOfWar, Sight};
-use crate::world::map::{base_sites, cell_center};
+use crate::sim::sides::SideSet;
+use crate::world::map::{base_sites, cell_center, chunk_of, map_bounds, world_to_cell};
 
 const UPDATE_INTERVAL_SECS: f32 = 0.2;
 
@@ -21,6 +22,8 @@ pub struct Intel {
     /// Keyed by simulation id, so every machine visits them in the same order.
     known_structures: Vec<BTreeMap<SimId, (Entity, Vec3)>>,
     fog_of_war: bool,
+    /// The sides with a visible cell in each chunk, as of the last update: only they can see anything there.
+    seeing_into: HashMap<IVec2, SideSet>,
 }
 
 impl Intel {
@@ -30,6 +33,7 @@ impl Intel {
             visions: Vec::new(),
             known_structures: Vec::new(),
             fog_of_war,
+            seeing_into: HashMap::new(),
         };
         for team in Team::ALL {
             intel.admit(team);
@@ -50,6 +54,25 @@ impl Intel {
         if let Some(vision) = self.visions.get_mut(team.index()) {
             *vision = FogOfWar::new(self.fog_of_war);
             self.known_structures[team.index()].clear();
+        }
+    }
+
+    /// The sides that may see `position` now: every side with a visible cell in its chunk, or every side
+    /// when there is no fog. Who among them does is for their vision to say.
+    pub fn viewers_seeing_into(&self, position: Vec3) -> SideSet {
+        if !self.fog_of_war {
+            return self.viewers().collect();
+        }
+        let chunk = chunk_of(map_bounds().clamp(world_to_cell(position)));
+        self.seeing_into.get(&chunk).copied().unwrap_or_default()
+    }
+
+    fn note_who_sees_where(&mut self) {
+        self.seeing_into.clear();
+        for viewer in self.viewers() {
+            for &chunk in self.visions[viewer.index()].visible_chunks() {
+                self.seeing_into.entry(chunk).or_default().insert(viewer);
+            }
         }
     }
 
@@ -141,11 +164,18 @@ pub fn update_intel(
         return;
     }
     let weather_sight = forecast.sight_factor(clock.elapsed_secs);
+    let mut eyes_by_side: BTreeMap<Team, Vec<(Vec3, f32)>> = BTreeMap::new();
+    for (&team, transform, sight) in &viewers {
+        eyes_by_side
+            .entry(team)
+            .or_default()
+            .push((transform.translation, sight.0 * weather_sight));
+    }
     for viewer in intel.viewers() {
-        let allied_eyes = viewers
+        let allied_eyes = eyes_by_side
             .iter()
-            .filter(|(team, ..)| !diplomacy.hostile(**team, viewer))
-            .map(|(_, transform, sight)| (transform.translation, sight.0 * weather_sight));
+            .filter(|(team, _)| !diplomacy.hostile(**team, viewer))
+            .flat_map(|(_, eyes)| eyes.iter().copied());
         let allied_flights = support
             .revealed_by_recon()
             .filter(|(team, ..)| !diplomacy.hostile(*team, viewer))
@@ -155,6 +185,7 @@ pub fn update_intel(
             .reveal_around(allied_eyes.chain(allied_flights));
     }
 
+    intel.note_who_sees_where();
     let intel = &mut *intel;
     for known in &mut intel.known_structures {
         known.retain(|_, &mut (entity, _)| buildings.contains(entity));

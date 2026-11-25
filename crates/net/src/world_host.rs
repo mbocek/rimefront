@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::network::{Arrival, Link, Message};
 use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
-use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
+use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews, WorldSnapshot};
 use iron_tide_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
 use iron_tide_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use iron_tide_sim::sim::ai::{AiCommander, AiCommanders};
@@ -420,10 +420,11 @@ impl WorldHost {
             effects: &effects,
             mined: &self.mined,
         };
-        let world = self.app.world_mut();
+        let snapshot = WorldSnapshot::of(self.app.world_mut());
+        let world = self.app.world();
         for player in &mut self.players {
             let Some(team) = player.team else { continue };
-            if let Some(change) = player.sent.next(world, team, &news) {
+            if let Some(change) = player.sent.next(world, &snapshot, team, &news) {
                 player
                     .connection
                     .send(&Message::WorldView(Box::new(change)));

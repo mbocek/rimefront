@@ -190,6 +190,20 @@ impl SideSet {
     pub fn remove(&mut self, team: Team) {
         self.0[team.index() / 64] &= !(1 << (team.index() % 64));
     }
+
+    /// Every side in the set, lowest number first.
+    pub fn iter(&self) -> impl Iterator<Item = Team> + '_ {
+        (0..Team::MOST)
+            .filter(|&index| self.0[index / 64] & (1 << (index % 64)) != 0)
+            .map(Team::from_index)
+    }
+
+    pub fn union(mut self, other: SideSet) -> SideSet {
+        for (word, other) in self.0.iter_mut().zip(other.0) {
+            *word |= other;
+        }
+        self
+    }
 }
 
 /// Sides out of the fighting while their players are away: nobody can hurt or capture what is theirs,

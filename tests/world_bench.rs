@@ -71,13 +71,13 @@ fn count<T: Component>(host: &mut WorldHost) -> usize {
     world.query_filtered::<(), With<T>>().iter(world).count()
 }
 
-/// How long a world takes a tick, and what it sends, with 4, 16 and 32 players connected, each with the
+/// How long a world takes a tick, and what it sends, with 4 to 64 players connected, each with the
 /// computer neighbour they bring, and again with an army of 60 for every side:
 /// `cargo test --release --test world_bench -- --ignored --nocapture`.
 #[test]
 #[ignore]
 fn a_world_with_many_players() {
-    for (players, army) in [(4, 0), (16, 0), (32, 0), (16, 60), (32, 60)] {
+    for (players, army) in [(4, 0), (16, 0), (32, 0), (16, 60), (32, 60), (64, 60)] {
         let mut host = WorldHost::new(29);
         let mut connections: Vec<LocalConnection> =
             (0..players).map(|_| enter(&mut host)).collect();

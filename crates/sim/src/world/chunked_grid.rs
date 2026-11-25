@@ -62,6 +62,17 @@ impl<T: Copy> ChunkedGrid<T> {
         self.chunks[chunk].as_mut().map(|cells| &mut cells[at])
     }
 
+    /// The cells of an opened chunk, row by row.
+    pub fn chunk_cells(&self, chunk: IVec2) -> Option<&[T]> {
+        let index = self.bounds.chunk_index(chunk)?;
+        self.chunks[index].as_deref()
+    }
+
+    pub fn chunk_cells_mut(&mut self, chunk: IVec2) -> Option<&mut [T]> {
+        let index = self.bounds.chunk_index(chunk)?;
+        self.chunks[index].as_deref_mut()
+    }
+
     /// Changes every opened cell, those of chunks reaching past the bounds included.
     pub fn update_all(&mut self, change: impl Fn(T) -> T) {
         for cells in self.chunks.iter_mut().flatten() {

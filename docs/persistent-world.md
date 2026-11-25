@@ -387,12 +387,12 @@ Pro, release build). The tick budget is 50 ms.
 
 | Players | Units | Structures | World | Tick, average | Tick, slowest | Sent to each player |
 | --- | --- | --- | --- | --- | --- | --- |
-| 4 | 35 | 40 | 320 × 320 | 0.06 ms | 0.29 ms | 89 B/s |
-| 16 | 157 | 133 | 448 × 448 | 0.28 ms | 1.53 ms | 74 B/s |
-| 32 | 294 | 236 | 576 × 576 | 0.48 ms | 2.92 ms | 68 B/s |
-| 16, armies of 60 | 1237 | 128 | 448 × 448 | 1.91 ms | 5.00 ms | 462 B/s |
-| 32, armies of 60 | 2393 | 222 | 576 × 576 | 4.00 ms | 8.37 ms | 477 B/s |
-| 64, armies of 60 | 4692 | 463 | 832 × 832 | 9.21 ms | 38.57 ms | 803 B/s |
+| 4 | 35 | 40 | 320 × 320 | 0.05 ms | 0.24 ms | 67 B/s |
+| 16 | 157 | 133 | 448 × 448 | 0.23 ms | 1.50 ms | 59 B/s |
+| 32 | 294 | 236 | 576 × 576 | 0.44 ms | 2.83 ms | 49 B/s |
+| 16, armies of 60 | 1237 | 128 | 448 × 448 | 1.84 ms | 3.57 ms | 239 B/s |
+| 32, armies of 60 | 2393 | 222 | 576 × 576 | 3.73 ms | 8.24 ms | 256 B/s |
+| 64, armies of 60 | 4692 | 463 | 832 × 832 | 8.51 ms | 36.53 ms | 434 B/s |
 
 Sixty-four players were first measured at 19.1 ms a tick and 65.6 ms at worst, past the budget. Of that, the
 views took 0.9 ms a tick and the simulation the rest: what grew with sides times the map or sides times
@@ -405,5 +405,7 @@ units. Four changes, with the battle's results unchanged:
 - **Views** gather the world once a tick, by chunk (`WorldSnapshot`), and each player's view walks the
   chunks it sees into rather than every thing of the world.
 
-Sixty-four players with 4700 units take a fifth of the budget on average; the slowest ticks come close to
-it, which bounds a world's players for now.
+Sixty-four players with 4700 units take a sixth of the budget on average; the slowest ticks come close to
+it, which bounds a world's players for now. Views ten times a second and deflated long messages (step 13 above)
+brought what each of them is sent from 803 B/s to 434 B/s: 64 players take about 28 kB/s of the server's
+upload in all.

@@ -317,12 +317,12 @@ struct Shortcut {
     together: bool,
 }
 
-/// Right click on the ground. Ctrl attack-moves, Alt patrols, Shift queues behind current orders, and the
-/// formation key keeps the group together at its slowest unit's pace.
+/// Right click on the ground. Ctrl attack-moves, the patrol key patrols, Shift queues behind current orders,
+/// and Alt (Option on a Mac) keeps the group together at its slowest unit's pace.
 fn ground_order_from_keys(keys: &ButtonInput<KeyCode>, bindings: &KeyBindings) -> Shortcut {
     let order = if keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]) {
         GroundOrder::AttackMove
-    } else if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+    } else if bindings.pressed(keys, Action::Patrol) {
         GroundOrder::Patrol
     } else {
         GroundOrder::Move
@@ -330,7 +330,7 @@ fn ground_order_from_keys(keys: &ButtonInput<KeyCode>, bindings: &KeyBindings) -
     Shortcut {
         order,
         queued: keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
-        together: bindings.pressed(keys, Action::KeepFormation),
+        together: keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]),
     }
 }
 

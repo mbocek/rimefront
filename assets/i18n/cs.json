@@ -74,7 +74,6 @@
   "Attack-move": "Útočný přesun",
   "Ctrl + right click": "Ctrl + pravý klik",
   "Patrol": "Hlídka",
-  "Alt + right click": "Alt + pravý klik",
   "Queue orders": "Rozkazy za sebou",
   "Shift + right click": "Shift + pravý klik",
   "Rally point": "Shromaždiště",
@@ -658,7 +657,8 @@
   "Ivory": "Slonovinová",
   "Side colour": "Barva strany",
   "The side's own": "Vlastní strany",
-  "Keep formation (hold with right click)": "Drž formaci (podrž s pravým tlačítkem)",
   "In formation": "Ve formaci",
-  "{} + right click: the group keeps to its slowest unit": "{} + pravé tlačítko: skupina drží tempo nejpomalejší jednotky"
+  "Patrol (hold with right click)": "Hlídka (podrž s pravým tlačítkem)",
+  "{} + right click": "{} + pravý klik",
+  "Alt (Option) + right click: the group keeps to its slowest unit": "Alt (Option) + pravý klik: skupina drží tempo nejpomalejší jednotky"
 }

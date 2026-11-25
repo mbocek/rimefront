@@ -4,10 +4,10 @@
 | --- | --- |
 | LMB / drag | select unit / box-select units (Shift adds); the box counts the units inside, selected units get white corner marks; a selected defensive structure outlines its weapon range on the ground |
 | RMB on ground | move: every unit at its own speed, so a fast one gets there first |
-| B (held) + RMB | move in formation: the group keeps to its slowest unit so it arrives together, ground units and aircraft each at their own pace; works with Ctrl and Shift too, and B can be rebound (*Keep formation*) |
+| Alt (Option on a Mac) + RMB | move in formation: the group keeps to its slowest unit so it arrives together, ground units and aircraft each at their own pace; works with Ctrl and Shift too |
 | RMB on enemy | attack |
-| Ctrl + RMB | attack-move: fight anything met on the way, then carry on; with B held the group keeps its slowest unit's pace until it meets the enemy |
-| Alt + RMB | patrol between the current position and the target |
+| Ctrl + RMB | attack-move: fight anything met on the way, then carry on; with Alt held the group keeps its slowest unit's pace until it meets the enemy |
+| P (held) + RMB | patrol between the current position and the target; P can be rebound (*Patrol*) |
 | Shift + RMB | queue the order behind the current ones (route shown for selected units) |
 | RMB with a barracks or factory selected | set its rally point |
 | RMB on crystals / refinery (harvester) | harvest / unload |

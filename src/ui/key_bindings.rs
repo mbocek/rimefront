@@ -31,7 +31,7 @@ pub enum Action {
     Unload,
     ReconFlight,
     Barrage,
-    KeepFormation,
+    Patrol,
 }
 
 impl Action {
@@ -60,7 +60,7 @@ impl Action {
         Action::Unload,
         Action::ReconFlight,
         Action::Barrage,
-        Action::KeepFormation,
+        Action::Patrol,
     ];
 
     pub fn name(self) -> &'static str {
@@ -89,7 +89,7 @@ impl Action {
             Action::Unload => tr("Unload carriers"),
             Action::ReconFlight => tr("Recon flight"),
             Action::Barrage => tr("Artillery barrage"),
-            Action::KeepFormation => tr("Keep formation (hold with right click)"),
+            Action::Patrol => tr("Patrol (hold with right click)"),
         }
     }
 
@@ -119,7 +119,7 @@ impl Action {
             Action::Unload => KeyCode::KeyU,
             Action::ReconFlight => KeyCode::KeyZ,
             Action::Barrage => KeyCode::KeyC,
-            Action::KeepFormation => KeyCode::KeyB,
+            Action::Patrol => KeyCode::KeyP,
         }
     }
 }

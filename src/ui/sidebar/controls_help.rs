@@ -48,12 +48,12 @@ pub(super) fn controls_overview(keys: &KeyBindings) -> Vec<(&'static str, String
         (tr("Attack-move"), tr_owned("Ctrl + right click")),
         (
             tr("In formation"),
-            tr_fmt(
-                "{} + right click: the group keeps to its slowest unit",
-                &[&key(Action::KeepFormation)],
-            ),
+            tr_owned("Alt (Option) + right click: the group keeps to its slowest unit"),
         ),
-        (tr("Patrol"), tr_owned("Alt + right click")),
+        (
+            tr("Patrol"),
+            tr_fmt("{} + right click", &[&key(Action::Patrol)]),
+        ),
         (tr("Queue orders"), tr_owned("Shift + right click")),
         (
             tr("Rally point"),

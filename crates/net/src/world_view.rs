@@ -303,6 +303,14 @@ impl MinedCrystal {
         mined
     }
 
+    /// Notes crystal laid or taken anywhere, as a new deposit lays it.
+    pub fn record(&mut self, cell: IVec2, amount: u32) {
+        self.by_chunk
+            .entry(chunk_of(cell))
+            .or_default()
+            .insert(cell, amount);
+    }
+
     /// Notes the crystal left where harvesters mine; called after every update.
     pub fn note(&mut self, world: &mut World) {
         let mut harvesters = world.query::<&Harvester>();
@@ -323,7 +331,7 @@ impl MinedCrystal {
         self.last_mined = mining;
     }
 
-    fn in_chunk(&self, chunk: IVec2) -> impl Iterator<Item = (IVec2, u32)> + '_ {
+    pub(crate) fn in_chunk(&self, chunk: IVec2) -> impl Iterator<Item = (IVec2, u32)> + '_ {
         self.by_chunk
             .get(&chunk)
             .into_iter()

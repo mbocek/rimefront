@@ -607,6 +607,7 @@ pub fn world_to_cell(position: Vec3) -> IVec2 {
     )
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct CrystalField {
     pub center: IVec2,
     pub radius: f32,

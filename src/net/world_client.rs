@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -33,8 +33,8 @@ use crate::sim::sides::{Shelter, Sides, side_stands};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
 use crate::view::side_tint::SideColors;
-use crate::world::map::{CrystalVisual, GameMap, crystal_scale, map_bounds};
-use crate::world::wilds::widen_world;
+use crate::world::map::{CrystalVisual, GameMap, crystal_scale, map_bounds, spawn_crystal_visual};
+use crate::world::wilds::{crystal_look, widen_world};
 
 /// How long a world the game runs itself sleeps between steps; short enough to answer at once.
 const LOCAL_WORLD_POLL: Duration = Duration::from_millis(2);
@@ -525,7 +525,9 @@ fn show_crystal(world: &mut World, changes: &[(IVec2, u32)]) {
     let left: HashMap<IVec2, u32> = changes.iter().copied().collect();
     let mut visuals = world.query::<(Entity, &CrystalVisual, &mut Transform)>();
     let mut mined_out = Vec::new();
+    let mut shown = HashSet::new();
     for (entity, visual, mut transform) in visuals.iter_mut(world) {
+        shown.insert(visual.cell);
         match left.get(&visual.cell) {
             Some(0) => mined_out.push(entity),
             Some(&amount) => transform.scale = Vec3::splat(visual.size * crystal_scale(amount)),
@@ -535,6 +537,19 @@ fn show_crystal(world: &mut World, changes: &[(IVec2, u32)]) {
     for entity in mined_out {
         world.despawn(entity);
     }
+    let map_seed = world.resource::<ActiveLevel>().0.map_seed;
+    let mut commands = world.commands();
+    for (&cell, &amount) in &left {
+        if amount > 0 && !shown.contains(&cell) {
+            spawn_crystal_visual(
+                &mut commands,
+                &mut crystal_look(map_seed, cell),
+                cell,
+                amount,
+            );
+        }
+    }
+    world.flush();
 }
 
 /// `None` for a thing of nobody's that is not a neutral site, which the world never sends.

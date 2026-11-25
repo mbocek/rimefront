@@ -11,6 +11,8 @@
   on their way so two of them never block a narrow lane. Once the fields near them are mined out they drive to
   the nearest crystal anywhere on the map. A crystal field is an irregular patch, richest in the
   middle, with a few poorer crystals scattered past its edge.
+  A battle's crystal runs out; a persistent world grows new fields now and then, away from every base
+  (see [persistent-world.md](persistent-world.md)).
 - **Power:** when consumption exceeds production, all production runs at half speed.
 - **Engineer:** unarmed $500 infantry from the Barracks. Right-click an enemy structure (not a wall) with
   engineers selected: they walk in and capture it, damage and all. Right-click a damaged own structure: they

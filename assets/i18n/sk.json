@@ -634,6 +634,7 @@
   "ENTER THE SERVER'S WORLD": "VSTÚPIŤ DO SVETA SERVERA",
   "PLAY A WORLD ALONE": "HRAŤ SVET SÁM",
   "Hold your own in a world that goes on": "Obstoj vo svete, ktorý ide ďalej",
+  "New crystal has surfaced somewhere in the world": "Niekde vo svete vyrástli nové kryštály",
   "Its player is away: it cannot be attacked now": "Jej hráč je preč: teraz sa nedá napadnúť",
   "Nothing of your side stands. Enter the world again to start anew.": "Z tvojej strany nič nestojí. Vstúp do sveta znova a začni odznova.",
   "A persistent world grows as players arrive; each newcomer gets a base of their own and a computer neighbour. Type ws://server/world above to enter a server's world, or play one alone: it is kept for your next game, and a new one puts it aside.": "Trvalý svet rastie s príchodom hráčov; každý nováčik dostane vlastnú základňu a počítačového suseda. Napíš hore ws://server/world a vstúp do sveta servera, alebo hraj svet sám: zostane ti uložený na ďalšiu hru. Nový svet ho odloží.",

@@ -34,7 +34,7 @@ use rimefront_sim::world::wilds::{crystal_look, widen_world};
 /// The layout of a saved world: what its files hold and in what order. It is the first thing in the world
 /// file, so a world saved by another layout is recognised before anything else is read; raising it needs a
 /// way to read the layout before (docs/compatibility.md), and `fixtures/world_layout.txt` changes with it.
-const STORE_VERSION: u32 = 5;
+const STORE_VERSION: u32 = 6;
 const WORLD_FILE: &str = "world.bin";
 const CHUNKS_DIRECTORY: &str = "chunks";
 
@@ -66,6 +66,7 @@ pub struct HostingRecord {
     pub sheltered: Vec<Team>,
     pub computer_sides: Vec<(Team, IVec2)>,
     pub colors: Vec<(Team, SideColor)>,
+    pub deposits: Vec<IVec2>,
 }
 
 /// Everything of a world that is not kept by chunk, and the file of every chunk saved with it.
@@ -545,6 +546,7 @@ mod tests {
                 sheltered: vec![Team::from_index(4)],
                 computer_sides: vec![(Team::Crimson, IVec2::new(54, 8))],
                 colors: vec![(Team::Crimson, SideColor([220, 45, 40]))],
+                deposits: vec![IVec2::new(-90, 70)],
             },
             chunks: vec![(IVec2::new(-1, 2), "-1_2_77.bin".into())],
         }

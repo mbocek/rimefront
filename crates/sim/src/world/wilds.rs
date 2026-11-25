@@ -237,7 +237,7 @@ fn fields_reaching(map_seed: u64, chunk: IVec2, sites: &[IVec2]) -> Vec<CrystalF
 }
 
 /// Crystal a cell holds: rich in the middle of a field, thinner towards its ragged edge.
-fn crystal_at(map: &GameMap, fields: &[CrystalField], cell: IVec2) -> u32 {
+pub(crate) fn crystal_at(map: &GameMap, fields: &[CrystalField], cell: IVec2) -> u32 {
     if !map.is_passable(cell) {
         return 0;
     }

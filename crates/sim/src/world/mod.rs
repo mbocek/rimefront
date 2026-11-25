@@ -1,4 +1,5 @@
 pub mod chunked_grid;
+pub mod deposits;
 pub mod map;
 pub mod map_edits;
 pub mod map_regions;

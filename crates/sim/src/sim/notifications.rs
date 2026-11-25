@@ -75,6 +75,8 @@ pub enum SideNews {
     NoMine,
     /// An order against a side whose player is away, which the shelter turned down.
     Sheltered,
+    /// A new crystal deposit appeared somewhere in the world.
+    CrystalSurfaced,
     BaseUnderAttack,
     HarvesterUnderAttack,
     LowPower,
@@ -100,6 +102,9 @@ impl SideNews {
             SideNews::Refused(refusal) => refusal.message(),
             SideNews::NoMine => tr("No mine: the cell has one or the credits ran out").into(),
             SideNews::Sheltered => tr("Its player is away: it cannot be attacked now").into(),
+            SideNews::CrystalSurfaced => {
+                tr("New crystal has surfaced somewhere in the world").into()
+            }
             SideNews::BaseUnderAttack => tr("Our base is under attack!").into(),
             SideNews::HarvesterUnderAttack => tr("Our harvester is under attack!").into(),
             SideNews::LowPower => tr("Low power - production slowed").into(),
@@ -120,7 +125,11 @@ impl SideNews {
             SideNews::CargoSold => Sound::Credits,
             SideNews::BaseUnderAttack => Sound::BaseAlert,
             SideNews::HarvesterUnderAttack => Sound::HarvesterAlert,
-            SideNews::Refused(_) | SideNews::NoMine | SideNews::Sheltered | SideNews::LowPower => {
+            SideNews::Refused(_)
+            | SideNews::NoMine
+            | SideNews::Sheltered
+            | SideNews::CrystalSurfaced
+            | SideNews::LowPower => {
                 return None;
             }
         })

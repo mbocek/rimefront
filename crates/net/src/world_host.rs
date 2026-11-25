@@ -19,8 +19,10 @@ use rimefront_sim::sim::components::{Building, Health};
 use rimefront_sim::sim::determinism::run_schedules_on_one_thread;
 use rimefront_sim::sim::economy::Economies;
 use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
+use rimefront_sim::sim::notifications::{News, SideNews};
 use rimefront_sim::sim::player_commands::{CommandQueue, SimulationTick};
 use rimefront_sim::sim::sides::{Shelter, retire_side, side_stands};
+use rimefront_sim::world::deposits::lay_new_deposit;
 use rimefront_sim::world::map::{GameMap, base_sites, map_bounds};
 use rimefront_sim::world::sites::{free_starting_site, neutral_site_in_square, squares_within};
 use rimefront_sim::world::terrain::Landscape;
@@ -132,7 +134,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 4;
+pub const WORLD_PROTOCOL: u32 = 5;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {
@@ -179,6 +181,11 @@ pub const TICKS_PER_VIEW: u64 = 2;
 /// the spacing of sites, so a computer side is one site away at most.
 const COMPUTER_NEIGHBOUR_REACH: f32 = 80.0;
 const TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES: u64 = 20;
+/// How often a world may grow a new crystal deposit.
+const TICKS_BETWEEN_DEPOSITS: u64 = 10 * 60 * 20;
+/// A deposit counts as fresh while crystal lies this close to its middle.
+const DEPOSIT_REACH: i32 = 6;
+
 /// How often a player present without a computer side near is given one: rarely enough that beating one
 /// leaves the player some peace first.
 const TICKS_BETWEEN_COMPUTER_NEIGHBOURS: u64 = 5 * 60 * 20;
@@ -218,6 +225,8 @@ pub struct WorldHost {
     computer_sides: HashMap<Team, IVec2>,
     /// Every side's colour, apart enough from the others' to tell them by.
     colors: HashMap<Team, SideColor>,
+    /// The middles of the crystal deposits the world grew since it began.
+    deposits: Vec<IVec2>,
     effects: WorldEffects,
     mined: MinedCrystal,
     /// Effects since the last views went out.
@@ -292,6 +301,7 @@ impl WorldHost {
         host.away_since = hosting.away_since.iter().copied().collect();
         host.computer_sides = hosting.computer_sides.iter().copied().collect();
         host.colors = hosting.colors.iter().copied().collect();
+        host.deposits.clone_from(&hosting.deposits);
         for &team in host.sides_of_players.values() {
             host.away_since.entry(team).or_insert(saved.tick());
         }
@@ -355,6 +365,7 @@ impl WorldHost {
             self.colors.iter().map(|(&t, &c)| (t, c)).collect();
         colors.sort_by_key(|(team, _)| *team);
         HostingRecord {
+            deposits: self.deposits.clone(),
             colors,
             computer_sides,
             level_side_taken: self.level_side_taken,
@@ -417,6 +428,7 @@ impl WorldHost {
         Self {
             computer_sides,
             colors,
+            deposits: Vec::new(),
             app,
             players: Vec::new(),
             level_side_taken: false,
@@ -471,6 +483,10 @@ impl WorldHost {
         let looks = |tick: u64| tick / TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES;
         if looks(self.tick()) != looks(before) {
             self.retire_fallen_computer_sides();
+        }
+        let deposit_rounds = |tick: u64| tick / TICKS_BETWEEN_DEPOSITS;
+        if deposit_rounds(self.tick()) != deposit_rounds(before) {
+            self.grow_a_deposit(deposit_rounds(self.tick()));
         }
         let neighbour_rounds = |tick: u64| tick / TICKS_BETWEEN_COMPUTER_NEIGHBOURS;
         if neighbour_rounds(self.tick()) != neighbour_rounds(before) {
@@ -723,6 +739,45 @@ impl WorldHost {
         self.paint(team, None);
     }
 
+    /// A new crystal deposit somewhere in the world, while fewer are fresh than one more than the players;
+    /// every player present is told it surfaced, not where.
+    fn grow_a_deposit(&mut self, round: u64) {
+        let world = self.app.world();
+        let map = world.resource::<GameMap>();
+        let fresh = self
+            .deposits
+            .iter()
+            .filter(|&&middle| {
+                (-DEPOSIT_REACH..=DEPOSIT_REACH)
+                    .flat_map(|dy| {
+                        (-DEPOSIT_REACH..=DEPOSIT_REACH).map(move |dx| IVec2::new(dx, dy))
+                    })
+                    .any(|offset| map.crystal_at(middle + offset) > 0)
+            })
+            .count();
+        if fresh > self.sides_of_players.len() {
+            return;
+        }
+        let Some((middle, laid)) = lay_new_deposit(self.app.world_mut(), round) else {
+            return;
+        };
+        self.deposits.push(middle);
+        for (cell, amount) in laid {
+            self.mined.record(cell, amount);
+        }
+        let mut present: Vec<Team> = self
+            .players
+            .iter()
+            .filter_map(|player| player.team)
+            .collect();
+        present.dedup();
+        for team in present {
+            self.app
+                .world_mut()
+                .write_message(News::to(team, SideNews::CrystalSurfaced));
+        }
+    }
+
     /// Every player present whose computer neighbour fell, or who never had one, gets one, as hard as the
     /// player's base is big.
     fn bring_computer_sides_to_players(&mut self) {
@@ -816,6 +871,7 @@ mod tests {
     use rimefront_sim::sim::spawn::{spawn_building, spawn_unit};
     use rimefront_sim::world::map::GameMap;
     use rimefront_sim::world::map::cell_center;
+    use rimefront_sim::world::map::chunk_of;
     use rimefront_sim::world::map::world_to_cell;
     use rimefront_sim::world::sites::StartingSites;
 
@@ -1559,6 +1615,68 @@ mod tests {
         run(&mut host, 1, &mut mirror, &mut first);
         assert_eq!(mirror.colors.get(&first_team), Some(&teal));
         assert_eq!(mirror.colors.get(&second_team), Some(&given));
+    }
+
+    #[test]
+    fn a_world_grows_crystal_deposits_away_from_bases_while_few_are_fresh() {
+        let mut host = WorldHost::new(29);
+        let (mut player, mut mirror) = entered_with_mirror(&mut host);
+        for round in 1..=5 {
+            host.grow_a_deposit(round);
+        }
+        assert_eq!(
+            host.deposits.len(),
+            2,
+            "one more fresh deposit than players"
+        );
+        let deposits = host.deposits.clone();
+        let recorded: Vec<bool> = deposits
+            .iter()
+            .map(|&middle| {
+                host.mined
+                    .in_chunk(chunk_of(middle))
+                    .any(|(cell, _)| cell == middle)
+            })
+            .collect();
+        assert!(
+            recorded.iter().all(|&shown| shown),
+            "not recorded for players"
+        );
+        let world = host.world();
+        let structures: Vec<Vec3> = world
+            .query_filtered::<&Transform, With<Building>>()
+            .iter(world)
+            .map(|transform| transform.translation)
+            .collect();
+        let map = world.resource::<GameMap>();
+        for &middle in &deposits {
+            assert!(
+                map.crystal_at(middle) > 0,
+                "no crystal at a deposit's middle"
+            );
+            let nearest = structures
+                .iter()
+                .map(|&at| (world_to_cell(at) - middle).as_vec2().length())
+                .fold(f32::MAX, f32::min);
+            assert!(
+                nearest > 16.0,
+                "a deposit grew {nearest} cells from a structure"
+            );
+        }
+        run(&mut host, 1, &mut mirror, &mut player);
+        assert!(mirror.told.contains(&SideNews::CrystalSurfaced));
+    }
+
+    #[test]
+    fn the_same_world_grows_the_same_deposit_in_the_same_round() {
+        let middle = || {
+            let mut host = WorldHost::new(41);
+            host.grow_a_deposit(3);
+            host.deposits.clone()
+        };
+        let first = middle();
+        assert_eq!(first.len(), 1);
+        assert_eq!(first, middle());
     }
 
     #[test]

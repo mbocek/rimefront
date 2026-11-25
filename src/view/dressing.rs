@@ -19,10 +19,9 @@ pub fn dress_new_unit(
     let Ok((unit, &team)) = units.get(added.entity) else {
         return;
     };
-    commands.entity(added.entity).insert((
-        WorldAssetRoot(models.unit(unit.0, team)),
-        animated_unit_model(unit.0, team),
-    ));
+    commands
+        .entity(added.entity)
+        .insert((models.unit(unit.0, team), animated_unit_model(unit.0)));
 }
 
 /// Structures of a side and the unclaimed sites waiting for one.
@@ -38,13 +37,13 @@ pub fn dress_new_building(
     let mut dressed = commands.entity(added.entity);
     match (team, unclaimed) {
         (Some(&team), false) => {
-            dressed.insert(WorldAssetRoot(models.building(building.kind, team)));
-            if let Some(animated) = animated_building_model(building.kind, team) {
+            dressed.insert(models.building(building.kind, team));
+            if let Some(animated) = animated_building_model(building.kind) {
                 dressed.insert(animated);
             }
         }
         _ => {
-            dressed.insert(WorldAssetRoot(models.unclaimed_site(building.kind)));
+            dressed.insert(models.unclaimed_site(building.kind));
         }
     }
 }
@@ -65,7 +64,7 @@ pub fn lay_corpses(
         spawn_corpse(
             &mut commands,
             models.unit(kind, loss.team),
-            animated_unit_model(kind, loss.team),
+            animated_unit_model(kind),
             Transform::from_translation(loss.position).with_rotation(loss.rotation),
         );
     }

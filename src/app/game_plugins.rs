@@ -381,7 +381,17 @@ impl Plugin for DisplayPlugin {
             MaterialPlugin::<terrain_material::TerrainMaterial>::default(),
             MaterialPlugin::<terrain_material::WaterMaterial>::default(),
             MaterialPlugin::<motion_material::MovingMaterial>::default(),
-        ));
+            MaterialPlugin::<crate::view::side_tint::SideTintedMaterial>::default(),
+        ))
+        .init_resource::<crate::view::side_tint::SideColors>()
+        .init_resource::<crate::view::side_tint::SideTintedMaterials>()
+        .add_systems(
+            Update,
+            (
+                crate::view::side_tint::paint_new_parts,
+                crate::view::side_tint::repaint_parts,
+            ),
+        );
     }
 }
 

@@ -1,0 +1,181 @@
+use std::collections::HashMap;
+
+use bevy::pbr::{ExtendedMaterial, MaterialExtension};
+use bevy::prelude::*;
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
+
+use crate::sim::catalog::Team;
+
+/// A model's own material with its side's colour put where the model has the key colour; see
+/// assets/shaders/side_tint.wesl.
+pub type SideTintedMaterial = ExtendedMaterial<StandardMaterial, SideTint>;
+
+/// Bindless like the standard material, so every side's units still draw in one batch.
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
+#[data(100, SideTintSettings, binding_array(101))]
+#[bindless(index_table(range(100..101), binding(102)))]
+pub struct SideTint {
+    pub settings: SideTintSettings,
+}
+
+impl From<&SideTint> for SideTintSettings {
+    fn from(tint: &SideTint) -> Self {
+        tint.settings
+    }
+}
+
+pub use uniforms::SideTintSettings;
+
+mod uniforms {
+    // The ShaderType derive emits per-field `check` helpers that rustc reports as unused.
+    #![allow(dead_code)]
+    use bevy::prelude::*;
+    use bevy::render::render_resource::ShaderType;
+
+    /// Same layout as `SideTintSettings` in assets/shaders/side_tint.wesl.
+    #[derive(Clone, Copy, Debug, Reflect, ShaderType)]
+    pub struct SideTintSettings {
+        pub color: Vec4,
+    }
+}
+
+impl MaterialExtension for SideTint {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/side_tint.wesl".into()
+    }
+}
+
+/// Whose colour a model's side-coloured surfaces take; put on the root of the model of a unit or structure.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Painted {
+    Side(Team),
+    /// A neutral site nobody holds.
+    Unclaimed,
+}
+
+const UNCLAIMED_GREY: Color = Color::linear_rgb(0.40, 0.41, 0.40);
+
+/// The colour of every side's models: what its player chose, or else the side's own.
+#[derive(Resource, Default, Debug)]
+pub struct SideColors {
+    chosen: HashMap<Team, Color>,
+}
+
+impl SideColors {
+    pub fn of(&self, paint: Painted) -> Color {
+        match paint {
+            Painted::Side(team) => self
+                .chosen
+                .get(&team)
+                .copied()
+                .unwrap_or_else(|| team.model_tint()),
+            Painted::Unclaimed => UNCLAIMED_GREY,
+        }
+    }
+
+    pub fn choose(&mut self, team: Team, color: Color) {
+        self.chosen.insert(team, color);
+    }
+}
+
+/// A part painted in its side's colour: the model's own material, to paint it again when the colour changes.
+#[derive(Component, Clone, Debug)]
+pub struct PaintedPart {
+    paint: Painted,
+    own: Handle<StandardMaterial>,
+}
+
+/// One tinted material for every model material and colour, made the first time a part needs it.
+#[derive(Resource, Default)]
+pub struct SideTintedMaterials(
+    HashMap<(AssetId<StandardMaterial>, [u32; 3]), Handle<SideTintedMaterial>>,
+);
+
+impl SideTintedMaterials {
+    fn for_colour(
+        &mut self,
+        own: &Handle<StandardMaterial>,
+        color: Color,
+        standard: &Assets<StandardMaterial>,
+        tinted: &mut Assets<SideTintedMaterial>,
+    ) -> Option<Handle<SideTintedMaterial>> {
+        let linear = color.to_linear();
+        let key = (
+            own.id(),
+            [linear.red, linear.green, linear.blue].map(f32::to_bits),
+        );
+        if let Some(handle) = self.0.get(&key) {
+            return Some(handle.clone());
+        }
+        let base = standard.get(own)?.clone();
+        let handle = tinted.add(SideTintedMaterial {
+            base,
+            extension: SideTint {
+                settings: SideTintSettings {
+                    color: linear.to_vec4(),
+                },
+            },
+        });
+        self.0.insert(key, handle.clone());
+        Some(handle)
+    }
+}
+
+/// Gives the parts of a model under `Painted` their side's colour, as the model's scene puts them down.
+pub fn paint_new_parts(
+    mut commands: Commands,
+    parts: Query<
+        (Entity, &MeshMaterial3d<StandardMaterial>),
+        Added<MeshMaterial3d<StandardMaterial>>,
+    >,
+    parents: Query<&ChildOf>,
+    paints: Query<&Painted>,
+    colors: Res<SideColors>,
+    standard: Res<Assets<StandardMaterial>>,
+    mut tinted: ResMut<Assets<SideTintedMaterial>>,
+    mut made: ResMut<SideTintedMaterials>,
+) {
+    for (part, material) in &parts {
+        let Some(&paint) = parents
+            .iter_ancestors(part)
+            .find_map(|ancestor| paints.get(ancestor).ok())
+        else {
+            continue;
+        };
+        let Some(handle) = made.for_colour(&material.0, colors.of(paint), &standard, &mut tinted)
+        else {
+            continue;
+        };
+        commands
+            .entity(part)
+            .remove::<MeshMaterial3d<StandardMaterial>>()
+            .insert((
+                MeshMaterial3d(handle),
+                PaintedPart {
+                    paint,
+                    own: material.0.clone(),
+                },
+            ));
+    }
+}
+
+/// Paints every part again when the sides' colours change.
+pub fn repaint_parts(
+    colors: Res<SideColors>,
+    mut parts: Query<(&PaintedPart, &mut MeshMaterial3d<SideTintedMaterial>)>,
+    standard: Res<Assets<StandardMaterial>>,
+    mut tinted: ResMut<Assets<SideTintedMaterial>>,
+    mut made: ResMut<SideTintedMaterials>,
+) {
+    if !colors.is_changed() {
+        return;
+    }
+    for (part, mut material) in &mut parts {
+        if let Some(handle) =
+            made.for_colour(&part.own, colors.of(part.paint), &standard, &mut tinted)
+        {
+            material.0 = handle;
+        }
+    }
+}

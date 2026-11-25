@@ -5,10 +5,11 @@ use bevy::animation::RepeatAnimation;
 use bevy::gltf::Gltf;
 use bevy::prelude::*;
 
-use crate::sim::catalog::{ArmorClass, BuildingKind, Team, UnitKind};
+use crate::sim::catalog::{ArmorClass, BuildingKind, UnitKind};
 use crate::sim::combat::{Targets, surface_distance};
 use crate::sim::components::*;
 use crate::sim::medical::Healer;
+use crate::view::side_tint::Painted;
 
 /// Clip names authored in Blender; tools/blender/irontide_models exports them with exactly these names.
 const IDLE: &str = "Idle";
@@ -85,15 +86,15 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
     }
 }
 
-pub fn animated_unit_model(kind: UnitKind, team: Team) -> AnimatedModel {
-    AnimatedModel(format!("{}_{}", kind.spec().model_id, team.model_variant()))
+pub fn animated_unit_model(kind: UnitKind) -> AnimatedModel {
+    AnimatedModel(kind.spec().model_id.to_string())
 }
 
-pub fn animated_building_model(kind: BuildingKind, team: Team) -> Option<AnimatedModel> {
+pub fn animated_building_model(kind: BuildingKind) -> Option<AnimatedModel> {
     kind.spec()
         .weapon
         .is_some()
-        .then(|| AnimatedModel(format!("{}_{}", kind.spec().model_id, team.model_variant())))
+        .then(|| AnimatedModel(kind.spec().model_id.to_string()))
 }
 
 pub fn load_animation_sources(
@@ -103,12 +104,10 @@ pub fn load_animation_sources(
     let unit_models = UnitKind::INFANTRY
         .iter()
         .chain(UnitKind::VEHICLES.iter())
-        .flat_map(|&kind| Team::ALL.map(|team| animated_unit_model(kind, team).0));
-    let turret_models = BuildingKind::CONSTRUCTIBLE.into_iter().flat_map(|kind| {
-        Team::ALL
-            .into_iter()
-            .filter_map(move |team| animated_building_model(kind, team).map(|m| m.0))
-    });
+        .map(|&kind| animated_unit_model(kind).0);
+    let turret_models = BuildingKind::CONSTRUCTIBLE
+        .into_iter()
+        .filter_map(|kind| animated_building_model(kind).map(|model| model.0));
     for model in unit_models.chain(turret_models) {
         let handle = asset_server.load(format!("models/{model}.glb"));
         library.pending.insert(model, handle);
@@ -318,16 +317,11 @@ pub fn animate_vehicles(
 
 pub fn spawn_corpse(
     commands: &mut Commands,
-    model_scene: Handle<WorldAsset>,
+    model_scene: (WorldAssetRoot, Painted),
     model: AnimatedModel,
     transform: Transform,
 ) {
-    commands.spawn((
-        Corpse { age: 0.0 },
-        model,
-        WorldAssetRoot(model_scene),
-        transform,
-    ));
+    commands.spawn((Corpse { age: 0.0 }, model, model_scene, transform));
 }
 
 /// Plays the fall once, then lets the body lie and finally sink into the ground.

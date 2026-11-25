@@ -60,7 +60,7 @@ pub fn join_walls(
                 for step in wanted.steps() {
                     post.spawn((
                         WallRun,
-                        WorldAssetRoot(models.wall_link(segment.team)),
+                        models.wall_link(segment.team),
                         Transform::from_rotation(Quat::from_rotation_y(
                             yaw_towards(step) - own_yaw,
                         )),

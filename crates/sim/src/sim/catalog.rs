@@ -43,8 +43,9 @@ impl Team {
         format!("{} {}", self.look().name, faction.name())
     }
 
-    pub fn model_variant(self) -> &'static str {
-        self.look().model_variant
+    /// The colour its models' side-coloured surfaces take unless its player chose another.
+    pub fn model_tint(self) -> Color {
+        self.look().model_tint
     }
 
     pub fn ui_color(self) -> Color {
@@ -72,50 +73,52 @@ const NAMED_SIDES: [&str; 4] = ["Player", "Crimson", "Amber", "Violet"];
 struct SideLook {
     name: &'static str,
     color: Color,
-    model_variant: &'static str,
+    /// Linear, as the models' palettes are painted; the first four are the tints the models were once
+    /// exported in, in tools/blender/irontide_models/materials.py.
+    model_tint: Color,
 }
 
-/// Sides past these take the same looks again; only four tints of the models exist.
+/// Sides past these take the same looks again, unless their players chose colours of their own.
 const SIDE_LOOKS: [SideLook; 8] = [
     SideLook {
         name: "Azure",
         color: Color::srgb(0.25, 0.55, 1.0),
-        model_variant: "blue",
+        model_tint: Color::linear_rgb(0.10, 0.30, 0.85),
     },
     SideLook {
         name: "Crimson",
         color: Color::srgb(1.0, 0.3, 0.25),
-        model_variant: "red",
+        model_tint: Color::linear_rgb(0.80, 0.12, 0.10),
     },
     SideLook {
         name: "Amber",
         color: Color::srgb(1.0, 0.62, 0.15),
-        model_variant: "orange",
+        model_tint: Color::linear_rgb(0.95, 0.48, 0.06),
     },
     SideLook {
         name: "Violet",
         color: Color::srgb(0.72, 0.4, 1.0),
-        model_variant: "purple",
+        model_tint: Color::linear_rgb(0.48, 0.16, 0.78),
     },
     SideLook {
         name: "Jade",
         color: Color::srgb(0.25, 0.85, 0.45),
-        model_variant: "blue",
+        model_tint: Color::linear_rgb(0.05, 0.55, 0.22),
     },
     SideLook {
         name: "Rust",
         color: Color::srgb(0.75, 0.4, 0.2),
-        model_variant: "red",
+        model_tint: Color::linear_rgb(0.50, 0.20, 0.07),
     },
     SideLook {
         name: "Gold",
         color: Color::srgb(0.95, 0.85, 0.3),
-        model_variant: "orange",
+        model_tint: Color::linear_rgb(0.85, 0.68, 0.08),
     },
     SideLook {
         name: "Rose",
         color: Color::srgb(1.0, 0.5, 0.75),
-        model_variant: "purple",
+        model_tint: Color::linear_rgb(0.90, 0.32, 0.55),
     },
 ];
 

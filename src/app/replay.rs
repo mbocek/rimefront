@@ -742,7 +742,7 @@ fn spawn_actor(commands: &mut Commands, models: &ModelLibrary, actor: Actor) -> 
     let mut spawned = commands.spawn((
         ReplayActor,
         DespawnOnExit(GameState::Replay),
-        WorldAssetRoot(model),
+        model,
         Transform::default(),
     ));
     if let Look::Building(kind) = look
@@ -756,7 +756,7 @@ fn spawn_actor(commands: &mut Commands, models: &ModelLibrary, actor: Actor) -> 
     }
     if let Look::Unit(kind) = look {
         spawned.insert((
-            animated_unit_model(kind, actor.team()),
+            animated_unit_model(kind),
             ReplayMotion {
                 moving: false,
                 infantry: kind.spec().armor == ArmorClass::Infantry,

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 
 use crate::sim::catalog::{BuildingKind, Team, UnitKind};
+use crate::view::side_tint::Painted;
 
 const NEUTRAL_MODELS: [&str; 22] = [
     "crystal_a",
@@ -31,7 +32,6 @@ const NEUTRAL_MODELS: [&str; 22] = [
 
 const WALL_LINK_MODEL: &str = "wall_link";
 /// The grey variant of a neutral site that nobody holds yet (tools/blender/build_models.py).
-const UNCLAIMED_VARIANT: &str = "neutral";
 
 #[derive(Resource)]
 pub struct ModelLibrary {
@@ -39,34 +39,31 @@ pub struct ModelLibrary {
 }
 
 impl ModelLibrary {
-    pub fn unit(&self, kind: UnitKind, team: Team) -> Handle<WorldAsset> {
-        self.team_model(kind.spec().model_id, team)
+    /// A unit's model, its side-coloured parts in its side's colour.
+    pub fn unit(&self, kind: UnitKind, team: Team) -> (WorldAssetRoot, Painted) {
+        self.painted(kind.spec().model_id, Painted::Side(team))
     }
 
-    pub fn building(&self, kind: BuildingKind, team: Team) -> Handle<WorldAsset> {
-        self.team_model(kind.spec().model_id, team)
+    pub fn building(&self, kind: BuildingKind, team: Team) -> (WorldAssetRoot, Painted) {
+        self.painted(kind.spec().model_id, Painted::Side(team))
     }
 
     /// Half a wall run, joining a wall post to its neighbour.
-    pub fn wall_link(&self, team: Team) -> Handle<WorldAsset> {
-        self.team_model(WALL_LINK_MODEL, team)
+    pub fn wall_link(&self, team: Team) -> (WorldAssetRoot, Painted) {
+        self.painted(WALL_LINK_MODEL, Painted::Side(team))
     }
 
-    pub fn unclaimed_site(&self, kind: BuildingKind) -> Handle<WorldAsset> {
-        self.scenes[&format!("{}_{UNCLAIMED_VARIANT}", kind.spec().model_id)].clone()
+    pub fn unclaimed_site(&self, kind: BuildingKind) -> (WorldAssetRoot, Painted) {
+        self.painted(kind.spec().model_id, Painted::Unclaimed)
     }
 
     pub fn neutral(&self, model_id: &str) -> Handle<WorldAsset> {
         self.scenes[model_id].clone()
     }
 
-    fn team_model(&self, model_id: &str, team: Team) -> Handle<WorldAsset> {
-        self.scenes[&team_model_key(model_id, team)].clone()
+    fn painted(&self, model_id: &str, paint: Painted) -> (WorldAssetRoot, Painted) {
+        (WorldAssetRoot(self.scenes[model_id].clone()), paint)
     }
-}
-
-fn team_model_key(model_id: &str, team: Team) -> String {
-    format!("{model_id}_{}", team.model_variant())
 }
 
 fn load_scene(asset_server: &AssetServer, file_stem: &str) -> Handle<WorldAsset> {
@@ -85,12 +82,9 @@ fn all_model_keys() -> Vec<String> {
                 .map(|kind| kind.spec().model_id),
         )
         .chain(std::iter::once(WALL_LINK_MODEL));
-    let unclaimed_sites = BuildingKind::NEUTRAL_SITES
-        .map(|kind| format!("{}_{UNCLAIMED_VARIANT}", kind.spec().model_id));
     team_model_ids
-        .flat_map(|model_id| Team::ALL.map(|team| team_model_key(model_id, team)))
-        .chain(unclaimed_sites)
-        .chain(NEUTRAL_MODELS.iter().map(|id| id.to_string()))
+        .chain(NEUTRAL_MODELS.iter().copied())
+        .map(str::to_string)
         .collect()
 }
 

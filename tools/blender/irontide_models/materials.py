@@ -9,6 +9,9 @@ TEAM_COLORS = {
     "orange": (0.95, 0.48, 0.06),
     "purple": (0.48, 0.16, 0.78),
     "neutral": (0.40, 0.41, 0.40),
+    # Exported models carry this instead of a side's colour; the game's shader puts the side's in its place.
+    # Same as TEAM_COLOR_KEY in assets/shaders/side_tint.wesl.
+    "key": (1.0, 0.0, 1.0),
 }
 
 

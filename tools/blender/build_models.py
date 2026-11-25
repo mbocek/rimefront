@@ -16,9 +16,8 @@ from irontide_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa
 from irontide_models.parts import TURRET, begin_model  # noqa: E402
 from irontide_models.pipeline import export_glb, inspect_glb, render_icon, render_preview, reset_scene  # noqa: E402
 
-TEAMS = ("blue", "red", "orange", "purple")
-# Structures standing unclaimed on the map until an engineer takes them also come in a grey variant.
-SITE_TEAMS = (*TEAMS, "neutral")
+# A model is exported once, its side's colour a key the game replaces; previews and icons show the first side.
+EXPORTED_TEAM = "key"
 PREVIEW_TEAM = "blue"
 UNIT_TRIANGLE_BUDGET = 16_000
 BUILDING_TRIANGLE_BUDGET = 30_000
@@ -64,7 +63,6 @@ TEAM_MODELS = {
     "observation_post": (buildings.build_observation_post, BUILDING_TRIANGLE_BUDGET),
     "field_hospital": (buildings.build_field_hospital, BUILDING_TRIANGLE_BUDGET),
 }
-SITE_MODELS = {"supply_depot", "observation_post", "field_hospital"}
 ICON_ONLY_MODELS = {
     "upgrade_armour": upgrades.build_armour_upgrade,
     "upgrade_warheads": upgrades.build_warheads_upgrade,
@@ -194,26 +192,26 @@ def build_all(arguments):
         started = time.time()
         root = build_model(model_id, builder)
         has_teams = model_id in TEAM_MODELS
-        teams = (SITE_TEAMS if model_id in SITE_MODELS else TEAMS) if has_teams else (None,)
         palette = convert_to_palette(root) if has_teams else None
-        for team in teams:
-            if team:
-                palette.set_team(team)
-            path = arguments.out / (f"{model_id}_{team}.glb" if team else f"{model_id}.glb")
-            export_glb(root, path)
-            summary, problems = verify_export(model_id, path, budget)
-            if has_teams and TEAM_COLOR_MATERIAL not in palette.names:
-                problems.append("no TeamColor surface")
-            if has_teams and summary.material_names != [PALETTE_MATERIAL]:
-                problems.append(f"expected only the palette material, got {summary.material_names}")
-            failures.extend(f"{path.name}: {p}" for p in problems)
-            report.append(f"{path.name:28s} {summary.triangles:6d} tris  nodes={summary.node_names}")
-            for name, (duration, targets) in summary.animations.items():
-                report.append(f"{'':28s} anim {name} {duration:.2f}s -> {targets}")
-            if not arguments.no_previews and team in (PREVIEW_TEAM, None):
-                render_preview(root, arguments.previews / f"{model_id}.png")
-            if arguments.icons and team == PREVIEW_TEAM:
-                render_icon(root, arguments.icons / f"{model_id}.png")
+        if has_teams:
+            palette.set_team(PREVIEW_TEAM)
+        if not arguments.no_previews:
+            render_preview(root, arguments.previews / f"{model_id}.png")
+        if arguments.icons and has_teams:
+            render_icon(root, arguments.icons / f"{model_id}.png")
+        if has_teams:
+            palette.set_team(EXPORTED_TEAM)
+        path = arguments.out / f"{model_id}.glb"
+        export_glb(root, path)
+        summary, problems = verify_export(model_id, path, budget)
+        if has_teams and TEAM_COLOR_MATERIAL not in palette.names:
+            problems.append("no TeamColor surface")
+        if has_teams and summary.material_names != [PALETTE_MATERIAL]:
+            problems.append(f"expected only the palette material, got {summary.material_names}")
+        failures.extend(f"{path.name}: {p}" for p in problems)
+        report.append(f"{path.name:28s} {summary.triangles:6d} tris  nodes={summary.node_names}")
+        for name, (duration, targets) in summary.animations.items():
+            report.append(f"{'':28s} anim {name} {duration:.2f}s -> {targets}")
         print(f"[iron-tide] built {model_id} in {time.time() - started:.1f}s", flush=True)
 
     if arguments.icons:

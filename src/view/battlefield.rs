@@ -169,7 +169,7 @@ pub fn leave_wrecks(
                 smoke_timer: 0.0,
                 rest_height: ground.y - 0.12,
             },
-            WorldAssetRoot(models.unit(kind, loss.team)),
+            models.unit(kind, loss.team),
             Transform::from_translation(ground)
                 .with_rotation(slump * Quat::from_rotation_y(rng.random_range(0.0..TAU))),
         ));

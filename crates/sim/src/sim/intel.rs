@@ -71,6 +71,10 @@ impl Intel {
             .map(|&(_, position)| position)
     }
 
+    pub fn knows_structure(&self, viewer: Team, id: SimId) -> bool {
+        self.known_structures[viewer.index()].contains_key(&id)
+    }
+
     pub fn known_enemy_structure_entities(
         &self,
         viewer: Team,

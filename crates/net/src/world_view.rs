@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
@@ -6,16 +6,17 @@ use serde::{Deserialize, Serialize};
 
 use iron_tide_sim::sim::catalog::{BuildingKind, Diplomacy, ProjectileStyle, Team, UnitKind};
 use iron_tide_sim::sim::combat::{Projectile, Targets};
-use iron_tide_sim::sim::components::{Building, Health, Unit};
+use iron_tide_sim::sim::components::{Building, HarvestState, Harvester, Health, Unit};
 use iron_tide_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
 use iron_tide_sim::sim::determinism::SimId;
 use iron_tide_sim::sim::economy::Economies;
 use iron_tide_sim::sim::fog::Sight;
+use iron_tide_sim::sim::intel::Intel;
 use iron_tide_sim::sim::production::{BuildItem, Lane, Production};
 use iron_tide_sim::sim::research::Upgrade;
 use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
 use iron_tide_sim::sim::transport::Embarked;
-use iron_tide_sim::world::map::{MapBounds, chunk_of, map_bounds, world_to_cell};
+use iron_tide_sim::world::map::{GameMap, MapBounds, chunk_of, map_bounds, world_to_cell};
 
 /// Positions travel in hundredths of a cell, facings in thousandths of a radian, health in percent: finer
 /// than anything drawn, coarse enough that a unit standing still sends nothing.
@@ -222,6 +223,51 @@ impl WorldEffects {
     }
 }
 
+/// The crystal left in every cell mined since the world grew, by chunk: what a player's fields differ in
+/// from the ones their game grows from the same seed.
+#[derive(Default)]
+pub struct MinedCrystal {
+    by_chunk: HashMap<IVec2, HashMap<IVec2, u32>>,
+    /// Cells harvesters mined at the last look; a harvester that empties a cell moves on in the same tick.
+    last_mined: HashSet<IVec2>,
+}
+
+impl MinedCrystal {
+    /// Notes the crystal left where harvesters mine; called after every update.
+    pub fn note(&mut self, world: &mut World) {
+        let mut harvesters = world.query::<&Harvester>();
+        let mining: HashSet<IVec2> = harvesters
+            .iter(world)
+            .filter_map(|harvester| match harvester.state {
+                HarvestState::Mining { cell, .. } => Some(cell),
+                _ => None,
+            })
+            .collect();
+        let map = world.resource::<GameMap>();
+        for &cell in mining.union(&self.last_mined) {
+            self.by_chunk
+                .entry(chunk_of(cell))
+                .or_default()
+                .insert(cell, map.crystal_at(cell));
+        }
+        self.last_mined = mining;
+    }
+
+    fn in_chunk(&self, chunk: IVec2) -> impl Iterator<Item = (IVec2, u32)> + '_ {
+        self.by_chunk
+            .get(&chunk)
+            .into_iter()
+            .flat_map(|cells| cells.iter().map(|(&cell, &amount)| (cell, amount)))
+    }
+}
+
+/// What happened in a world since the last views went out, for each player to be shown their part of.
+pub struct WorldNews<'a> {
+    pub tick: u64,
+    pub effects: &'a [Effect],
+    pub mined: &'a MinedCrystal,
+}
+
 /// What changed in a player's view of a world since the last one they were sent.
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct ViewChange {
@@ -236,6 +282,8 @@ pub struct ViewChange {
     /// Things gone from view: out of sight, destroyed or carried off.
     pub hidden: Vec<SimId>,
     pub effects: Vec<Effect>,
+    /// Cells whose crystal changed, with what is left.
+    pub crystal: Vec<(IVec2, u32)>,
 }
 
 impl ViewChange {
@@ -244,6 +292,8 @@ impl ViewChange {
             && self.side.is_none()
             && self.shown.is_empty()
             && self.hidden.is_empty()
+            && self.effects.is_empty()
+            && self.crystal.is_empty()
     }
 }
 
@@ -330,6 +380,7 @@ pub struct SentView {
     bounds: Option<MapBounds>,
     credits: Option<i32>,
     side: Option<SideState>,
+    crystal: HashMap<IVec2, u32>,
 }
 
 impl SentView {
@@ -338,16 +389,11 @@ impl SentView {
         &mut self,
         world: &mut World,
         viewer: Team,
-        tick: u64,
-        effects: &[Effect],
+        news: &WorldNews,
     ) -> Option<ViewChange> {
         let chunks = chunks_in_sight(world, viewer);
-        let now = things_in_chunks(world, viewer, &chunks);
-        let effects = effects
-            .iter()
-            .filter(|effect| effect.is_in(&chunks))
-            .copied()
-            .collect();
+        let mut now = things_in_chunks(world, viewer, &chunks);
+        self.keep_known_structures(world, viewer, &mut now);
         let shown = now
             .values()
             .filter(|state| self.things.get(&state.id) != Some(state))
@@ -363,22 +409,63 @@ impl SentView {
         self.bounds = Some(map_bounds());
         self.things = now;
         let credits = world.resource::<Economies>().of(viewer).credits;
-        let side = Some(SideState::of(world, viewer, tick))
+        let side = Some(SideState::of(world, viewer, news.tick))
             .filter(|side| self.side.as_ref() != Some(side));
         if side.is_some() {
             self.side.clone_from(&side);
         }
         let change = ViewChange {
-            tick,
+            tick: news.tick,
             bounds,
             credits,
             side,
             shown,
             hidden,
-            effects,
+            effects: news
+                .effects
+                .iter()
+                .filter(|effect| effect.is_in(&chunks))
+                .copied()
+                .collect(),
+            crystal: self.crystal_changes(&chunks, news.mined),
         };
         let credits_changed = self.credits.replace(credits) != Some(credits);
         (credits_changed || !change.is_empty()).then_some(change)
+    }
+}
+
+impl SentView {
+    /// Enemy structures out of sight stay as last seen, as long as the side has not seen them gone.
+    fn keep_known_structures(
+        &self,
+        world: &World,
+        viewer: Team,
+        now: &mut BTreeMap<SimId, ThingState>,
+    ) {
+        let intel = world.resource::<Intel>();
+        for (id, state) in &self.things {
+            let is_building = matches!(state.thing, Thing::Building { .. });
+            if is_building && !now.contains_key(id) && intel.knows_structure(viewer, *id) {
+                now.insert(*id, *state);
+            }
+        }
+    }
+
+    fn crystal_changes(
+        &mut self,
+        chunks: &HashSet<IVec2>,
+        mined: &MinedCrystal,
+    ) -> Vec<(IVec2, u32)> {
+        let mut changes = Vec::new();
+        for &chunk in chunks {
+            for (cell, amount) in mined.in_chunk(chunk) {
+                if self.crystal.insert(cell, amount) != Some(amount) {
+                    changes.push((cell, amount));
+                }
+            }
+        }
+        changes.sort_by_key(|&(cell, _)| (cell.y, cell.x));
+        changes
     }
 }
 
@@ -390,6 +477,7 @@ pub struct WorldMirror {
     pub credits: i32,
     pub side: SideState,
     pub things: BTreeMap<SimId, ThingState>,
+    pub crystal: BTreeMap<(i32, i32), u32>,
 }
 
 impl WorldMirror {
@@ -407,6 +495,9 @@ impl WorldMirror {
         }
         for state in change.shown {
             self.things.insert(state.id, state);
+        }
+        for (cell, amount) in change.crystal {
+            self.crystal.insert((cell.x, cell.y), amount);
         }
     }
 }

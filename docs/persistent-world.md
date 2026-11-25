@@ -252,10 +252,15 @@ for ordinary network matches.
     (`WorldEffects`): every shot fired with its start, end, arc and flight time, every blast and every
     sound with a place, each to the players who see into a chunk it touches. The game flies the shots as
     `view::effects::ShotFlight`, the same flight replays show, if an end is in its sight, and hands blasts and
-    sounds to the usual presentation. With effects, the quiet minute of the start grew from 6.6 to 7.3 kB.
-    Sounds the rules make only for the level's own player (credits, repair, sale, capture)
-    reach whoever sees the spot. Not mirrored yet: crystal mined away, and enemy structures once out of
-    sight.
+    sounds to the usual presentation. A view that carries only effects goes out too; the quiet minute of the
+    start, with 48 machine-gun shots in the player's sight, costs 17 kB.
+    Crystal mined away travels as cells and what is left in them (`MinedCrystal`): after every update the
+    host notes the cells harvesters mine, by chunk, and each player is sent the cells of the chunks they see
+    into that differ from what they were last sent. A newcomer's game grows the same fields from the seed,
+    so they are sent every cell mined in the chunks they come to see, and nothing else. Enemy structures
+    stay as last seen once out of sight, as long as the side's intel still knows them, as in any battle.
+    Sounds the rules make only for the level's own player (credits, repair, sale, capture) reach whoever
+    sees the spot, and the announcements and messages for the player's own side are not sent yet.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.

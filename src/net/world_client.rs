@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::TcpStream;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -20,7 +21,7 @@ use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::Sides;
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
-use crate::world::map::{GameMap, map_bounds};
+use crate::world::map::{CrystalVisual, GameMap, crystal_scale, map_bounds};
 use crate::world::wilds::widen_world;
 
 /// How long a world the game runs itself sleeps between steps; short enough to answer at once.
@@ -184,6 +185,7 @@ pub fn follow_world(world: &mut World) {
         for effect in change.effects {
             show_effect(world, side, effect);
         }
+        show_crystal(world, &change.crystal);
     }
     show_support_recharge(world, side, local_tick);
 }
@@ -248,6 +250,30 @@ fn show_effect(world: &mut World, side: Team, effect: Effect) {
         Effect::Sound { sound, at } => {
             world.write_message(SoundCue::at(sound, at.position()));
         }
+    }
+}
+
+/// Fields shrink and mined-out cells clear as the world says.
+fn show_crystal(world: &mut World, changes: &[(IVec2, u32)]) {
+    if changes.is_empty() {
+        return;
+    }
+    let mut map = world.resource_mut::<GameMap>();
+    for &(cell, amount) in changes {
+        map.set_crystal(cell, amount);
+    }
+    let left: HashMap<IVec2, u32> = changes.iter().copied().collect();
+    let mut visuals = world.query::<(Entity, &CrystalVisual, &mut Transform)>();
+    let mut mined_out = Vec::new();
+    for (entity, visual, mut transform) in visuals.iter_mut(world) {
+        match left.get(&visual.cell) {
+            Some(0) => mined_out.push(entity),
+            Some(&amount) => transform.scale = Vec3::splat(visual.size * crystal_scale(amount)),
+            None => {}
+        }
+    }
+    for entity in mined_out {
+        world.despawn(entity);
     }
 }
 

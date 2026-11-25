@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
 use crate::network::{Arrival, Link, Message};
-use crate::world_view::{Effect, SentView, WorldEffects};
+use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
 use iron_tide_sim::SimulationPlugin;
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
 use iron_tide_sim::match_flow::{GameState, deploy_newcomer};
@@ -86,6 +86,7 @@ pub struct WorldHost {
     players: Vec<WorldPlayer>,
     level_side_taken: bool,
     effects: WorldEffects,
+    mined: MinedCrystal,
     /// Effects since the last views went out.
     unshown_effects: Vec<Effect>,
 }
@@ -119,6 +120,7 @@ impl WorldHost {
             players: Vec::new(),
             level_side_taken: false,
             effects: WorldEffects::default(),
+            mined: MinedCrystal::default(),
             unshown_effects: Vec::new(),
         }
     }
@@ -153,18 +155,23 @@ impl WorldHost {
         self.app.update();
         let effects = self.effects.gather(self.app.world_mut());
         self.unshown_effects.extend(effects);
+        self.mined.note(self.app.world_mut());
         if self.tick() != before {
             self.show_views();
         }
     }
 
     fn show_views(&mut self) {
-        let tick = self.tick();
         let effects = std::mem::take(&mut self.unshown_effects);
+        let news = WorldNews {
+            tick: self.tick(),
+            effects: &effects,
+            mined: &self.mined,
+        };
         let world = self.app.world_mut();
         for player in &mut self.players {
             let Some(team) = player.team else { continue };
-            if let Some(change) = player.sent.next(world, team, tick, &effects) {
+            if let Some(change) = player.sent.next(world, team, &news) {
                 player
                     .connection
                     .send(&Message::WorldView(Box::new(change)));
@@ -257,9 +264,10 @@ mod tests {
     use iron_tide_sim::sim::intel::Intel;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
     use iron_tide_sim::sim::production::{BuildItem, placement_context};
-    use iron_tide_sim::sim::spawn::spawn_unit;
+    use iron_tide_sim::sim::spawn::{spawn_building, spawn_unit};
     use iron_tide_sim::world::map::GameMap;
     use iron_tide_sim::world::map::map_bounds;
+    use iron_tide_sim::world::map::world_to_cell;
 
     fn follow(mirror: &mut WorldMirror, player: &mut LocalConnection) -> usize {
         let mut bytes = 0;
@@ -383,6 +391,102 @@ mod tests {
                 .any(|effect| matches!(effect, Effect::Blast { .. })),
             "no blast shown"
         );
+    }
+
+    fn own_unit(world: &mut World, team: Team, kind: UnitKind) -> (Entity, Vec3) {
+        world
+            .query::<(Entity, &Unit, &Team, &Transform)>()
+            .iter(world)
+            .find(|(_, unit, owner, _)| **owner == team && unit.0 == kind)
+            .map(|(entity, .., transform)| (entity, transform.translation))
+            .expect("the side has the unit")
+    }
+
+    fn entered_with_mirror(host: &mut WorldHost) -> (LocalConnection, WorldMirror) {
+        let (mut player, _) = enter(host);
+        let mut mirror = WorldMirror::default();
+        host.step(SIMULATION_TICK);
+        follow(&mut mirror, &mut player);
+        (player, mirror)
+    }
+
+    fn run(
+        host: &mut WorldHost,
+        secs: usize,
+        mirror: &mut WorldMirror,
+        player: &mut LocalConnection,
+    ) {
+        for _ in 0..secs * 20 {
+            host.step(SIMULATION_TICK);
+            follow(mirror, player);
+        }
+    }
+
+    #[test]
+    fn a_player_is_shown_the_crystal_mined_in_sight() {
+        let mut host = WorldHost::new(29);
+        let (mut player, mut mirror) = entered_with_mirror(&mut host);
+        let world = host.world();
+        let (_, tank_position) = own_unit(world, Team::Player, UnitKind::Tank);
+        let mut commands = world.commands();
+        spawn_unit(
+            &mut commands,
+            UnitKind::Harvester,
+            Team::Player,
+            tank_position,
+            0.0,
+        );
+        world.flush();
+        run(&mut host, 30, &mut mirror, &mut player);
+
+        assert!(!mirror.crystal.is_empty(), "no mining shown");
+        let map = host.world().resource::<GameMap>();
+        for (&(x, y), &amount) in &mirror.crystal {
+            assert_eq!(map.crystal_at(IVec2::new(x, y)), amount);
+        }
+    }
+
+    #[test]
+    fn an_enemy_structure_stays_as_last_seen_once_out_of_sight() {
+        let mut host = WorldHost::new(29);
+        let (mut player, mut mirror) = entered_with_mirror(&mut host);
+        let world = host.world();
+        let (scout, scout_position) = own_unit(world, Team::Player, UnitKind::Scout);
+        let far_off = scout_position + Vec3::new(0.0, 0.0, -30.0);
+        world.get_mut::<Transform>(scout).unwrap().translation = far_off;
+        let origin = world_to_cell(far_off) + IVec2::new(2, 0);
+        let outpost = world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            spawn_building(
+                &mut commands,
+                &mut map,
+                BuildingKind::PowerPlant,
+                Team::Crimson,
+                origin,
+            )
+        });
+        world.flush();
+        let outpost_shown = |mirror: &WorldMirror| {
+            mirror.things.values().any(|thing| {
+                thing.thing
+                    == Thing::Building {
+                        kind: BuildingKind::PowerPlant,
+                        origin,
+                    }
+            })
+        };
+        run(&mut host, 1, &mut mirror, &mut player);
+        assert!(outpost_shown(&mirror), "the scout never saw the outpost");
+
+        host.world().despawn(scout);
+        run(&mut host, 2, &mut mirror, &mut player);
+        assert!(
+            outpost_shown(&mirror),
+            "the outpost went with the scout's sight"
+        );
+        host.world().despawn(outpost);
+        run(&mut host, 1, &mut mirror, &mut player);
+        assert!(!outpost_shown(&mirror), "a destroyed outpost still shown");
     }
 
     #[test]

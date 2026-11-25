@@ -136,18 +136,17 @@ Done in the code (2026-11-25): the crates (`rimefront`, `rimefront_sim`, `rimefr
 (`rimefront`, `rimefront-server`), environment variables (`RIMEFRONT_*`), the data directory with its move,
 window and headings, packaging and signing scripts, CI, the Blender package (`rimefront_models`, its models
 unchanged: a fresh export differs only in the order Blender writes triangles in), docs, and the updater and
-packages of the bridge release. Mission 10 keeps its name. Simulation results are unchanged.
+packages of the bridge release. Mission 10 keeps its name. Simulation results are unchanged. The GitHub repository is
+`mbocek/rimefront` since the same day; GitHub sends the old address there, so installed copies of Iron Tide
+still find its releases.
 
 Still open, in this order:
 
 1. Check domains and trademarks.
-2. Rename the GitHub repository `mbocek/iron-tide` to `mbocek/rimefront` and update the local remote, before
-   the bridge release is published: `Cargo.toml` already names the new repository, which the update check
-   asks.
-3. Publish the bridge release (a minor version); its notes explain the new name, that settings and saves move
+2. Publish the bridge release (a minor version); its notes explain the new name, that settings and saves move
    on their own, that macOS asks for approval once more, and that the image holds the game under both names
    for this one release.
-4. In the release after, drop the old-name copies from both packaging scripts.
+3. In the release after, drop the old-name copies from both packaging scripts.
 
 ## Order of work (as planned)
 

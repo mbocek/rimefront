@@ -216,8 +216,9 @@ fn deploy_force_at(
 }
 
 /// A newcomer to a wilds world: a side of its own, in a camp of its own, on the free starting site nearest
-/// `near`, with the usual starting force and credits. `None` when the world is not a wilds world.
-pub fn deploy_newcomer(world: &mut World, near: IVec2) -> Option<Team> {
+/// `near`, with the usual starting force and credits. The side and its site; `None` when the world is not
+/// a wilds world.
+pub fn deploy_newcomer(world: &mut World, near: IVec2) -> Option<(Team, IVec2)> {
     let site = claim_starting_site(world, near)?;
     let team = admit_side(world);
     let force = ForceSetup::default();
@@ -228,7 +229,7 @@ pub fn deploy_newcomer(world: &mut World, near: IVec2) -> Option<Team> {
         deploy_force_at(&mut commands, &mut map, team, &force, deployment);
     });
     world.flush();
-    Some(team)
+    Some((team, site))
 }
 
 /// Builds the opening position of the active level: bases, armies, money, opponents and tech limits.

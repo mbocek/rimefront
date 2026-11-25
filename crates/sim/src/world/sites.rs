@@ -100,6 +100,13 @@ pub fn claim_starting_site(world: &mut World, near: IVec2) -> Option<IVec2> {
     }
 }
 
+/// Gives a site back to be claimed by the next newcomer.
+pub fn free_starting_site(world: &mut World, site: IVec2) {
+    if let Some(mut sites) = world.get_resource_mut::<StartingSites>() {
+        sites.claimed.retain(|&claimed| claimed != site);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bevy::ecs::system::RunSystemOnce;

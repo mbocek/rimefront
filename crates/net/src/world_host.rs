@@ -12,10 +12,12 @@ use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews}
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
 use iron_tide_sim::match_flow::{GameState, HostedWorld, deploy_newcomer};
 use iron_tide_sim::sim::catalog::Team;
+use iron_tide_sim::sim::components::Health;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
 use iron_tide_sim::sim::sides::{Shelter, side_stands};
 use iron_tide_sim::world::map::{GameMap, base_sites};
+use iron_tide_sim::world::sites::free_starting_site;
 use iron_tide_sim::world::terrain::Landscape;
 use iron_tide_sim::{SIMULATION_TICK, SimulationPlugin};
 
@@ -104,12 +106,19 @@ impl PlayerKey {
 pub struct AbsenceRules {
     /// Away this long, a side is sheltered; long enough that leaving does not get anyone out of a fight.
     pub shelter_after: Duration,
+    /// Away this long, a side's units and structures start to decay.
+    pub decay_after: Duration,
+    /// How long decay takes to wear down something unhurt.
+    pub decay_over: Duration,
 }
 
 impl Default for AbsenceRules {
     fn default() -> Self {
+        let day = Duration::from_secs(24 * 60 * 60);
         Self {
             shelter_after: Duration::from_secs(120),
+            decay_after: 3 * day,
+            decay_over: 2 * day,
         }
     }
 }
@@ -139,6 +148,8 @@ pub struct WorldHost {
     absence: AbsenceRules,
     /// The tick each side of a player who is not connected was left at.
     away_since: HashMap<Team, u64>,
+    /// The generated site each newcomer's side was deployed on.
+    sites: HashMap<Team, IVec2>,
     effects: WorldEffects,
     mined: MinedCrystal,
     /// Effects since the last views went out.
@@ -178,6 +189,7 @@ impl WorldHost {
             entries: 0,
             absence: AbsenceRules::default(),
             away_since: HashMap::new(),
+            sites: HashMap::new(),
             effects: WorldEffects::default(),
             mined: MinedCrystal::default(),
             unshown_effects: Vec::new(),
@@ -218,6 +230,8 @@ impl WorldHost {
         self.app
             .insert_resource(TimeUpdateStrategy::ManualDuration(elapsed));
         self.app.update();
+        let ticks_gone_by = self.tick() - before;
+        self.wear_down_long_absent_sides(ticks_gone_by);
         let effects = self.effects.gather(self.app.world_mut());
         self.unshown_effects.extend(effects);
         self.mined.note(self.app.world_mut());
@@ -281,6 +295,48 @@ impl WorldHost {
             }
         }
         self.app.insert_resource(shelter);
+    }
+
+    /// The units and structures of a side away past `decay_after` lose health by the tick; once nothing of
+    /// it stands, its player is forgotten and its site freed for the next newcomer.
+    fn wear_down_long_absent_sides(&mut self, ticks: u64) {
+        let now = self.tick();
+        let decay_after = ticks_in(self.absence.decay_after);
+        let decaying: Vec<Team> = self
+            .away_since
+            .iter()
+            .filter(|&(_, &since)| now - since >= decay_after)
+            .map(|(&team, _)| team)
+            .collect();
+        if decaying.is_empty() || ticks == 0 {
+            return;
+        }
+        let share = ticks as f32 / ticks_in(self.absence.decay_over).max(1) as f32;
+        let world = self.app.world_mut();
+        let mut things = world.query::<(&Team, &mut Health)>();
+        for (team, mut health) in things.iter_mut(world) {
+            if decaying.contains(team) {
+                health.current -= health.max * share;
+            }
+        }
+        for team in decaying {
+            if !side_stands(self.app.world_mut(), team) {
+                self.retire(team);
+            }
+        }
+    }
+
+    fn retire(&mut self, team: Team) {
+        self.sides_of_players.retain(|_, &mut side| side != team);
+        self.away_since.remove(&team);
+        self.app
+            .world_mut()
+            .resource_mut::<Shelter>()
+            .0
+            .remove(team);
+        if let Some(site) = self.sites.remove(&team) {
+            free_starting_site(self.app.world_mut(), site);
+        }
     }
 
     /// A player who entered again elsewhere commands their side from there; the older connection goes.
@@ -350,10 +406,11 @@ impl WorldHost {
 
     /// A returning player's side if anything of it still stands, otherwise a new one.
     fn side_for(&mut self, key: &PlayerKey) -> Option<Team> {
-        if let Some(&team) = self.sides_of_players.get(key)
-            && side_stands(self.app.world_mut(), team)
-        {
-            return Some(team);
+        if let Some(&team) = self.sides_of_players.get(key) {
+            if side_stands(self.app.world_mut(), team) {
+                return Some(team);
+            }
+            self.retire(team);
         }
         let team = self.side_for_newcomer()?;
         self.sides_of_players.insert(key.clone(), team);
@@ -367,7 +424,9 @@ impl WorldHost {
             return Some(Team::Player);
         }
         let first_base = base_sites()[0];
-        deploy_newcomer(self.app.world_mut(), first_base)
+        let (team, site) = deploy_newcomer(self.app.world_mut(), first_base)?;
+        self.sites.insert(team, site);
+        Some(team)
     }
 }
 
@@ -400,6 +459,7 @@ mod tests {
     use iron_tide_sim::world::map::GameMap;
     use iron_tide_sim::world::map::map_bounds;
     use iron_tide_sim::world::map::world_to_cell;
+    use iron_tide_sim::world::sites::StartingSites;
 
     fn follow(mirror: &mut WorldMirror, player: &mut LocalConnection) -> usize {
         let mut bytes = 0;
@@ -743,6 +803,7 @@ mod tests {
         let mut host = WorldHost::new(29);
         host.set_absence_rules(AbsenceRules {
             shelter_after: Duration::from_secs(2),
+            ..AbsenceRules::default()
         });
         let key = PlayerKey::new_random();
         let (visit, team) = enter_as(&mut host, &key);
@@ -763,6 +824,35 @@ mod tests {
             !sheltered(&mut host),
             "still sheltered after the player came back"
         );
+    }
+
+    #[test]
+    fn a_side_long_away_decays_and_frees_its_site() {
+        let mut host = WorldHost::new(29);
+        host.set_absence_rules(AbsenceRules {
+            shelter_after: Duration::from_secs(1),
+            decay_after: Duration::from_secs(2),
+            decay_over: Duration::from_secs(3),
+        });
+        let (_first, _) = enter(&mut host);
+        let key = PlayerKey::new_random();
+        let (visit, team) = enter_as(&mut host, &key);
+        let site = host.sites[&team];
+        drop(visit);
+        for _ in 0..3 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(side_stands(host.world(), team), "decayed too soon");
+        for _ in 0..4 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(!side_stands(host.world(), team), "never decayed");
+        let claimed = &host.world().resource::<StartingSites>().claimed;
+        assert!(!claimed.contains(&site), "the site stayed claimed");
+        assert!(!host.world().resource::<Shelter>().covers(team));
+
+        let (_back, new_team) = enter_as(&mut host, &key);
+        assert_ne!(new_team, team);
     }
 
     #[test]

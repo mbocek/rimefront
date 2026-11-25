@@ -281,6 +281,13 @@ for ordinary network matches.
     ordered before the shelter is dropped, a shell already flying at one does it no harm, and engineers
     cannot capture its structures. Vision is untouched, so others still see a sheltered base. Players are not
     yet shown which sides are sheltered.
+    Away past `decay_after` (3 days by default), every unit and structure of the side loses a share of its
+    full health each tick, so that something unhurt is gone after `decay_over` (2 more days); the usual rules
+    remove what reaches nothing. A player who returns stops the decay and can repair. Once nothing of a side
+    stands, from decay or from a fight, it is retired: its key is forgotten, so its player starts anew, and
+    the generated site it was deployed on is free for the next newcomer. Retired side ids are not given out
+    again, so a world holds at most 256 sides over its life, and the level's own base is not given out again
+    once its first player's side is gone.
 15. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
     the JSON save format gives way to a compact binary one.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing

@@ -515,7 +515,7 @@ mod tests {
             },
             Message::WorldView(Box::new(ViewChange {
                 tick: 5,
-                credits: -40,
+                credits: Some(-40),
                 ..ViewChange::default()
             })),
         ];

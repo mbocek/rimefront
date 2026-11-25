@@ -63,6 +63,38 @@ impl ThingState {
     pub fn facing(&self) -> f32 {
         self.facing as f32 / FACING_STEPS
     }
+
+    /// How this differs from `before`, when it is the same thing of the same side that moved, turned or
+    /// was hurt.
+    fn moved_from(&self, before: &ThingState) -> Option<Moved> {
+        let same = self.id == before.id && self.thing == before.thing && self.team == before.team;
+        same.then(|| Moved {
+            id: self.id,
+            step: [0, 1, 2].map(|axis| self.position.0[axis] - before.position.0[axis]),
+            turn: self.facing - before.facing,
+            health_percent: self.health_percent,
+        })
+    }
+
+    /// This thing after `moved`.
+    pub fn after(mut self, moved: &Moved) -> ThingState {
+        for (axis, step) in moved.step.iter().enumerate() {
+            self.position.0[axis] += step;
+        }
+        self.facing += moved.turn;
+        self.health_percent = moved.health_percent;
+        self
+    }
+}
+
+/// A thing the player was shown before that moved, turned or was hurt, as the change from the last state
+/// sent: a step of a tick is a byte or two where a whole state is a dozen.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct Moved {
+    pub id: SimId,
+    step: [i32; 3],
+    turn: i32,
+    health_percent: u8,
 }
 
 /// One production lane of the player's side: what is queued, how far along the first item is, and a
@@ -308,11 +340,14 @@ pub struct ViewChange {
     pub tick: u64,
     /// The world's cells, when they widened since the last view.
     pub bounds: Option<MapBounds>,
-    pub credits: i32,
+    /// The player's credits, when they changed.
+    pub credits: Option<i32>,
     /// The player's own side, when it changed since the last view.
     pub side: Option<SideState>,
-    /// Things that came into view or changed.
+    /// Things that came into view or changed into another.
     pub shown: Vec<ThingState>,
+    /// Things already shown that moved, turned or were hurt.
+    pub moved: Vec<Moved>,
     /// Things gone from view: out of sight, destroyed or carried off.
     pub hidden: Vec<SimId>,
     pub effects: Vec<Effect>,
@@ -323,8 +358,10 @@ pub struct ViewChange {
 impl ViewChange {
     fn is_empty(&self) -> bool {
         self.bounds.is_none()
+            && self.credits.is_none()
             && self.side.is_none()
             && self.shown.is_empty()
+            && self.moved.is_empty()
             && self.hidden.is_empty()
             && self.effects.is_empty()
             && self.crystal.is_empty()
@@ -428,11 +465,18 @@ impl SentView {
         let chunks = chunks_in_sight(world, viewer);
         let mut now = things_in_chunks(world, viewer, &chunks);
         self.keep_known_structures(world, viewer, &mut now);
-        let shown = now
-            .values()
-            .filter(|state| self.things.get(&state.id) != Some(state))
-            .copied()
-            .collect();
+        let mut shown = Vec::new();
+        let mut moved = Vec::new();
+        for state in now.values() {
+            match self.things.get(&state.id) {
+                Some(before) if before == state => {}
+                Some(before) => match state.moved_from(before) {
+                    Some(change) => moved.push(change),
+                    None => shown.push(*state),
+                },
+                None => shown.push(*state),
+            }
+        }
         let hidden = self
             .things
             .keys()
@@ -443,6 +487,7 @@ impl SentView {
         self.bounds = Some(map_bounds());
         self.things = now;
         let credits = world.resource::<Economies>().of(viewer).credits;
+        let credits = (self.credits.replace(credits) != Some(credits)).then_some(credits);
         let side = Some(SideState::of(world, viewer, news.tick))
             .filter(|side| self.side.as_ref() != Some(side));
         if side.is_some() {
@@ -454,6 +499,7 @@ impl SentView {
             credits,
             side,
             shown,
+            moved,
             hidden,
             effects: news
                 .effects
@@ -463,8 +509,7 @@ impl SentView {
                 .collect(),
             crystal: self.crystal_changes(&chunks, news.mined),
         };
-        let credits_changed = self.credits.replace(credits) != Some(credits);
-        (credits_changed || !change.is_empty()).then_some(change)
+        (!change.is_empty()).then_some(change)
     }
 }
 
@@ -519,7 +564,9 @@ pub struct WorldMirror {
 impl WorldMirror {
     pub fn apply(&mut self, change: ViewChange) {
         self.tick = change.tick;
-        self.credits = change.credits;
+        if let Some(credits) = change.credits {
+            self.credits = credits;
+        }
         if change.bounds.is_some() {
             self.bounds = change.bounds;
         }
@@ -531,6 +578,11 @@ impl WorldMirror {
         }
         for state in change.shown {
             self.things.insert(state.id, state);
+        }
+        for moved in &change.moved {
+            if let Some(state) = self.things.get_mut(&moved.id) {
+                *state = state.after(moved);
+            }
         }
         for (cell, amount) in change.crystal {
             self.crystal.insert((cell.x, cell.y), amount);

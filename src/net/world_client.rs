@@ -17,7 +17,7 @@ use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewCha
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
 use crate::sim::cues::{BlastCue, SoundCue};
-use crate::sim::determinism::SimEntities;
+use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
 use crate::sim::notifications::News;
@@ -41,6 +41,8 @@ pub struct WorldClient {
     /// Views that arrived and are not yet shown.
     waiting: Vec<ViewChange>,
     side: SideState,
+    /// Every thing shown, as last sent, for the changes the world sends of them.
+    shown: HashMap<SimId, ThingState>,
     /// How many ticks the world is ahead of the battle here.
     world_tick_lead: i64,
     lost: bool,
@@ -57,6 +59,7 @@ impl WorldClient {
             team: None,
             waiting: Vec::new(),
             side: SideState::default(),
+            shown: HashMap::new(),
             world_tick_lead: 0,
             lost: false,
         }
@@ -194,17 +197,31 @@ pub fn follow_world(world: &mut World) {
         if let Some(bounds) = change.bounds.filter(|&bounds| bounds != map_bounds()) {
             widen_world(world, bounds);
         }
-        world.resource_mut::<Economies>().of_mut(side).credits = change.credits;
+        if let Some(credits) = change.credits {
+            world.resource_mut::<Economies>().of_mut(side).credits = credits;
+        }
         if let Some(state) = change.side {
             state.apply_to(world, side);
             world.resource_mut::<WorldClient>().side = state;
         }
         for id in change.hidden {
+            world.resource_mut::<WorldClient>().shown.remove(&id);
             if let Some(entity) = world.resource::<SimEntities>().get(id) {
                 forget(world, entity);
             }
         }
-        for state in change.shown {
+        let mut client = world.resource_mut::<WorldClient>();
+        let mut states = change.shown;
+        states.extend(
+            change
+                .moved
+                .iter()
+                .filter_map(|moved| client.shown.get(&moved.id).map(|state| state.after(moved))),
+        );
+        for state in &states {
+            client.shown.insert(state.id, *state);
+        }
+        for state in states {
             show(world, state);
         }
         for effect in change.effects {

@@ -313,8 +313,11 @@ for ordinary network matches.
     Every message after the version check travels in postcard too (`link::encode`, see
     [determinism.md](determinism.md)), lockstep turns included. Measured in `world_host`'s test on the wire:
     the quiet first minute, with effects and side news, went from 16.8 kB as JSON to 2.1 kB, and a tank
-    driving 10 s from 56 kB to 6.7 kB, about 0.7 kB/s for every moving unit in sight. Sending only the
-    change of a moving unit's position would about halve that again.
+    driving 10 s from 56 kB to 6.7 kB. A thing already shown that only moved, turned or was hurt then
+    travels as the change from the last state sent (`Moved`: a step and a turn, a byte or two each, and its
+    health), and credits only when they change: 1.9 kB and 5.1 kB. Of those 10 s, 191 views: 1.6 kB of
+    moves, 1.5 kB of effects (each shot carries its flight, blast and sound), and about 8 bytes of header a
+    view (tick, empty lists). The game keeps the last state of every thing shown to apply the moves to.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing
     empty between players.
 

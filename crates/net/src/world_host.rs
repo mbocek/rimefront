@@ -15,7 +15,7 @@ use rimefront_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective}
 use rimefront_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
 use rimefront_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
-use rimefront_sim::sim::components::Health;
+use rimefront_sim::sim::components::{Building, Health};
 use rimefront_sim::sim::determinism::run_schedules_on_one_thread;
 use rimefront_sim::sim::economy::Economies;
 use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
@@ -178,8 +178,14 @@ pub const TICKS_PER_VIEW: u64 = 2;
 /// A newcomer whose site has no computer side this many cells away gets one beside them: a little more than
 /// the spacing of sites, so a computer side is one site away at most.
 const COMPUTER_NEIGHBOUR_REACH: f32 = 80.0;
-const COMPUTER_DIFFICULTY: Difficulty = Difficulty::Normal;
 const TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES: u64 = 20;
+/// How often a player present without a computer side near is given one: rarely enough that beating one
+/// leaves the player some peace first.
+const TICKS_BETWEEN_COMPUTER_NEIGHBOURS: u64 = 5 * 60 * 20;
+/// A computer side gets harder beside a player with this many structures that keep a side alive, and harder
+/// again past the second.
+const STRUCTURES_FOR_A_HARD_NEIGHBOUR: usize = 8;
+const STRUCTURES_FOR_A_BRUTAL_NEIGHBOUR: usize = 20;
 
 fn ticks_in(duration: Duration) -> u64 {
     (duration.as_secs_f64() / SIMULATION_TICK.as_secs_f64()).round() as u64
@@ -466,6 +472,10 @@ impl WorldHost {
         if looks(self.tick()) != looks(before) {
             self.retire_fallen_computer_sides();
         }
+        let neighbour_rounds = |tick: u64| tick / TICKS_BETWEEN_COMPUTER_NEIGHBOURS;
+        if neighbour_rounds(self.tick()) != neighbour_rounds(before) {
+            self.bring_computer_sides_to_players();
+        }
         let effects = self.effects.gather(self.app.world_mut());
         self.unshown_effects.extend(effects);
         self.mined.note(self.app.world_mut());
@@ -687,12 +697,12 @@ impl WorldHost {
         let first_base = base_sites()[0];
         let (team, site) = self.deploy_side_near(first_base)?;
         self.sites.insert(team, site);
-        self.give_a_computer_neighbour(site);
+        self.give_a_computer_neighbour(site, Difficulty::Normal);
         Some(team)
     }
 
     /// A newcomer with no computer side near finds one on the free site nearest them.
-    fn give_a_computer_neighbour(&mut self, site: IVec2) {
+    fn give_a_computer_neighbour(&mut self, site: IVec2, difficulty: Difficulty) {
         let has_one = self
             .computer_sides
             .values()
@@ -707,11 +717,53 @@ impl WorldHost {
         world
             .resource_mut::<AiCommanders>()
             .0
-            .push(AiCommander::new(team, computer_site, COMPUTER_DIFFICULTY));
-        world.resource_mut::<Economies>().of_mut(team).income_rate =
-            COMPUTER_DIFFICULTY.income_rate();
+            .push(AiCommander::new(team, computer_site, difficulty));
+        world.resource_mut::<Economies>().of_mut(team).income_rate = difficulty.income_rate();
         self.computer_sides.insert(team, computer_site);
         self.paint(team, None);
+    }
+
+    /// Every player present whose computer neighbour fell, or who never had one, gets one, as hard as the
+    /// player's base is big.
+    fn bring_computer_sides_to_players(&mut self) {
+        let mut present: Vec<Team> = self
+            .players
+            .iter()
+            .filter_map(|player| player.team)
+            .collect();
+        present.sort();
+        present.dedup();
+        for team in present {
+            let Some(site) = self.site_of(team) else {
+                continue;
+            };
+            let difficulty = self.neighbour_difficulty_for(team);
+            self.give_a_computer_neighbour(site, difficulty);
+        }
+    }
+
+    /// Where a player's side started: a generated site, or the level's first base for the first player.
+    fn site_of(&self, team: Team) -> Option<IVec2> {
+        match self.sites.get(&team) {
+            Some(&site) => Some(site),
+            None => (team == Team::Player).then(|| base_sites()[0]),
+        }
+    }
+
+    fn neighbour_difficulty_for(&mut self, team: Team) -> Difficulty {
+        let world = self.app.world_mut();
+        let structures = world
+            .query::<(&Building, &Team)>()
+            .iter(world)
+            .filter(|(building, owner)| **owner == team && building.kind.keeps_a_side_alive())
+            .count();
+        if structures >= STRUCTURES_FOR_A_BRUTAL_NEIGHBOUR {
+            Difficulty::Brutal
+        } else if structures >= STRUCTURES_FOR_A_HARD_NEIGHBOUR {
+            Difficulty::Hard
+        } else {
+            Difficulty::Normal
+        }
     }
 
     /// A computer side with nothing left gives up its commander and its site.
@@ -1507,6 +1559,65 @@ mod tests {
         run(&mut host, 1, &mut mirror, &mut first);
         assert_eq!(mirror.colors.get(&first_team), Some(&teal));
         assert_eq!(mirror.colors.get(&second_team), Some(&given));
+    }
+
+    #[test]
+    fn a_player_whose_computer_neighbour_fell_gets_another_after_a_while() {
+        let mut host = WorldHost::new(29);
+        let (_first, _) = enter(&mut host);
+        let (_player, team) = enter(&mut host);
+        let site = host.sites[&team];
+        let neighbour = |host: &WorldHost| {
+            host.computer_sides
+                .iter()
+                .find(|(_, computer)| {
+                    (**computer - site).as_vec2().length() <= COMPUTER_NEIGHBOUR_REACH
+                })
+                .map(|(&computer, _)| computer)
+        };
+        let fallen = neighbour(&host).expect("the newcomer has a computer neighbour");
+        let world = host.world();
+        let everything: Vec<Entity> = world
+            .query::<(Entity, &Team)>()
+            .iter(world)
+            .filter(|(_, owner)| **owner == fallen)
+            .map(|(entity, _)| entity)
+            .collect();
+        for entity in everything {
+            world.despawn(entity);
+        }
+        for _ in 0..TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES + 1 {
+            host.step(SIMULATION_TICK);
+        }
+        assert_eq!(neighbour(&host), None, "the fallen neighbour stayed");
+        for _ in 0..TICKS_BETWEEN_COMPUTER_NEIGHBOURS {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(neighbour(&host).is_some(), "no new neighbour came");
+    }
+
+    #[test]
+    fn a_computer_neighbour_is_as_hard_as_the_player_is_big() {
+        let mut host = WorldHost::new(29);
+        let (_player, team) = enter(&mut host);
+        assert_eq!(host.neighbour_difficulty_for(team), Difficulty::Normal);
+        let site = host.site_of(team).unwrap();
+        let world = host.world();
+        world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            for index in 0..STRUCTURES_FOR_A_HARD_NEIGHBOUR as i32 {
+                let origin = site + IVec2::new(-20 + index * 3, 12);
+                spawn_building(
+                    &mut commands,
+                    &mut map,
+                    BuildingKind::PowerPlant,
+                    team,
+                    origin,
+                );
+            }
+        });
+        world.flush();
+        assert_eq!(host.neighbour_difficulty_for(team), Difficulty::Hard);
     }
 
     #[test]

@@ -101,3 +101,19 @@ fn a_retired_side_leaves_nothing_and_its_number_is_given_out_again() {
         "a level's side was given out again"
     );
 }
+
+#[test]
+fn a_commander_searches_the_sites_a_world_gave_out_too() {
+    use rimefront::sim::intel::Intel;
+    use rimefront::world::map::cell_center;
+    let mut battle = Battle::sandbox();
+    let claimed = IVec2::new(40, 40);
+    let beside_it = cell_center(claimed + IVec2::new(-4, -4));
+    let intel = battle.world().resource::<Intel>();
+    let searched = intel
+        .base_site_to_search(Team::Crimson, beside_it, &[claimed])
+        .expect("somewhere to search");
+    assert_eq!(searched, cell_center(claimed + IVec2::ONE));
+    let without = intel.base_site_to_search(Team::Crimson, beside_it, &[]);
+    assert_ne!(without, Some(searched));
+}

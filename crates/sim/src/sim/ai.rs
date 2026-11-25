@@ -27,6 +27,7 @@ use crate::world::map::{
     CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, in_far_half,
     mirror_centre, opposite_cell, opposite_origin, world_to_cell,
 };
+use crate::world::sites::StartingSites;
 
 const MAX_WAVE_SIZE: usize = 16;
 const SPLIT_WAVES_FROM: usize = 6;
@@ -295,6 +296,7 @@ pub fn command_enemies(
     buildings: Query<(&Building, &Team)>,
     unit_positions: Query<&Transform, With<Unit>>,
     mut army: Query<ArmyUnit>,
+    starting_sites: Option<Res<StartingSites>>,
 ) {
     for ai in commanders.0.iter_mut() {
         ai.think_timer -= time.delta_secs();
@@ -351,6 +353,7 @@ pub fn command_enemies(
         let knowledge = Knowledge {
             targets: &targets,
             intel: &intel,
+            claimed_sites: claimed_sites(&starting_sites),
         };
         direct_army(ai, &knowledge, &map, &buildings, &mut army);
     }
@@ -849,6 +852,12 @@ fn pursue_research(
 struct Knowledge<'a> {
     targets: &'a Targets,
     intel: &'a Intel,
+    /// The starting sites a world gave out, where enemies may stand beside the level's own bases.
+    claimed_sites: &'a [IVec2],
+}
+
+fn claimed_sites<'a>(sites: &'a Option<Res<StartingSites>>) -> &'a [IVec2] {
+    sites.as_deref().map_or(&[], |sites| &sites.claimed)
 }
 
 fn direct_army(
@@ -894,7 +903,11 @@ fn direct_army(
         })
         .map(|t| t.position);
     let known_objective = known_assault_objective(team, home, &visible_enemies, knowledge);
-    let search_site = || knowledge.intel.base_site_to_search(team, home);
+    let search_site = || {
+        knowledge
+            .intel
+            .base_site_to_search(team, home, knowledge.claimed_sites)
+    };
     let assault_objective = known_objective.or_else(search_site);
 
     if visible_enemies.iter().any(|t| !t.is_building) {
@@ -1322,6 +1335,7 @@ pub fn call_support_powers(
     intel: Res<Intel>,
     mut support: ResMut<SupportPowers>,
     buildings: Query<(&Building, &Team)>,
+    starting_sites: Option<Res<StartingSites>>,
 ) {
     for ai in &commanders.0 {
         let team = ai.team;
@@ -1332,7 +1346,8 @@ pub fn call_support_powers(
             .is_none();
         if support.is_charged(team, SupportPower::ReconSweep)
             && nothing_known
-            && let Some(site) = intel.base_site_to_search(team, home)
+            && let Some(site) =
+                intel.base_site_to_search(team, home, claimed_sites(&starting_sites))
         {
             support.call(team, SupportPower::ReconSweep, world_to_cell(site), &owned);
         }

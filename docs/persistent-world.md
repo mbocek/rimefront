@@ -340,7 +340,12 @@ for ordinary network matches.
     Computer sides: the level's own opponent holds its base, and a newcomer with no computer side within
     80 cells of their site (a little more than the spacing of sites, so one site away at most) gets one on
     the free site nearest them: the usual starting force, a commander of normal difficulty and its income.
-    A computer side with nothing left gives up its commander and its site. The host keeps which sides are
+    A computer side with nothing left gives up its commander and its site. Every five minutes of world time
+    each player present without a computer side near gets one, so a neighbour beaten is replaced after a
+    while rather than at once; it is normal against a player with fewer than 8 structures that keep a side
+    alive, hard up to 20 and brutal beyond. Commanders search for enemies nobody has found at the starting
+    sites the world gave out as well as at the level's four bases, so in a world that has widened they find
+    the players around them. The host keeps which sides are
     the computer's and where, and a saved world keeps that too. Computer commanders leave a sheltered side's
     structures out of their plans (attack waves, barrages, recon, engineers): `Targets` already keeps their
     shooters off them, and they would only stand there.

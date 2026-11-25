@@ -113,12 +113,13 @@ impl Intel {
         self.known_structures[viewer.index()].values().copied()
     }
 
-    /// Where to look for an enemy nobody has found: the nearest base site never explored, or failing that
-    /// the nearest one out of sight right now.
-    pub fn base_site_to_search(&self, viewer: Team, from: Vec3) -> Option<Vec3> {
+    /// Where to look for an enemy nobody has found: the nearest base site, the level's or one of `claimed`
+    /// (the starting sites a world gave out), never explored, or failing that the nearest out of sight now.
+    pub fn base_site_to_search(&self, viewer: Team, from: Vec3, claimed: &[IVec2]) -> Option<Vec3> {
         let vision = self.vision(viewer);
         let sites: Vec<Vec3> = base_sites()
             .iter()
+            .chain(claimed)
             .map(|&site| cell_center(site + IVec2::ONE))
             .collect();
         let nearest = |candidates: Vec<Vec3>| {

@@ -285,9 +285,12 @@ for ordinary network matches.
     full health each tick, so that something unhurt is gone after `decay_over` (2 more days); the usual rules
     remove what reaches nothing. A player who returns stops the decay and can repair. Once nothing of a side
     stands, from decay or from a fight, it is retired: its key is forgotten, so its player starts anew, and
-    the generated site it was deployed on is free for the next newcomer. Retired side ids are not given out
-    again, so a world holds at most 256 sides over its life, and the level's own base is not given out again
-    once its first player's side is gone.
+    the generated site it was deployed on is free for the next newcomer. Retiring a side (`sim::sides::
+    retire_side`) takes away what is left of it (walls, mines) and its credits, production, research, support
+    charge, statistics, intel and commander, and the next side to join takes the lowest retired number
+    (`RetiredSides`, kept in a saved world), so a world holds 256 sides at once rather than over its life.
+    The four sides a level names are not given out again, since the level put them in camps, and the
+    level's own base is not given out again once its first player's side is gone.
 15. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
     the JSON save format gives way to a compact binary one.
     A world is kept in a directory (`world_store::WorldStore`): `world.bin` holds what is not kept by chunk

@@ -196,6 +196,12 @@ impl Production {
         self.player_faction = player_faction;
     }
 
+    /// `team` has nothing queued or researched; what the level forbids it stays forbidden.
+    pub fn forget(&mut self, team: Team) {
+        self.lanes.forget(team);
+        self.researched.forget(team);
+    }
+
     pub fn has_researched(&self, team: Team, upgrade: Upgrade) -> bool {
         self.researched.of(team).contains(&upgrade)
     }

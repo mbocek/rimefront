@@ -43,6 +43,10 @@ pub struct MatchStats {
 }
 
 impl MatchStats {
+    pub fn forget(&mut self, team: Team) {
+        self.teams.forget(team);
+    }
+
     pub fn of(&self, team: Team) -> &TeamTally {
         self.teams.of(team)
     }

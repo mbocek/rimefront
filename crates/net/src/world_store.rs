@@ -22,7 +22,7 @@ use iron_tide_sim::sim::records::{
     SavableBuilding, SavableUnit, SavedBuilding, SavedUnit, respawn_building, respawn_unit,
 };
 use iron_tide_sim::sim::research::Upgrade;
-use iron_tide_sim::sim::sides::Sides;
+use iron_tide_sim::sim::sides::{RetiredSides, Sides};
 use iron_tide_sim::sim::structures::BeingSold;
 use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
 use iron_tide_sim::world::map::{
@@ -32,7 +32,7 @@ use iron_tide_sim::world::sites::StartingSites;
 use iron_tide_sim::world::wilds::{crystal_look, widen_world};
 
 /// Bumped whenever the layout changes incompatibly; a world saved by another layout is refused.
-const STORE_VERSION: u32 = 3;
+const STORE_VERSION: u32 = 4;
 const WORLD_FILE: &str = "world.bin";
 const CHUNKS_DIRECTORY: &str = "chunks";
 
@@ -74,6 +74,7 @@ struct WorldRecord {
     match_secs: f32,
     bounds: MapBounds,
     sides: Vec<SideRecord>,
+    retired_sides: Vec<Team>,
     starting_sites: Vec<IVec2>,
     ai: AiCommanders,
     hosting: HostingRecord,
@@ -345,6 +346,9 @@ fn world_record(
         match_secs: world.resource::<MatchClock>().elapsed_secs,
         bounds: map_bounds(),
         sides,
+        retired_sides: world
+            .get_resource::<RetiredSides>()
+            .map_or_else(Vec::new, |retired| retired.0.clone()),
         starting_sites: world
             .get_resource::<StartingSites>()
             .map_or_else(Vec::new, |sites| sites.claimed.clone()),
@@ -399,6 +403,7 @@ pub fn restore(world: &mut World, saved: &SavedWorld) -> Vec<(IVec2, u32)> {
     });
     world.flush();
     world.resource_mut::<MatchClock>().elapsed_secs = record.match_secs;
+    world.insert_resource(RetiredSides(record.retired_sides.clone()));
     world.insert_resource(StartingSites {
         claimed: record.starting_sites.clone(),
     });

@@ -45,6 +45,14 @@ impl Intel {
         }
     }
 
+    /// `team` knows nothing of the map any more.
+    pub fn forget(&mut self, team: Team) {
+        if let Some(vision) = self.visions.get_mut(team.index()) {
+            *vision = FogOfWar::new(self.fog_of_war);
+            self.known_structures[team.index()].clear();
+        }
+    }
+
     pub fn viewers(&self) -> impl Iterator<Item = Team> + use<> {
         (0..self.visions.len()).map(Team::from_index)
     }

@@ -64,3 +64,40 @@ fn a_sheltered_side_neither_suffers_nor_deals_harm() {
     battle.run_for(10.0);
     assert!(battle.damage_taken(away) > 0.0, "the shelter never lifted");
 }
+
+#[test]
+fn a_side_that_joins_charges_its_support_powers() {
+    use iron_tide::sim::support_powers::{SupportPower, SupportPowers};
+    let mut battle = Battle::sandbox();
+    let newcomer = admit_side(battle.world());
+    battle.run_for(SupportPower::ReconSweep.recharge_secs() + 1.0);
+    let powers = battle.world().resource::<SupportPowers>();
+    assert!(powers.is_charged(newcomer, SupportPower::ReconSweep));
+}
+
+#[test]
+fn a_retired_side_leaves_nothing_and_its_number_is_given_out_again() {
+    use iron_tide::sim::catalog::BuildingKind;
+    use iron_tide::sim::economy::Economies;
+    use iron_tide::sim::sides::retire_side;
+    let mut battle = Battle::sandbox();
+    let gone = admit_side(battle.world());
+    battle.construct(BuildingKind::Wall, gone, IVec2::new(30, 45));
+    battle.spawn_unit(UnitKind::Tank, gone, IVec2::new(34, 45));
+    battle.set_credits(gone, 77);
+    retire_side(battle.world(), gone);
+    assert!(battle.buildings(gone).is_empty() && battle.units(gone, None).is_empty());
+
+    let next = admit_side(battle.world());
+    assert_eq!(next, gone);
+    let starting = Economies::default().of(next).credits;
+    assert_eq!(battle.credits(next), starting);
+
+    retire_side(battle.world(), Team::Crimson);
+    let after_a_level_side = admit_side(battle.world());
+    assert_ne!(
+        after_a_level_side,
+        Team::Crimson,
+        "a level's side was given out again"
+    );
+}

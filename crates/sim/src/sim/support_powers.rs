@@ -118,6 +118,16 @@ impl SupportPowers {
         self.recharge.of(team)[power.index()].max(0.0)
     }
 
+    /// `team`'s powers start charging; only the sides with a recharge of their own count down.
+    pub fn admit(&mut self, team: Team) {
+        self.recharge.of_mut(team);
+    }
+
+    /// `team`'s powers charge from the start again.
+    pub fn forget(&mut self, team: Team) {
+        self.recharge.forget(team);
+    }
+
     pub fn set_secs_until_ready(&mut self, team: Team, power: SupportPower, secs: f32) {
         self.recharge.of_mut(team)[power.index()] = secs;
     }

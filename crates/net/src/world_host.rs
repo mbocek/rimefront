@@ -20,7 +20,7 @@ use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::economy::Economies;
 use iron_tide_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
-use iron_tide_sim::sim::sides::{Shelter, side_stands};
+use iron_tide_sim::sim::sides::{Shelter, retire_side, side_stands};
 use iron_tide_sim::world::map::{GameMap, base_sites, map_bounds};
 use iron_tide_sim::world::sites::{free_starting_site, neutral_site_in_square, squares_within};
 use iron_tide_sim::world::terrain::Landscape;
@@ -499,17 +499,15 @@ impl WorldHost {
         }
     }
 
+    /// A player's side with nothing left: its player is forgotten, its site freed and its number given out
+    /// again.
     fn retire(&mut self, team: Team) {
         self.sides_of_players.retain(|_, &mut side| side != team);
         self.away_since.remove(&team);
-        self.app
-            .world_mut()
-            .resource_mut::<Shelter>()
-            .0
-            .remove(team);
         if let Some(site) = self.sites.remove(&team) {
             free_starting_site(self.app.world_mut(), site);
         }
+        retire_side(self.app.world_mut(), team);
     }
 
     /// A player who entered again elsewhere commands their side from there; the older connection goes.
@@ -636,11 +634,8 @@ impl WorldHost {
         for (team, site) in fallen {
             self.computer_sides.remove(&team);
             let world = self.app.world_mut();
-            world
-                .resource_mut::<AiCommanders>()
-                .0
-                .retain(|ai| ai.team != team);
             free_starting_site(world, site);
+            retire_side(world, team);
         }
     }
 }
@@ -1070,7 +1065,12 @@ mod tests {
         assert!(!host.world().resource::<Shelter>().covers(team));
 
         let (_back, new_team) = enter_as(&mut host, &key);
-        assert_ne!(new_team, team);
+        assert_eq!(new_team, team, "the side's number was not given out again");
+        assert!(
+            side_stands(host.world(), new_team),
+            "the player was not given a new start"
+        );
+        assert!(host.sites.contains_key(&new_team));
     }
 
     fn scratch_directory(name: &str) -> std::path::PathBuf {

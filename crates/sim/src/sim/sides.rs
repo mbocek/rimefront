@@ -1,8 +1,16 @@
 use bevy::prelude::*;
 
+use crate::sim::abilities::Mine;
+use crate::sim::ai::AiCommanders;
+use crate::sim::cadence::SimulationCadences;
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Unit};
+use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
+use crate::sim::match_stats::MatchStats;
+use crate::sim::production::Production;
+use crate::sim::support_powers::SupportPowers;
+use crate::world::map::GameMap;
 
 /// The sides in the battle: the four a level names, then every side that joined since, numbered on.
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug)]
@@ -38,11 +46,67 @@ impl Sides {
     }
 }
 
-/// Lets a new side into the battle, in a camp of its own and knowing nothing of the map yet.
+/// Sides that left the battle for good, whose numbers new sides take again before the count grows.
+#[derive(Resource, Clone, PartialEq, Eq, Default, Debug)]
+pub struct RetiredSides(pub Vec<Team>);
+
+/// Lets a new side into the battle, in a camp of its own and knowing nothing of the map yet; it takes the
+/// lowest number a side retired, if any did.
 pub fn admit_side(world: &mut World) -> Team {
-    let team = world.resource_mut::<Sides>().join();
+    let reused = world
+        .get_resource_mut::<RetiredSides>()
+        .and_then(|mut retired| {
+            retired.0.sort();
+            (!retired.0.is_empty()).then(|| retired.0.remove(0))
+        });
+    let team = reused.unwrap_or_else(|| world.resource_mut::<Sides>().join());
     world.resource_mut::<Intel>().admit(team);
+    world.resource_mut::<SupportPowers>().admit(team);
     team
+}
+
+/// Takes a side out of the battle for good: whatever of it is left (walls, mines) goes, and it owns,
+/// knows and has made nothing any more. Its number is given out again unless a level names it, since a
+/// level's sides keep the camps the level put them in.
+pub fn retire_side(world: &mut World, team: Team) {
+    let mut owned = world.query::<(Entity, &Team)>();
+    let left: Vec<Entity> = owned
+        .iter(world)
+        .filter(|(_, owner)| **owner == team)
+        .map(|(entity, _)| entity)
+        .collect();
+    let mut mines = world.query::<(Entity, &Mine)>();
+    let buried: Vec<Entity> = mines
+        .iter(world)
+        .filter(|(_, mine)| mine.team == team)
+        .map(|(entity, _)| entity)
+        .collect();
+    for entity in left.into_iter().chain(buried) {
+        if let Some(building) = world.get::<Building>(entity) {
+            let (origin, footprint) = (building.origin, building.kind.spec().footprint);
+            world
+                .resource_mut::<GameMap>()
+                .set_building(origin, footprint, None);
+        }
+        world.despawn(entity);
+    }
+    world.resource_mut::<Economies>().forget(team);
+    world.resource_mut::<Production>().forget(team);
+    world.resource_mut::<SupportPowers>().forget(team);
+    world.resource_mut::<MatchStats>().forget(team);
+    world
+        .resource_mut::<SimulationCadences>()
+        .harvester_rescue_cooldown_secs
+        .forget(team);
+    world.resource_mut::<Intel>().forget(team);
+    world.resource_mut::<Shelter>().0.remove(team);
+    world
+        .resource_mut::<AiCommanders>()
+        .0
+        .retain(|ai| ai.team != team);
+    if team.index() >= Team::ALL.len() {
+        world.get_resource_or_init::<RetiredSides>().0.push(team);
+    }
 }
 
 /// Whether anything of `team` still stands: a unit, or a structure that keeps a side in the battle.
@@ -89,6 +153,13 @@ impl<T: Clone> PerSide<T> {
     pub fn set_all(&mut self, value: T) {
         self.values.fill(value.clone());
         self.blank = value;
+    }
+
+    /// `team` has the blank value again.
+    pub fn forget(&mut self, team: Team) {
+        if let Some(value) = self.values.get_mut(team.index()) {
+            *value = self.blank.clone();
+        }
     }
 
     /// The values of the sides that have one of their own.

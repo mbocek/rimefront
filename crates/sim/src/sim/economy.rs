@@ -69,6 +69,10 @@ impl Economies {
     pub fn of_mut(&mut self, team: Team) -> &mut TeamEconomy {
         self.0.of_mut(team)
     }
+
+    pub fn forget(&mut self, team: Team) {
+        self.0.forget(team);
+    }
 }
 
 pub fn tally_power(mut economies: ResMut<Economies>, buildings: Query<(&Building, &Team)>) {

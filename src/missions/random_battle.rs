@@ -103,20 +103,24 @@ pub fn generate(options: &RandomBattleOptions, seed: u64) -> LevelDefinition {
     };
     let enemies = corners[1..=opponents]
         .iter()
-        .map(|&site| EnemySetup {
-            force: ForceSetup {
-                site,
-                credits: options.credits,
-                ..default()
-            },
-            difficulty: match options.difficulty {
+        .map(|&site| {
+            let difficulty = match options.difficulty {
                 DifficultyChoice::Fixed(difficulty) => difficulty,
                 DifficultyChoice::Mixed => pick(
                     &mut sides,
                     &[Difficulty::Easy, Difficulty::Normal, Difficulty::Hard],
                 ),
-            },
-            personality: pick(&mut personalities, &Personality::ALL),
+            };
+            let rolled = pick(&mut personalities, &Personality::ALL);
+            EnemySetup {
+                force: ForceSetup {
+                    site,
+                    credits: options.credits,
+                    ..default()
+                },
+                difficulty,
+                personality: difficulty.rolled_personality(rolled),
+            }
         })
         .collect();
     LevelDefinition {

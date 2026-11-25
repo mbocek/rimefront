@@ -90,8 +90,10 @@
   often with fast, cheap units and leaves its defences for later), a *Fortress* (rings its base with guns, waits
   longer and attacks with bigger waves behind artillery), *Armoured* (heads for the Tech Center, a Repair Bay
   and heavy tanks) or *Air power* (two Helipads as soon as it can, gunships and bombers). Random battles roll one
-  for each commander, the battle editor sets one for all of them or mixes them (*Commander style*), and the
-  level details show each commander's. Campaign missions keep the Balanced commander. Measured against each
+  for each Hard or Brutal commander, the battle editor sets one for all of them or mixes them (*Commander
+  style*), and the level details show each commander's. Rolled and mixed personalities are for Hard and Brutal
+  only: Easy and Normal commanders play Balanced unless the battle editor names a style, since a Normal rusher
+  beat a player who sat in their base in 5.0 minutes on average against 6.1 for Normal before personalities. Campaign missions keep the Balanced commander. Measured against each
   other in [balance.md](balance.md).
 - **Support powers:** two buttons under the credits call help onto any spot of the map, then recharge. A
   **recon flight** (Z, needs the Command Center, every 2 minutes) reveals 16 m around the spot for 20 s, to

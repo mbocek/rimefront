@@ -103,6 +103,16 @@ impl Difficulty {
         Difficulty::Brutal,
     ];
 
+    /// The personality a commander of this difficulty plays when the dice rolled `rolled`: Easy and Normal
+    /// play the balanced way, since a rusher's early waves made Normal harder than it was before personalities
+    /// (a passive player beaten in 5.0 minutes on average against 6.1, `tests/personalities.rs`).
+    pub fn rolled_personality(self, rolled: Personality) -> Personality {
+        match self {
+            Difficulty::Easy | Difficulty::Normal => Personality::Balanced,
+            Difficulty::Hard | Difficulty::Brutal => rolled,
+        }
+    }
+
     pub fn think_interval_secs(self) -> f32 {
         match self {
             Difficulty::Easy => 2.0,
@@ -593,9 +603,10 @@ impl SkirmishOptions {
                     ..default()
                 },
                 difficulty: self.difficulty,
-                personality: self
-                    .personality
-                    .unwrap_or_else(|| self.mixed_personality(index)),
+                personality: self.personality.unwrap_or_else(|| {
+                    self.difficulty
+                        .rolled_personality(self.mixed_personality(index))
+                }),
             })
             .collect();
         let objective = match self.objective {

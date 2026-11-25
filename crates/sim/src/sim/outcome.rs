@@ -57,6 +57,7 @@ pub fn decide_outcome(
         }),
         Objective::Survive { minutes } => clock.elapsed_secs >= minutes * 60.0,
         Objective::ReachCredits { credits } => economies.of(local.0).credits >= credits,
+        Objective::World => false,
     };
     if achieved {
         *outcome = GameOutcome::Victory;
@@ -84,7 +85,8 @@ pub fn objective_status(
         }
         Objective::DestroyAllEnemies
         | Objective::DestroyCommandCenters
-        | Objective::CaptureCommandCenter => String::new(),
+        | Objective::CaptureCommandCenter
+        | Objective::World => String::new(),
     };
     format!("{}{progress}", objective.describe())
 }

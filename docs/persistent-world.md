@@ -342,6 +342,12 @@ for ordinary network matches.
     square the world widens by. A player is shown a neutral site, without a side, once their side has
     explored its ground, and keeps it shown until somebody takes it; computer engineers go for the ones
     their side explored, as in a battle. A saved world keeps them as any neutral site.
+    What the player of a world sees of it: the objective is the world's own (`Objective::World`: nothing wins
+    it), the clock shows the world's age from its tick, and once nothing of their side stands after it was
+    shown standing, the battle is lost; the screen then offers only the main menu, since entering the world
+    again gives them a new start. An attack or engineers ordered against a sheltered side are turned down
+    with news to the one who ordered them (`SideNews::Sheltered`), which is how a player learns that a side
+    is sheltered; nothing else marks it yet.
 
 ## Decisions
 

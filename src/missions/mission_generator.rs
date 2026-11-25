@@ -88,6 +88,7 @@ fn briefing(objective: Objective, faction: Faction) -> String {
             "Command wants ${} in the war chest. Mine the fields hard and keep the {} away from the harvesters.",
             &[&credits, &enemy],
         ),
+        Objective::World => tr("Hold your own in a world that goes on").into(),
     }
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::match_flow::MirroredBattle;
 
 #[derive(Component)]
 pub struct OutcomeOverlay;
@@ -342,7 +343,7 @@ pub fn show_outcome(
     mut title: Query<(&mut Text, &mut TextColor), (With<OutcomeTitle>, Without<OutcomeSubtitle>)>,
     mut subtitle: Query<&mut Text, (With<OutcomeSubtitle>, Without<OutcomeTitle>)>,
     level: Res<ActiveLevel>,
-    session: Option<Res<NetSession>>,
+    (session, in_a_world): (Option<Res<NetSession>>, Option<Res<MirroredBattle>>),
     (run, library): (Option<Res<CampaignRun>>, Res<CampaignLibrary>),
     button_rows: Query<Entity, With<OutcomeButtons>>,
     tables: Query<Entity, With<OutcomeStats>>,
@@ -369,10 +370,18 @@ pub fn show_outcome(
     }
     if banner.is_some() {
         if let Ok(mut subtitle) = subtitle.single_mut() {
-            subtitle.0 = campaign_debriefing(&level.0, *outcome, run.as_deref(), &library);
+            subtitle.0 = match in_a_world {
+                Some(_) => {
+                    tr("Nothing of your side stands. Enter the world again to start anew.").into()
+                }
+                None => campaign_debriefing(&level.0, *outcome, run.as_deref(), &library),
+            };
         }
         if let Ok(row) = button_rows.single() {
-            let actions = outcome_actions(*outcome, run.as_deref(), &library, session.is_some());
+            let actions = match in_a_world {
+                Some(_) => vec![OutcomeAction::MainMenu],
+                None => outcome_actions(*outcome, run.as_deref(), &library, session.is_some()),
+            };
             commands.entity(row).despawn_related::<Children>();
             commands.entity(row).with_children(|row| {
                 for (index, action) in actions.into_iter().enumerate() {

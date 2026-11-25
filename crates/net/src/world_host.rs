@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::network::{Arrival, Link, Message};
 use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
-use iron_tide_sim::levels::{ActiveLevel, Difficulty, LevelDefinition};
+use iron_tide_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
 use iron_tide_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use iron_tide_sim::sim::ai::{AiCommander, AiCommanders};
 use iron_tide_sim::sim::catalog::Team;
@@ -646,6 +646,7 @@ pub fn world_level(map_seed: u64) -> LevelDefinition {
         name: "World".into(),
         map_seed,
         landscape: Landscape::Wilds,
+        objective: Objective::World,
         ..LevelDefinition::default()
     }
 }
@@ -1030,6 +1031,29 @@ mod tests {
             host.step(SIMULATION_TICK);
         }
         assert!(sheltered(&mut host), "never sheltered");
+
+        let (mut attacker, attacking) = enter(&mut host);
+        let world = host.world();
+        let (_, target_id) = world
+            .query::<(&Team, &SimId)>()
+            .iter(world)
+            .find(|(owner, _)| **owner == team)
+            .map(|(owner, id)| (*owner, *id))
+            .expect("the sheltered side has something");
+        let (tank, _) = own_unit(world, attacking, UnitKind::Tank);
+        let tank_id = *world.get::<SimId>(tank).unwrap();
+        attacker.send(&Message::Orders {
+            commands: vec![PlayerCommand::Attack {
+                units: vec![tank_id],
+                target: target_id,
+            }],
+        });
+        let mut mirror = WorldMirror::default();
+        run(&mut host, 1, &mut mirror, &mut attacker);
+        assert!(
+            mirror.told.contains(&SideNews::Sheltered),
+            "the attacker was not told why"
+        );
 
         let (_back, _) = enter_as(&mut host, &key);
         host.step(SIMULATION_TICK);

@@ -187,6 +187,8 @@ pub enum Objective {
     ReachCredits {
         credits: i32,
     },
+    /// A persistent world: nothing wins it, and a side is beaten only once nothing of it stands.
+    World,
 }
 
 impl Objective {
@@ -201,6 +203,7 @@ impl Objective {
                 tr_fmt("Hold out for {} minutes", &[&format!("{minutes:.0}")])
             }
             Objective::ReachCredits { credits } => tr_fmt("Stockpile ${}", &[&credits]),
+            Objective::World => tr("Hold your own in a world that goes on").into(),
         }
     }
 }

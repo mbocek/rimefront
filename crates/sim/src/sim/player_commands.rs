@@ -14,6 +14,7 @@ use crate::sim::production::{
     BuildItem, Lane, Production, affordable_wall_line, construct_building, owned_building_kinds,
     placement_context,
 };
+use crate::sim::sides::Shelter;
 use crate::sim::structures::{StructureOrder, StructureOrderKind};
 use crate::sim::support_powers::{SupportPower, SupportPowers, owned_kinds};
 use crate::sim::transport::{BoardingTask, Unloading};
@@ -287,6 +288,8 @@ pub struct Battlefield<'w, 's> {
     stances: Query<'w, 's, &'static mut Stance>,
     intel: Res<'w, Intel>,
     support: ResMut<'w, SupportPowers>,
+    shelter: Res<'w, Shelter>,
+    owners_of_anything: Query<'w, 's, &'static Team>,
 }
 
 pub fn carry_out_player_commands(
@@ -429,10 +432,20 @@ impl Battlefield<'_, '_> {
         }
     }
 
+    fn is_sheltered(&self, target: Entity) -> bool {
+        self.owners_of_anything
+            .get(target)
+            .is_ok_and(|&owner| self.shelter.covers(owner))
+    }
+
     fn attack(&mut self, team: Team, ids: &[SimId], target: SimId) {
         let Some(target) = self.ids.get(target) else {
             return;
         };
+        if self.is_sheltered(target) {
+            self.news.write(News::to(team, SideNews::Sheltered));
+            return;
+        }
         for entity in self.own_units(team, ids) {
             let Ok((.., mobile, attack, _, orders)) = self.units.get_mut(entity) else {
                 continue;
@@ -451,6 +464,10 @@ impl Battlefield<'_, '_> {
         let Some(target) = self.ids.get(structure) else {
             return;
         };
+        if self.is_sheltered(target) {
+            self.news.write(News::to(team, SideNews::Sheltered));
+            return;
+        }
         let Ok((building, owner, health)) = self.structures.get(target) else {
             return;
         };

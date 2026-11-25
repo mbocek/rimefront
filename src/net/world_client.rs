@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 
-use crate::app::match_flow::{GameState, MirroredBattle};
+use crate::SIMULATION_TICK;
+use crate::app::match_flow::{GameState, MatchClock, MirroredBattle};
 use crate::app::settings::game_data_directory;
 use crate::missions::levels::ActiveLevel;
 use crate::net::lobby::DEFAULT_PORT;
@@ -25,8 +26,9 @@ use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
 use crate::sim::neutral_sites::spawn_unclaimed_site;
 use crate::sim::notifications::News;
+use crate::sim::outcome::GameOutcome;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
-use crate::sim::sides::Sides;
+use crate::sim::sides::{Sides, side_stands};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
 use crate::world::map::{CrystalVisual, GameMap, crystal_scale, map_bounds};
@@ -54,6 +56,8 @@ pub struct WorldClient {
     lost: bool,
     /// The thread of a world the game runs itself.
     world_thread: Option<JoinHandle<()>>,
+    /// Whether anything of the player's side was shown standing yet.
+    side_was_shown: bool,
 }
 
 impl WorldClient {
@@ -71,6 +75,7 @@ impl WorldClient {
             world_tick_lead: 0,
             lost: false,
             world_thread: None,
+            side_was_shown: false,
         }
     }
 
@@ -325,14 +330,34 @@ pub fn follow_world(world: &mut World) {
         }
         show_crystal(world, &change.crystal);
     }
-    show_support_recharge(world, side, local_tick);
+    let world_tick = world_tick_now(world, local_tick);
+    show_support_recharge(world, side, world_tick);
+    world.resource_mut::<MatchClock>().elapsed_secs =
+        world_tick as f32 * SIMULATION_TICK.as_secs_f32();
+    see_whether_the_side_fell(world, side);
 }
 
-fn show_support_recharge(world: &mut World, side: Team, local_tick: u64) {
-    let client = world.resource::<WorldClient>();
-    let world_tick = (local_tick as i64 + client.world_tick_lead).max(0) as u64;
-    let state = client.side.clone();
+fn world_tick_now(world: &World, local_tick: u64) -> u64 {
+    let lead = world.resource::<WorldClient>().world_tick_lead;
+    (local_tick as i64 + lead).max(0) as u64
+}
+
+fn show_support_recharge(world: &mut World, side: Team, world_tick: u64) {
+    let state = world.resource::<WorldClient>().side.clone();
     state.show_support_recharge(world, side, world_tick);
+}
+
+/// The battle here is lost once nothing of the player's side stands any more, after it was shown standing.
+fn see_whether_the_side_fell(world: &mut World, side: Team) {
+    let stands = side_stands(world, side);
+    let mut client = world.resource_mut::<WorldClient>();
+    if stands {
+        client.side_was_shown = true;
+        return;
+    }
+    if client.side_was_shown && *world.resource::<GameOutcome>() == GameOutcome::Ongoing {
+        *world.resource_mut::<GameOutcome>() = GameOutcome::Defeat;
+    }
 }
 
 fn admit_own_side(world: &mut World, side: Team) {

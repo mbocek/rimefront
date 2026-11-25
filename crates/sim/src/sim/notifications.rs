@@ -73,6 +73,8 @@ pub enum SideNews {
     CargoSold,
     Refused(EnqueueRefusal),
     NoMine,
+    /// An order against a side whose player is away, which the shelter turned down.
+    Sheltered,
     BaseUnderAttack,
     HarvesterUnderAttack,
     LowPower,
@@ -97,6 +99,7 @@ impl SideNews {
             SideNews::Repaired(kind) => tr_fmt("{} repaired", &[&name(kind)]),
             SideNews::Refused(refusal) => refusal.message(),
             SideNews::NoMine => tr("No mine: the cell has one or the credits ran out").into(),
+            SideNews::Sheltered => tr("Its player is away: it cannot be attacked now").into(),
             SideNews::BaseUnderAttack => tr("Our base is under attack!").into(),
             SideNews::HarvesterUnderAttack => tr("Our harvester is under attack!").into(),
             SideNews::LowPower => tr("Low power - production slowed").into(),
@@ -117,7 +120,9 @@ impl SideNews {
             SideNews::CargoSold => Sound::Credits,
             SideNews::BaseUnderAttack => Sound::BaseAlert,
             SideNews::HarvesterUnderAttack => Sound::HarvesterAlert,
-            SideNews::Refused(_) | SideNews::NoMine | SideNews::LowPower => return None,
+            SideNews::Refused(_) | SideNews::NoMine | SideNews::Sheltered | SideNews::LowPower => {
+                return None;
+            }
         })
     }
 

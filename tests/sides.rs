@@ -26,3 +26,41 @@ fn a_side_that_joins_sees_for_itself_and_fights_everyone() {
     assert!(!battle.alive(target), "the newcomer never fought");
     assert!(battle.damage_taken(Team::Player) > 0.0);
 }
+
+#[test]
+fn a_sheltered_side_neither_suffers_nor_deals_harm() {
+    use iron_tide::sim::catalog::BuildingKind;
+    use iron_tide::sim::player_commands::PlayerCommand;
+    use iron_tide::sim::sides::Shelter;
+    let mut battle = Battle::sandbox();
+    let away = admit_side(battle.world());
+    battle.world().resource_mut::<Shelter>().0.insert(away);
+    battle.construct(BuildingKind::GunTurret, away, IVec2::new(30, 45));
+    battle.spawn_unit(UnitKind::Tank, away, IVec2::new(30, 49));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, IVec2::new(34, 47));
+    let turret = battle.building(away, BuildingKind::GunTurret).unwrap();
+    let turret_id = battle.sim_id(turret);
+    let tank_id = battle.sim_id(tank);
+    battle.issue(
+        Team::Player,
+        PlayerCommand::Attack {
+            units: vec![tank_id],
+            target: turret_id,
+        },
+    );
+    battle.run_for(10.0);
+    assert_eq!(
+        battle.damage_taken(away),
+        0.0,
+        "the sheltered side was hurt"
+    );
+    assert_eq!(
+        battle.damage_taken(Team::Player),
+        0.0,
+        "the sheltered side fired"
+    );
+
+    battle.world().resource_mut::<Shelter>().0.remove(away);
+    battle.run_for(10.0);
+    assert!(battle.damage_taken(away) > 0.0, "the shelter never lifted");
+}

@@ -146,6 +146,7 @@ impl Plugin for SimulationPlugin {
             .init_resource::<cadence::SimulationCadences>()
             .init_resource::<catalog::Diplomacy>()
             .init_resource::<sim::sides::Sides>()
+            .init_resource::<sim::sides::Shelter>()
             .init_resource::<veterancy::LastHits>()
             .init_resource::<match_stats::MatchStats>()
             .add_message::<combat::DamageDealt>()

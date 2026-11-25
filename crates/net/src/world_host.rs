@@ -9,15 +9,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::network::{Arrival, Link, Message};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
-use iron_tide_sim::SimulationPlugin;
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
 use iron_tide_sim::match_flow::{GameState, HostedWorld, deploy_newcomer};
 use iron_tide_sim::sim::catalog::Team;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
-use iron_tide_sim::sim::sides::side_stands;
+use iron_tide_sim::sim::sides::{Shelter, side_stands};
 use iron_tide_sim::world::map::{GameMap, base_sites};
 use iron_tide_sim::world::terrain::Landscape;
+use iron_tide_sim::{SIMULATION_TICK, SimulationPlugin};
 
 /// A connection to one player of a world: a network link, or a channel when the game runs the world itself.
 pub trait WorldConnection: Send {
@@ -99,6 +99,25 @@ impl PlayerKey {
     }
 }
 
+/// How a world treats the sides of players who are away.
+#[derive(Clone, Copy, Debug)]
+pub struct AbsenceRules {
+    /// Away this long, a side is sheltered; long enough that leaving does not get anyone out of a fight.
+    pub shelter_after: Duration,
+}
+
+impl Default for AbsenceRules {
+    fn default() -> Self {
+        Self {
+            shelter_after: Duration::from_secs(120),
+        }
+    }
+}
+
+fn ticks_in(duration: Duration) -> u64 {
+    (duration.as_secs_f64() / SIMULATION_TICK.as_secs_f64()).round() as u64
+}
+
 struct WorldPlayer {
     connection: Box<dyn WorldConnection>,
     /// None until the player has entered.
@@ -117,6 +136,9 @@ pub struct WorldHost {
     level_side_taken: bool,
     sides_of_players: HashMap<PlayerKey, Team>,
     entries: u64,
+    absence: AbsenceRules,
+    /// The tick each side of a player who is not connected was left at.
+    away_since: HashMap<Team, u64>,
     effects: WorldEffects,
     mined: MinedCrystal,
     /// Effects since the last views went out.
@@ -154,6 +176,8 @@ impl WorldHost {
             level_side_taken: false,
             sides_of_players: HashMap::new(),
             entries: 0,
+            absence: AbsenceRules::default(),
+            away_since: HashMap::new(),
             effects: WorldEffects::default(),
             mined: MinedCrystal::default(),
             unshown_effects: Vec::new(),
@@ -183,8 +207,13 @@ impl WorldHost {
 
     /// Takes in what the players sent, lets `elapsed` of time pass in the world, then shows every player
     /// what changed in their view if a tick went by.
+    pub fn set_absence_rules(&mut self, rules: AbsenceRules) {
+        self.absence = rules;
+    }
+
     pub fn step(&mut self, elapsed: Duration) {
         self.receive();
+        self.shelter_sides_of_absent_players();
         let before = self.tick();
         self.app
             .insert_resource(TimeUpdateStrategy::ManualDuration(elapsed));
@@ -229,6 +258,29 @@ impl WorldHost {
         });
         self.players = players;
         self.let_go_of_displaced_players();
+    }
+
+    fn shelter_sides_of_absent_players(&mut self) {
+        let now = self.tick();
+        let present: Vec<Team> = self
+            .players
+            .iter()
+            .filter_map(|player| player.team)
+            .collect();
+        let shelter_after = ticks_in(self.absence.shelter_after);
+        let mut shelter = *self.app.world().resource::<Shelter>();
+        for &team in self.sides_of_players.values() {
+            if present.contains(&team) {
+                self.away_since.remove(&team);
+                shelter.0.remove(team);
+                continue;
+            }
+            let since = *self.away_since.entry(team).or_insert(now);
+            if now - since >= shelter_after {
+                shelter.0.insert(team);
+            }
+        }
+        self.app.insert_resource(shelter);
     }
 
     /// A player who entered again elsewhere commands their side from there; the older connection goes.
@@ -684,6 +736,33 @@ mod tests {
 
         let (_second_visit, team_again) = enter_as(&mut host, &key);
         assert_eq!(team_again, team);
+    }
+
+    #[test]
+    fn the_side_of_a_player_away_for_a_while_is_sheltered_until_they_return() {
+        let mut host = WorldHost::new(29);
+        host.set_absence_rules(AbsenceRules {
+            shelter_after: Duration::from_secs(2),
+        });
+        let key = PlayerKey::new_random();
+        let (visit, team) = enter_as(&mut host, &key);
+        drop(visit);
+        let sheltered = |host: &mut WorldHost| host.world().resource::<Shelter>().covers(team);
+        for _ in 0..20 {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(!sheltered(&mut host), "sheltered at once");
+        for _ in 0..30 {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(sheltered(&mut host), "never sheltered");
+
+        let (_back, _) = enter_as(&mut host, &key);
+        host.step(SIMULATION_TICK);
+        assert!(
+            !sheltered(&mut host),
+            "still sheltered after the player came back"
+        );
     }
 
     #[test]

@@ -115,6 +115,21 @@ impl SideSet {
     pub fn contains(&self, team: Team) -> bool {
         self.0[team.index() / 64] & (1 << (team.index() % 64)) != 0
     }
+
+    pub fn remove(&mut self, team: Team) {
+        self.0[team.index() / 64] &= !(1 << (team.index() % 64));
+    }
+}
+
+/// Sides out of the fighting while their players are away: nobody can hurt or capture what is theirs,
+/// and it fires at nobody.
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub struct Shelter(pub SideSet);
+
+impl Shelter {
+    pub fn covers(&self, team: Team) -> bool {
+        self.0.contains(team)
+    }
 }
 
 impl FromIterator<Team> for SideSet {

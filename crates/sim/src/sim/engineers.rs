@@ -7,6 +7,7 @@ use crate::sim::components::{Building, Health, Mobile, Orders};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
 use crate::sim::notifications::{News, SideNews};
+use crate::sim::sides::Shelter;
 use crate::sim::spawn::spawn_building;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_center};
 
@@ -78,6 +79,7 @@ pub fn carry_out_engineer_tasks(
     )>,
     mut buildings: Query<(&Building, Option<&Team>, &mut Health)>,
     diplomacy: Res<Diplomacy>,
+    shelter: Res<Shelter>,
 ) {
     let mut entered = HashSet::new();
     let in_order = in_simulation_order(engineers.iter_mut(), |item| *item.6);
@@ -92,7 +94,9 @@ pub fn carry_out_engineer_tasks(
             continue;
         };
         let owner = owner.copied();
-        if job_for(&diplomacy, team, owner, building.kind, &health) != Some(task.job) {
+        let job = job_for(&diplomacy, team, owner, building.kind, &health)
+            .filter(|_| owner.is_none_or(|owner| owner == team || !shelter.covers(owner)));
+        if job != Some(task.job) {
             commands.entity(engineer).remove::<EngineerTask>();
             continue;
         }

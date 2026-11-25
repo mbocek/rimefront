@@ -274,6 +274,13 @@ for ordinary network matches.
     side in the battle), otherwise a new side on a new site, as an unknown key does. Entering again while
     still connected elsewhere lets go of the older connection, which is told why. The keys live as long as
     the server runs, until persistence (step 15) keeps them.
+    A side whose player has been away for `AbsenceRules::shelter_after` (2 minutes by default, so leaving does
+    not get anyone out of a fight) is sheltered (`sim::sides::Shelter`) until the player returns: it is out
+    of the fighting both ways. `Targets::hostile` is false between a sheltered side and anyone, so nothing
+    picks its units or structures, splash and mines pass them by and its own weapons pick nothing; a target
+    ordered before the shelter is dropped, a shell already flying at one does it no harm, and engineers
+    cannot capture its structures. Vision is untouched, so others still see a sheltered base. Players are not
+    yet shown which sides are sheltered.
 15. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
     the JSON save format gives way to a compact binary one.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing

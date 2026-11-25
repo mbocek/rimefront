@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::sim::abilities::Camouflage;
+use crate::sim::sides::Shelter;
 use bevy::prelude::*;
 use rand::RngExt;
 
@@ -70,6 +71,7 @@ pub struct Targets {
     by_entity: HashMap<Entity, usize>,
     nearby: SpatialIndex,
     diplomacy: Diplomacy,
+    shelter: Shelter,
 }
 
 impl Targets {
@@ -87,8 +89,13 @@ impl Targets {
         self.nearby.near(&self.list, from, reach)
     }
 
+    /// Whether the two sides fight: enemies, neither of them sheltered.
     pub fn hostile(&self, team: Team, other: Team) -> bool {
-        self.diplomacy.hostile(team, other)
+        self.diplomacy.hostile(team, other) && !self.is_sheltered(team) && !self.is_sheltered(other)
+    }
+
+    pub fn is_sheltered(&self, team: Team) -> bool {
+        self.shelter.covers(team)
     }
 
     /// The enemy this weapon should fire at: one it hurts most and that is nearly finished, preferably
@@ -206,6 +213,7 @@ pub fn snapshot_targets(
     mut targets: ResMut<Targets>,
     intel: Res<Intel>,
     diplomacy: Res<Diplomacy>,
+    shelter: Res<Shelter>,
     damageable: Query<
         (
             &SimId,
@@ -225,6 +233,7 @@ pub fn snapshot_targets(
     targets.list.clear();
     targets.by_entity.clear();
     targets.diplomacy.clone_from(&diplomacy);
+    targets.shelter = *shelter;
     for (_, entity, &team, transform, radius, armor, is_building, camouflage, health, weapon) in
         in_simulation_order(damageable, |target| *target.0)
     {
@@ -280,10 +289,11 @@ pub fn acquire_targets(
             Stance::HoldPosition | Stance::HoldFire => weapon.spec.range,
         };
         if let Some((entity, mode)) = attack.target {
-            let Some(target) = targets
-                .get(entity)
-                .filter(|target| weapon.spec.can_hit(target.armor))
-            else {
+            let Some(target) = targets.get(entity).filter(|target| {
+                weapon.spec.can_hit(target.armor)
+                    && !targets.is_sheltered(target.team)
+                    && !targets.is_sheltered(team)
+            }) else {
                 attack.clear();
                 continue;
             };
@@ -628,7 +638,11 @@ fn deal_impact_damage(
             let amount = weapon.damage * falloff * weapon.multiplier_against(victim.armor);
             apply_damage(healths, damage_log, production, victim, amount, projectile);
         }
-    } else if let Some(victim) = projectile.target.and_then(|e| targets.get(e)) {
+    } else if let Some(victim) = projectile
+        .target
+        .and_then(|e| targets.get(e))
+        .filter(|victim| !targets.is_sheltered(victim.team))
+    {
         let amount = weapon.damage * weapon.multiplier_against(victim.armor);
         apply_damage(healths, damage_log, production, victim, amount, projectile);
     }

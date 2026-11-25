@@ -24,6 +24,7 @@ pub enum MenuCommand {
     JoinNetworkBattle,
     OpenServerRoom,
     PlayWorldAlone,
+    NewWorldAlone,
     EnterServerWorld,
     AcceptNetworkOffer,
     StartNetworkBattle,
@@ -176,6 +177,15 @@ pub(super) fn run_command(
                 OwnWorld::kept_with_the_game(),
                 rand::rng().random(),
             ));
+        }
+        MenuCommand::NewWorldAlone => {
+            let own = OwnWorld::kept_with_the_game();
+            match own.put_aside() {
+                Ok(()) => {
+                    commands.insert_resource(WorldClient::alone_in(own, rand::rng().random()));
+                }
+                Err(error) => lobby.fail(error.to_string()),
+            }
         }
         MenuCommand::EnterServerWorld => match WorldClient::on_server(&settings.join_address) {
             Ok(client) => commands.insert_resource(client),

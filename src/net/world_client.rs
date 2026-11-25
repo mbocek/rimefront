@@ -39,6 +39,7 @@ const LOCAL_WORLD_POLL: Duration = Duration::from_millis(2);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const PLAYER_KEY_FILE: &str = "world_player_key";
 const OWN_WORLD_DIRECTORY: &str = "worlds/own";
+const PUT_ASIDE_SUFFIX: &str = "-previous";
 const OWN_WORLD_SAVE_EVERY: Duration = Duration::from_secs(30);
 
 /// The world this game plays in, run elsewhere: on a server, or on a thread of the game's own.
@@ -205,6 +206,20 @@ pub struct OwnWorld {
 }
 
 impl OwnWorld {
+    /// Puts the kept world aside, in place of the one put aside before, so the next one starts anew.
+    pub fn put_aside(&self) -> std::io::Result<()> {
+        if !self.directory.exists() {
+            return Ok(());
+        }
+        let mut aside = self.directory.clone().into_os_string();
+        aside.push(PUT_ASIDE_SUFFIX);
+        let aside = PathBuf::from(aside);
+        if aside.exists() {
+            std::fs::remove_dir_all(&aside)?;
+        }
+        std::fs::rename(&self.directory, aside)
+    }
+
     /// The one kept with the game's data.
     pub fn kept_with_the_game() -> Self {
         Self {

@@ -187,3 +187,27 @@ fn a_world_played_alone_is_there_the_next_time() {
     drop(app);
     std::fs::remove_dir_all(&directory).unwrap();
 }
+
+#[test]
+fn a_new_world_alone_puts_the_kept_one_aside_in_place_of_the_last() {
+    let root = std::env::temp_dir().join(format!("iron_tide_put_aside_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let own = OwnWorld {
+        directory: root.join("own"),
+        player: PlayerKey::new_random(),
+    };
+    let aside = root.join("own-previous");
+    own.put_aside().expect("nothing to put aside is fine");
+
+    for generation in ["first", "second"] {
+        std::fs::create_dir_all(&own.directory).unwrap();
+        std::fs::write(own.directory.join("world.bin"), generation).unwrap();
+        own.put_aside().unwrap();
+        assert!(!own.directory.exists());
+        assert_eq!(
+            std::fs::read_to_string(aside.join("world.bin")).unwrap(),
+            generation
+        );
+    }
+    std::fs::remove_dir_all(&root).unwrap();
+}

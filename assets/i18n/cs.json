@@ -634,8 +634,9 @@
   "A room with this name is already open; join it or pick another name": "Místnost s tímto názvem je už otevřená; připoj se do ní nebo zvol jiný název",
   "ENTER THE SERVER'S WORLD": "VSTOUPIT DO SVĚTA SERVERU",
   "PLAY A WORLD ALONE": "HRÁT SVĚT SÁM",
-  "A persistent world grows as players arrive; each newcomer gets a base of their own and a computer neighbour. Type ws://server/world above to enter a server's world, or play one alone: it is kept for your next game.": "Trvalý svět roste s příchodem hráčů; každý nováček dostane vlastní základnu a počítačového souseda. Napiš nahoře ws://server/world a vstup do světa serveru, nebo hraj svět sám: zůstane ti uložený na příští hru.",
   "Hold your own in a world that goes on": "Obstůj ve světě, který jde dál",
   "Its player is away: it cannot be attacked now": "Její hráč je pryč: teď ji nelze napadnout",
-  "Nothing of your side stands. Enter the world again to start anew.": "Z tvé strany nic nestojí. Vstup do světa znovu a začni od začátku."
+  "Nothing of your side stands. Enter the world again to start anew.": "Z tvé strany nic nestojí. Vstup do světa znovu a začni od začátku.",
+  "A persistent world grows as players arrive; each newcomer gets a base of their own and a computer neighbour. Type ws://server/world above to enter a server's world, or play one alone: it is kept for your next game, and a new one puts it aside.": "Trvalý svět roste s příchodem hráčů; každý nováček dostane vlastní základnu a počítačového souseda. Napiš nahoře ws://server/world a vstup do světa serveru, nebo hraj svět sám: zůstane ti uložený na příští hru. Nový svět ho odloží.",
+  "NEW WORLD ALONE": "NOVÝ SVĚT SÁM"
 }

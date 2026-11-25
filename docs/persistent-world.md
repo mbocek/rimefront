@@ -328,6 +328,8 @@ for ordinary network matches.
     one otherwise. Its thread saves it every half minute and once more when the player leaves; leaving waits
     for that save, so the next game finds it (`tests/world_client.rs` drives a tank, leaves, comes back and
     finds it where it stopped).
+    *New world alone* puts the kept world aside, in `worlds/own-previous` in place of the one put aside
+    before, and grows a new one.
     Computer sides: the level's own opponent holds its base, and a newcomer with no computer side within
     80 cells of their site (a little more than the spacing of sites, so one site away at most) gets one on
     the free site nearest them: the usual starting force, a commander of normal difficulty and its income.

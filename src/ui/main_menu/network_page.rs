@@ -113,8 +113,14 @@ pub(super) fn spawn_network_details(
             tr("PLAY A WORLD ALONE"),
             MenuCommand::PlayWorldAlone,
         );
+        spawn_command_button(
+            panel,
+            fonts,
+            tr("NEW WORLD ALONE"),
+            MenuCommand::NewWorldAlone,
+        );
         panel.spawn(fonts.text(
-            tr("A persistent world grows as players arrive; each newcomer gets a base of their own and a computer neighbour. Type ws://server/world above to enter a server's world, or play one alone: it is kept for your next game."),
+            tr("A persistent world grows as players arrive; each newcomer gets a base of their own and a computer neighbour. Type ws://server/world above to enter a server's world, or play one alone: it is kept for your next game, and a new one puts it aside."),
             14.0,
             TEXT_DIM,
         ));

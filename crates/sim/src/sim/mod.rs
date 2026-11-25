@@ -19,6 +19,7 @@ pub mod notifications;
 pub mod outcome;
 pub mod player_commands;
 pub mod production;
+pub mod records;
 pub mod research;
 pub mod servicing;
 pub mod sides;

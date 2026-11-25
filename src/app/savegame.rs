@@ -12,17 +12,18 @@ use crate::app::settings::{GameSettings, game_data_directory};
 use crate::missions::levels::{ActiveLevel, LevelDefinition};
 use crate::net::network::NetSession;
 use crate::sim::ai::AiCommanders;
-use crate::sim::catalog::{BuildingKind, Team, UnitKind};
+use crate::sim::catalog::{BuildingKind, Team};
 use crate::sim::components::*;
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
 use crate::sim::neutral_sites::{UnclaimedSite, spawn_unclaimed_site};
 use crate::sim::notifications::Notifications;
 use crate::sim::production::{BuildItem, Lane, Production};
+use crate::sim::records::{
+    SavableBuilding, SavableUnit, SavedBuilding, SavedUnit, respawn_building, respawn_unit,
+};
 use crate::sim::research::Upgrade;
-use crate::sim::spawn::{spawn_building, spawn_unit};
-use crate::sim::structures::{BeingSold, Repairing};
-use crate::sim::veterancy::Veterancy;
+use crate::sim::structures::BeingSold;
 use crate::ui::key_bindings::Action;
 use crate::view::camera::RtsCamera;
 use crate::world::map::{GameMap, cell_of_index, spawn_crystal_visual};
@@ -32,34 +33,6 @@ const SAVE_VERSION: u32 = 2;
 const SAVES_DIRECTORY: &str = "saves";
 pub const QUICK_SAVE_SLOT: usize = 0;
 pub const NAMED_SLOTS: std::ops::RangeInclusive<usize> = 1..=3;
-
-#[derive(Serialize, Deserialize, Clone)]
-struct SavedBuilding {
-    team: Team,
-    kind: BuildingKind,
-    origin: [i32; 2],
-    health: f32,
-    #[serde(default)]
-    rally: Option<[i32; 2]>,
-    #[serde(default)]
-    repairing: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct SavedUnit {
-    team: Team,
-    kind: UnitKind,
-    position: [f32; 3],
-    facing: f32,
-    health: f32,
-    cargo: u32,
-    #[serde(default)]
-    orders: Vec<Order>,
-    #[serde(default)]
-    experience: f32,
-    #[serde(default)]
-    stance: Stance,
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 struct SavedLane {
@@ -163,7 +136,7 @@ pub fn slot_summary(directory: &SaveDirectory, slot: usize) -> Option<String> {
     let own_units = save
         .units
         .iter()
-        .filter(|unit| unit.team == Team::Player)
+        .filter(|unit| unit.team() == Team::Player)
         .count();
     Some(tr_fmt(
         "{}  -  ${}, {} units",
@@ -189,72 +162,6 @@ pub fn quick_save_keys(
     }
     if settings.keys.just_pressed(&keys, Action::QuickLoad) {
         requests.load = Some(QUICK_SAVE_SLOT);
-    }
-}
-
-type SavableBuilding<'a> = (
-    &'a Building,
-    &'a Team,
-    &'a Health,
-    Option<&'a RallyPoint>,
-    Has<Repairing>,
-);
-
-type SavableUnit<'a> = (
-    &'a Unit,
-    &'a Team,
-    &'a Transform,
-    &'a Mobile,
-    &'a Health,
-    Option<&'a Harvester>,
-    Option<&'a Orders>,
-    Option<&'a Veterancy>,
-    Option<&'a Stance>,
-);
-
-impl SavedBuilding {
-    fn of(
-        (building, &team, health, rally, repairing): (
-            &Building,
-            &Team,
-            &Health,
-            Option<&RallyPoint>,
-            bool,
-        ),
-    ) -> Self {
-        Self {
-            team,
-            kind: building.kind,
-            origin: building.origin.to_array(),
-            health: health.current,
-            rally: rally.map(|rally| rally.0.to_array()),
-            repairing,
-        }
-    }
-}
-
-impl SavedUnit {
-    fn of(
-        (unit, &team, transform, mobile, health, harvester, orders, veterancy, stance): SavableUnit,
-    ) -> Self {
-        Self {
-            team,
-            kind: unit.0,
-            position: transform.translation.to_array(),
-            facing: mobile.facing,
-            health: health.current,
-            cargo: harvester.map_or(0, |h| h.cargo),
-            orders: orders.map_or_else(Vec::new, |orders| {
-                orders
-                    .current
-                    .iter()
-                    .chain(orders.queued.iter())
-                    .copied()
-                    .collect()
-            }),
-            experience: veterancy.map_or(0.0, |veterancy| veterancy.experience),
-            stance: stance.copied().unwrap_or_default(),
-        }
     }
 }
 
@@ -456,48 +363,6 @@ pub fn restore_pending_load(
         camera.focus = Vec3::from_array(save.camera_focus);
     }
     notifications.push(tr("Game loaded"));
-}
-
-fn respawn_building(commands: &mut Commands, map: &mut GameMap, saved: &SavedBuilding) {
-    let origin = IVec2::from_array(saved.origin);
-    let entity = spawn_building(commands, map, saved.kind, saved.team, origin);
-    commands.entity(entity).insert(Health {
-        current: saved.health,
-        max: saved.kind.spec().max_health,
-    });
-    if let Some(rally) = saved.rally {
-        commands
-            .entity(entity)
-            .insert(RallyPoint(IVec2::from_array(rally)));
-    }
-    if saved.repairing {
-        commands.entity(entity).insert(Repairing::default());
-    }
-}
-
-fn respawn_unit(commands: &mut Commands, saved: &SavedUnit) {
-    let position = Vec3::from_array(saved.position);
-    let entity = spawn_unit(commands, saved.kind, saved.team, position, saved.facing);
-    let (veterancy, health) = Veterancy::restored(saved.kind, saved.experience, saved.health);
-    commands.entity(entity).insert(health);
-    if saved.kind.spec().weapon.is_some() {
-        commands.entity(entity).insert(saved.stance);
-    }
-    if saved.experience > 0.0 {
-        commands.entity(entity).insert(veterancy);
-    }
-    let mut planned = saved.orders.iter().copied();
-    commands.entity(entity).insert(Orders {
-        current: planned.next(),
-        queued: planned.collect(),
-    });
-    if saved.kind == UnitKind::Harvester {
-        commands.entity(entity).insert(Harvester {
-            state: HarvestState::SeekingField,
-            cargo: saved.cargo,
-            preferred_field: None,
-        });
-    }
 }
 
 /// Saves from before every opponent had its own view kept one shared Syndicate view for all of them.

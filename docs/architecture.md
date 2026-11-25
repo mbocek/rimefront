@@ -28,6 +28,7 @@ The code is a Cargo workspace of three crates:
 | `combat` | target acquisition, chasing, turrets, projectiles, damage |
 | `economy` | credits, power, harvester state machine |
 | `production` | production queues and the rules for where structures and walls may stand |
+| `records` | what a saved game or a saved world keeps of every unit and structure, and how they come back |
 | `structures` | repairing and selling structures |
 | `ai` | computer opponents: build plan, saving up for structures, gathered attack waves, base defense |
 | `army_mix` | what the computer has seen of the enemy army and which units counter it |

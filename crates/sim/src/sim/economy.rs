@@ -5,7 +5,7 @@ use crate::sim::components::*;
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
 use crate::sim::notifications::{News, SideNews};
-use crate::sim::sides::PerSide;
+use crate::sim::sides::{PerSide, Shelter};
 use crate::sim::spawn::exit_cell;
 use crate::world::map::{
     CrystalVisual, GameMap, cell_center, cells_by_distance, crystal_scale, map_bounds,
@@ -111,6 +111,7 @@ pub fn run_harvesters(
     mut harvesters: Query<(&Team, &Transform, &mut Harvester, &mut Mobile, &SimId)>,
     refineries: Refineries,
     mut crystal_visuals: CrystalVisuals,
+    shelter: Res<Shelter>,
 ) {
     let dt = time.delta_secs();
     let mut claimed: Vec<IVec2> = harvesters
@@ -123,6 +124,13 @@ pub fn run_harvesters(
         let mobile = &mut *mobile;
         let next_state = match harvester.state {
             HarvestState::Holding => None,
+            HarvestState::SeekingField if shelter.covers(team) => None,
+            HarvestState::TravellingToField(_) | HarvestState::Mining { .. }
+                if shelter.covers(team) =>
+            {
+                head_to_refinery(mobile, &map, position, team, &refineries)
+                    .or(Some(HarvestState::SeekingField))
+            }
             HarvestState::SeekingField => seek_field(
                 &harvester,
                 mobile,

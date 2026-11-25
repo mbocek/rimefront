@@ -13,6 +13,7 @@ use crate::sim::fog::{CellSight, FogOfWar};
 use crate::sim::movement::{FLIGHT_ALTITUDE, order_move};
 use crate::sim::notifications::{News, SideNews};
 use crate::sim::research::Upgrade;
+use crate::sim::sides::Shelter;
 use crate::sim::sides::{PerSide, Sides};
 use crate::sim::spawn::{exit_cell, spawn_building, spawn_unit};
 use crate::world::map::{GameMap, cell_center, footprint_cells, footprint_center, world_to_cell};
@@ -321,6 +322,7 @@ pub struct UnitLimit(pub usize);
 pub fn advance_production(
     mut news: MessageWriter<News>,
     limit: Option<Res<UnitLimit>>,
+    shelter: Res<Shelter>,
     units: Query<&Team, With<Unit>>,
     mut commands: Commands,
     mut rng: ResMut<SimulationRng>,
@@ -332,7 +334,7 @@ pub fn advance_production(
     sides: Res<Sides>,
 ) {
     let limit = limit.map(|limit| limit.0);
-    for team in sides.iter() {
+    for team in sides.iter().filter(|&team| !shelter.covers(team)) {
         let rate = economies.of(team).production_rate();
         for lane_kind in Lane::ALL {
             let lane = production.lane_mut(team, lane_kind);

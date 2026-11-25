@@ -283,6 +283,10 @@ for ordinary network matches.
     ordered before the shelter is dropped, a shell already flying at one does it no harm, and engineers
     cannot capture its structures. Vision is untouched, so others still see a sheltered base. Players are not
     yet shown which sides are sheltered.
+    A sheltered side rests: when the shelter begins its units, harvesters aside, are sent to gather by its
+    Command Center; its harvesters drop what they were mining, unload at the refinery and wait there; its
+    production stops where it is. When the player returns the harvesters go back to mining on their own
+    and production goes on; the units stay at home until ordered.
     Away past `decay_after` (3 days by default), every unit and structure of the side loses a share of its
     full health each tick, so that something unhurt is gone after `decay_over` (2 more days); the usual rules
     remove what reaches nothing. A player who returns stops the decay and can repair. Once nothing of a side
@@ -363,9 +367,10 @@ for ordinary network matches.
     with news to the one who ordered them (`SideNews::Sheltered`). Every player is also sent which sides are
     sheltered whenever that changes, and the game puts a glass dome over each one's structures it knows of,
     as wide as they spread and a little more (`view::shelter_dome`), gone when the side's player returns.
-    New crystal: every ten minutes of world time a world grows a deposit for every four players present (at
-    least one), while fewer deposits are fresh (crystal still lies within 6 cells of the middle) than one
-    more than the sides of players (`world::deposits::lay_new_deposit`). It is a field like those the world
+    New crystal: every ten minutes of world time a world grows a deposit for every four sides that mine (a
+    refinery of theirs stands and they are not sheltered; at least one), while fewer deposits are fresh
+    (crystal still lies within 6 cells of the middle) than one more than the sides that mine
+    (`world::deposits::lay_new_deposit`). It is a field like those the world
     grew with, on open ground at least 16 cells from every structure and 4 from crystal already lying there,
     chosen from the map seed and the turn alone; on a fresh 64-cell world 57 of 60 turns found a spot. Every
     player present is told once a round that crystal surfaced (`SideNews::CrystalSurfaced`) but not where,
@@ -453,7 +458,7 @@ world 29 (Apple M5 Pro, release build), before and after the four fixes it led t
 - **Saves stalled the world**: a save took its records and wrote them on the world's thread; the records
   now read whole chunks at once and are written on a thread of their own.
 - **Crystal ran out**: one deposit every ten minutes did not keep up with twenty players; a round now
-  grows one for every four players present.
+  grows one for every four sides that mine, and the sides of players who are away no longer mine.
 - **A side that fell started again among the army that beat it**: the first run counted 644 falls in five
   hours, the same sides falling every few minutes; a newcomer is now given a site nobody stands near.
 

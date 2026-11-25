@@ -14,13 +14,17 @@ use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews,
 use rimefront_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
 use rimefront_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
+use rimefront_sim::sim::catalog::BuildingKind;
 use rimefront_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
-use rimefront_sim::sim::components::{Building, Health};
+use rimefront_sim::sim::components::{Building, Harvester, Health, Unit};
+use rimefront_sim::sim::determinism::SimId;
 use rimefront_sim::sim::determinism::run_schedules_on_one_thread;
 use rimefront_sim::sim::economy::Economies;
 use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
 use rimefront_sim::sim::notifications::{News, SideNews};
-use rimefront_sim::sim::player_commands::{CommandQueue, SimulationTick};
+use rimefront_sim::sim::player_commands::{
+    CommandQueue, GroundOrder, PlayerCommand, SimulationTick,
+};
 use rimefront_sim::sim::production::UnitLimit;
 use rimefront_sim::sim::sides::{Shelter, retire_side, side_stands};
 use rimefront_sim::world::deposits::lay_new_deposit;
@@ -190,9 +194,9 @@ const MOST_UNITS_PER_SIDE: usize = 120;
 const TICKS_BETWEEN_DEPOSITS: u64 = 10 * 60 * 20;
 /// A deposit counts as fresh while crystal lies this close to its middle.
 const DEPOSIT_REACH: i32 = 6;
-/// Players present for each deposit a world grows at a time: in a soak with twenty players, one deposit a
+/// Mining sides for each deposit a world grows at a time: in a soak with twenty players, one deposit a
 /// round let the crystal fall to a sixth in three hours (`rimefront-world-soak`).
-const PLAYERS_PER_DEPOSIT: usize = 4;
+const SIDES_PER_DEPOSIT: usize = 4;
 
 /// How often a player present without a computer side near is given one: rarely enough that beating one
 /// leaves the player some peace first.
@@ -575,6 +579,7 @@ impl WorldHost {
             .collect();
         let shelter_after = ticks_in(self.absence.shelter_after);
         let mut shelter = *self.app.world().resource::<Shelter>();
+        let mut newly_sheltered = Vec::new();
         for &team in self.sides_of_players.values() {
             if present.contains(&team) {
                 self.away_since.remove(&team);
@@ -582,11 +587,53 @@ impl WorldHost {
                 continue;
             }
             let since = *self.away_since.entry(team).or_insert(now);
-            if now - since >= shelter_after {
+            if now - since >= shelter_after && !shelter.covers(team) {
                 shelter.0.insert(team);
+                newly_sheltered.push(team);
             }
         }
         self.app.insert_resource(shelter);
+        for team in newly_sheltered {
+            self.send_units_home(team);
+        }
+    }
+
+    /// While its player is away a side rests at home: its units, harvesters aside, gather by its Command
+    /// Center, and its harvesters and production stop on their own.
+    fn send_units_home(&mut self, team: Team) {
+        let world = self.app.world_mut();
+        let home = world
+            .query::<(&Building, &Team)>()
+            .iter(world)
+            .filter(|(_, owner)| **owner == team)
+            .min_by_key(|(building, _)| building.kind != BuildingKind::CommandCenter)
+            .map(|(building, _)| {
+                building.origin + IVec2::new(1, building.kind.spec().footprint.y + 2)
+            });
+        let Some(home) = home else { return };
+        let mut units: Vec<SimId> = world
+            .query_filtered::<(&SimId, &Team, &Unit), Without<Harvester>>()
+            .iter(world)
+            .filter(|(_, owner, _)| **owner == team)
+            .map(|(id, ..)| *id)
+            .collect();
+        if units.is_empty() {
+            return;
+        }
+        units.sort();
+        let now = *world.resource::<SimulationTick>();
+        world.resource_mut::<CommandQueue>().issue(
+            now,
+            team,
+            PlayerCommand::Ground {
+                units,
+                goal: home,
+                order: GroundOrder::Move,
+                queued: false,
+                refinery: None,
+                together: false,
+            },
+        );
     }
 
     /// The units and structures of a side away past `decay_after` lose health by the tick; once nothing of
@@ -760,8 +807,8 @@ impl WorldHost {
         self.paint(team, None);
     }
 
-    /// A deposit for every few players present, and at least one; every player present is told crystal
-    /// surfaced, not where.
+    /// A deposit for every few sides that mine (those with a refinery, their players present), and at least
+    /// one; every player present is told crystal surfaced, not where.
     fn grow_deposits(&mut self, round: u64) {
         let mut present: Vec<Team> = self
             .players
@@ -770,9 +817,10 @@ impl WorldHost {
             .collect();
         present.sort_by_key(|team| team.index());
         present.dedup();
-        let deposits = present.len().div_ceil(PLAYERS_PER_DEPOSIT).max(1) as u64;
+        let mining = self.mining_sides();
+        let deposits = mining.div_ceil(SIDES_PER_DEPOSIT).max(1) as u64;
         let laid = (0..deposits)
-            .filter(|index| self.grow_a_deposit(round * 256 + index))
+            .filter(|index| self.grow_a_deposit(round * 256 + index, mining))
             .count();
         if laid == 0 {
             return;
@@ -784,9 +832,25 @@ impl WorldHost {
         }
     }
 
-    /// A new crystal deposit somewhere in the world, while fewer are fresh than one more than the players;
-    /// whether one was laid.
-    fn grow_a_deposit(&mut self, turn: u64) -> bool {
+    fn mining_sides(&mut self) -> usize {
+        let world = self.app.world_mut();
+        let shelter = *world.resource::<Shelter>();
+        let mut mining: Vec<Team> = world
+            .query::<(&Building, &Team)>()
+            .iter(world)
+            .filter(|(building, owner)| {
+                building.kind == BuildingKind::Refinery && !shelter.covers(**owner)
+            })
+            .map(|(_, owner)| *owner)
+            .collect();
+        mining.sort_by_key(|team| team.index());
+        mining.dedup();
+        mining.len()
+    }
+
+    /// A new crystal deposit somewhere in the world, while fewer are fresh than one more than the sides
+    /// that mine; whether one was laid.
+    fn grow_a_deposit(&mut self, turn: u64, mining: usize) -> bool {
         let world = self.app.world();
         let map = world.resource::<GameMap>();
         let fresh = self
@@ -800,7 +864,7 @@ impl WorldHost {
                     .any(|offset| map.crystal_at(middle + offset) > 0)
             })
             .count();
-        if fresh > self.sides_of_players.len() {
+        if fresh > mining {
             return false;
         }
         let Some((middle, laid)) = lay_new_deposit(self.app.world_mut(), turn) else {
@@ -894,6 +958,7 @@ mod tests {
     use rimefront_sim::sim::catalog::ProjectileStyle;
     use rimefront_sim::sim::catalog::{BuildingKind, UnitKind};
     use rimefront_sim::sim::components::Building;
+    use rimefront_sim::sim::components::HarvestState;
     use rimefront_sim::sim::components::Unit;
     use rimefront_sim::sim::determinism::SimId;
     use rimefront_sim::sim::economy::Economies;
@@ -1253,6 +1318,117 @@ mod tests {
 
         let (_second_visit, team_again) = enter_as(&mut host, &key);
         assert_eq!(team_again, team);
+    }
+
+    #[test]
+    fn a_side_whose_player_is_away_rests_at_home_and_neither_mines_nor_builds() {
+        let mut host = WorldHost::new(29);
+        host.set_absence_rules(AbsenceRules {
+            shelter_after: Duration::from_secs(2),
+            ..AbsenceRules::default()
+        });
+        let (mut player, mut mirror) = entered_with_mirror(&mut host);
+        let team = Team::Player;
+        let world = host.world();
+        let refinery = free_site_near_base(world, team, BuildingKind::Refinery);
+        world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            spawn_building(
+                &mut commands,
+                &mut map,
+                BuildingKind::Refinery,
+                team,
+                refinery,
+            );
+        });
+        world.flush();
+        let barracks = free_site_near_base(world, team, BuildingKind::Barracks);
+        let (tank, tank_position) = own_unit(world, team, UnitKind::Tank);
+        let tank_id = *world.get::<SimId>(tank).unwrap();
+        world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            spawn_building(
+                &mut commands,
+                &mut map,
+                BuildingKind::Barracks,
+                team,
+                barracks,
+            );
+            spawn_unit(&mut commands, UnitKind::Harvester, team, tank_position, 0.0);
+        });
+        world.flush();
+        let home = world_to_cell(tank_position);
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::Ground {
+                units: vec![tank_id],
+                goal: home + IVec2::new(0, -20),
+                order: GroundOrder::Move,
+                queued: false,
+                refinery: None,
+                together: false,
+            }],
+        });
+        run(&mut host, 20, &mut mirror, &mut player);
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::Enqueue {
+                item: BuildItem::Unit(UnitKind::Rifleman),
+                copies: 1,
+            }],
+        });
+        run(&mut host, 1, &mut mirror, &mut player);
+        let units_of = |host: &mut WorldHost| {
+            let world = host.world();
+            world
+                .query_filtered::<&Team, With<Unit>>()
+                .iter(world)
+                .filter(|&&owner| owner == team)
+                .count()
+        };
+        let units_when_left = units_of(&mut host);
+        drop(player);
+
+        for _ in 0..60 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(host.world().resource::<Shelter>().covers(team));
+        let economy = |host: &mut WorldHost| {
+            let economy = host.world().resource::<Economies>().of(team);
+            (economy.harvested, economy.credits)
+        };
+        let resting = economy(&mut host);
+        for _ in 0..30 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        assert_eq!(economy(&mut host), resting, "mined or spent while away");
+        assert_eq!(units_of(&mut host), units_when_left, "built while away");
+        let world = host.world();
+        let tank_cell = world_to_cell(world.get::<Transform>(tank).unwrap().translation);
+        let command_center = world
+            .query::<(&Building, &Team)>()
+            .iter(world)
+            .find(|(building, owner)| {
+                **owner == team && building.kind == BuildingKind::CommandCenter
+            })
+            .map(|(building, _)| building.origin)
+            .expect("the side has its Command Center");
+        assert!(
+            (tank_cell - command_center).as_vec2().length() < 12.0,
+            "the tank stayed at {tank_cell}, its Command Center at {command_center}"
+        );
+        let resting = world
+            .query::<(&Harvester, &Team)>()
+            .iter(world)
+            .filter(|(_, owner)| **owner == team)
+            .map(|(harvester, _)| (harvester.cargo, harvester.state))
+            .collect::<Vec<_>>();
+        assert!(!resting.is_empty());
+        for (cargo, state) in resting {
+            assert_eq!(cargo, 0);
+            assert!(
+                matches!(state, HarvestState::SeekingField),
+                "a harvester still {state:?}"
+            );
+        }
     }
 
     #[test]
@@ -1754,10 +1930,11 @@ mod tests {
         for round in 1..=5 {
             host.grow_deposits(round);
         }
+        let mining = host.mining_sides();
         assert_eq!(
             host.deposits.len(),
-            2,
-            "one more fresh deposit than players"
+            mining + 1,
+            "one more fresh deposit than sides that mine"
         );
         let deposits = host.deposits.clone();
         let recorded: Vec<bool> = deposits

@@ -65,8 +65,13 @@ impl Server {
 
     /// Runs a world grown from `map_seed` beside the rooms.
     pub fn with_world(listener: TcpListener, map_seed: u64) -> std::io::Result<Self> {
+        Self::hosting(listener, WorldHost::new(map_seed))
+    }
+
+    /// Runs `world` beside the rooms.
+    pub fn hosting(listener: TcpListener, world: WorldHost) -> std::io::Result<Self> {
         let mut server = Self::new(listener)?;
-        server.world = Some(WorldHost::new(map_seed));
+        server.world = Some(world);
         Ok(server)
     }
 

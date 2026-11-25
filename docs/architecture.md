@@ -83,6 +83,7 @@ The code is a Cargo workspace of three crates:
 | `world_view` | what a player of a world is shown: the things in sight, sent as changes, and the player's mirror of them |
 | `world_client` (in the game, `src/net`) | playing a world that runs elsewhere: entering it, mirroring what it shows, sending orders |
 | `world_host` | a persistent world run without drawing: players entering it and their orders, over the network or a channel |
+| `world_store` | a world saved by chunk in a directory, in a compact binary form, and built again from it |
 | `lobby` | hosting and joining a network battle from the main menu |
 
 ## `view` — drawing the battle

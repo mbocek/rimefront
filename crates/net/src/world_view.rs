@@ -254,6 +254,19 @@ pub struct MinedCrystal {
 }
 
 impl MinedCrystal {
+    /// Crystal known to differ from what the seed grows, as a world read back from its save has it.
+    pub fn of_cells(cells: impl IntoIterator<Item = (IVec2, u32)>) -> Self {
+        let mut mined = Self::default();
+        for (cell, amount) in cells {
+            mined
+                .by_chunk
+                .entry(chunk_of(cell))
+                .or_default()
+                .insert(cell, amount);
+        }
+        mined
+    }
+
     /// Notes the crystal left where harvesters mine; called after every update.
     pub fn note(&mut self, world: &mut World) {
         let mut harvesters = world.query::<&Harvester>();

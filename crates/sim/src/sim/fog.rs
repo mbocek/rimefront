@@ -40,6 +40,11 @@ impl Clone for FogOfWar {
     }
 }
 
+fn chunk_cells(bounds: MapBounds, chunk: IVec2) -> impl Iterator<Item = IVec2> {
+    let (first, last) = bounds.cells_of_chunk(chunk);
+    (first.y..=last.y).flat_map(move |y| (first.x..=last.x).map(move |x| IVec2::new(x, y)))
+}
+
 /// Radius in meters an entity reveals around itself.
 #[derive(Component, Clone, Copy)]
 pub struct Sight(pub f32);
@@ -127,6 +132,46 @@ impl FogOfWar {
             return;
         }
         for (cell, &was_explored) in bounds.cells().zip(explored) {
+            if let Some(sight) = self.cells.get_mut(cell)
+                && was_explored
+                && *sight == CellSight::Unexplored
+            {
+                *sight = CellSight::Explored;
+            }
+        }
+        self.revision += 1;
+        self.chunk_revisions.fill(self.revision);
+    }
+
+    /// Which cells of `chunk` were ever seen, a bit each row by row from its first map cell; `None` when
+    /// none were.
+    pub fn explored_in_chunk(&self, chunk: IVec2) -> Option<Vec<u8>> {
+        let mut bits = Vec::new();
+        let mut any = false;
+        for (index, cell) in chunk_cells(self.cells.bounds(), chunk).enumerate() {
+            if index % 8 == 0 {
+                bits.push(0);
+            }
+            if self
+                .cells
+                .get(cell)
+                .is_some_and(|sight| sight != CellSight::Unexplored)
+            {
+                bits[index / 8] |= 1 << (index % 8);
+                any = true;
+            }
+        }
+        any.then_some(bits)
+    }
+
+    pub fn restore_explored_in_chunk(&mut self, chunk: IVec2, bits: &[u8]) {
+        if !self.enabled {
+            return;
+        }
+        for (index, cell) in chunk_cells(self.cells.bounds(), chunk).enumerate() {
+            let was_explored = bits
+                .get(index / 8)
+                .is_some_and(|byte| byte & (1 << (index % 8)) != 0);
             if let Some(sight) = self.cells.get_mut(cell)
                 && was_explored
                 && *sight == CellSight::Unexplored

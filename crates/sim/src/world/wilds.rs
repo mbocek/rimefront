@@ -176,7 +176,7 @@ pub(crate) fn coordinate_rng(seed: u64, chunk: IVec2) -> StdRng {
 }
 
 /// Each crystal looks the same however its chunk came to be generated.
-fn crystal_look(map_seed: u64, cell: IVec2) -> StdRng {
+pub fn crystal_look(map_seed: u64, cell: IVec2) -> StdRng {
     coordinate_rng(map_seed ^ CRYSTAL_LOOK_SALT, cell)
 }
 

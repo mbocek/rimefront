@@ -3,8 +3,10 @@
 `iron-tide-server` (`crates/net/src/bin/server.rs`, `make server`) is a dedicated server for network battles: every player
 connects to it, so nobody forwards a port and no player's computer is the hub. Its battle rooms run no
 simulation. Hosting from the game on a local network works as before. With `--world SEED` it also runs a
-persistent world, entered at `ws://server:47300/world` (see [persistent-world.md](persistent-world.md); the
-game cannot show one yet).
+persistent world, entered at `ws://server:47300/world` from the game's network page (see
+[persistent-world.md](persistent-world.md)). With `--world-dir DIR` the world is saved in `DIR` every 30 seconds
+of world time (`--save-every SECS`) and resumed from there when the server starts again; `--world SEED` then
+only grows a world when `DIR` holds none. Stopping the server loses at most the time since the last save.
 
 ## Playing through it
 

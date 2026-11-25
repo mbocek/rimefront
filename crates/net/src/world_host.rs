@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 
@@ -8,9 +9,10 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::network::{Arrival, Link, Message};
+use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
-use iron_tide_sim::match_flow::{GameState, HostedWorld, deploy_newcomer};
+use iron_tide_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use iron_tide_sim::sim::catalog::Team;
 use iron_tide_sim::sim::components::Health;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
@@ -154,10 +156,104 @@ pub struct WorldHost {
     mined: MinedCrystal,
     /// Effects since the last views went out.
     unshown_effects: Vec<Effect>,
+    store: Option<KeptStore>,
+}
+
+/// Where a world is saved, how often, and when it last was.
+struct KeptStore {
+    store: WorldStore,
+    every_ticks: u64,
+    last_saved_tick: u64,
 }
 
 impl WorldHost {
     pub fn new(map_seed: u64) -> Self {
+        Self::hosting(Self::started(map_seed, false))
+    }
+
+    /// The world as it was saved, with its players' sides kept for them; nobody is connected yet.
+    pub fn resume(saved: &SavedWorld) -> Self {
+        let mut app = Self::started(saved.map_seed(), true);
+        let world = app.world_mut();
+        let mined = restore(world, saved);
+        world.remove_resource::<RestoringSave>();
+        world.resource_mut::<SimulationTick>().0 = saved.tick();
+        let hosting = saved.hosting();
+        world.resource_mut::<Shelter>().0 = hosting.sheltered.iter().copied().collect();
+        let mut host = Self::hosting(app);
+        host.mined = MinedCrystal::of_cells(mined);
+        host.level_side_taken = hosting.level_side_taken;
+        host.sides_of_players = hosting.players.iter().cloned().collect();
+        host.sites = hosting.sites.iter().copied().collect();
+        host.away_since = hosting.away_since.iter().copied().collect();
+        for &team in host.sides_of_players.values() {
+            host.away_since.entry(team).or_insert(saved.tick());
+        }
+        host
+    }
+
+    /// Saves the world into `store` every `every` of world time, and once at once.
+    pub fn keep_in(&mut self, store: WorldStore, every: Duration) -> io::Result<SaveReport> {
+        self.store = Some(KeptStore {
+            store,
+            every_ticks: ticks_in(every).max(1),
+            last_saved_tick: self.tick(),
+        });
+        self.save()
+    }
+
+    pub fn save(&mut self) -> io::Result<SaveReport> {
+        let tick = self.tick();
+        let hosting = self.hosting_record();
+        let Some(kept) = &mut self.store else {
+            return Ok(SaveReport::default());
+        };
+        kept.last_saved_tick = tick;
+        kept.store.save(self.app.world_mut(), tick, hosting)
+    }
+
+    fn save_when_due(&mut self) {
+        let due = self
+            .store
+            .as_ref()
+            .is_some_and(|kept| self.tick() - kept.last_saved_tick >= kept.every_ticks);
+        if !due {
+            return;
+        }
+        if let Err(error) = self.save() {
+            warn!("could not save the world: {error}");
+        }
+    }
+
+    fn hosting_record(&self) -> HostingRecord {
+        let shelter = self.app.world().resource::<Shelter>();
+        let mut players: Vec<(PlayerKey, Team)> = self
+            .sides_of_players
+            .iter()
+            .map(|(key, &team)| (key.clone(), team))
+            .collect();
+        players.sort_by_key(|(_, team)| *team);
+        let mut sites: Vec<(Team, IVec2)> = self.sites.iter().map(|(&t, &s)| (t, s)).collect();
+        sites.sort_by_key(|(team, _)| *team);
+        let mut away_since: Vec<(Team, u64)> =
+            self.away_since.iter().map(|(&t, &s)| (t, s)).collect();
+        away_since.sort_by_key(|(team, _)| *team);
+        HostingRecord {
+            level_side_taken: self.level_side_taken,
+            sheltered: players
+                .iter()
+                .map(|(_, team)| *team)
+                .filter(|&team| shelter.covers(team))
+                .collect(),
+            players,
+            sites,
+            away_since,
+        }
+    }
+
+    /// The simulation of a world grown from `map_seed`, started; without the level's forces when a save
+    /// is to take their place.
+    fn started(map_seed: u64, restoring: bool) -> App {
         let level = world_level(map_seed);
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
@@ -165,6 +261,9 @@ impl WorldHost {
             .insert_resource(ActiveLevel(level))
             .insert_resource(HostedWorld)
             .add_plugins(SimulationPlugin::default());
+        if restoring {
+            app.insert_resource(RestoringSave);
+        }
         run_schedules_on_one_thread(&mut app);
         let startup_frame_limit = 10;
         for _ in 0..startup_frame_limit {
@@ -181,6 +280,10 @@ impl WorldHost {
             app.world().contains_resource::<GameMap>(),
             "the world never started"
         );
+        app
+    }
+
+    fn hosting(app: App) -> Self {
         Self {
             app,
             players: Vec::new(),
@@ -193,6 +296,7 @@ impl WorldHost {
             effects: WorldEffects::default(),
             mined: MinedCrystal::default(),
             unshown_effects: Vec::new(),
+            store: None,
         }
     }
 
@@ -238,6 +342,7 @@ impl WorldHost {
         if self.tick() != before {
             self.show_views();
         }
+        self.save_when_due();
     }
 
     fn show_views(&mut self) {
@@ -451,10 +556,12 @@ mod tests {
     use iron_tide_sim::sim::components::Building;
     use iron_tide_sim::sim::components::Unit;
     use iron_tide_sim::sim::determinism::SimId;
+    use iron_tide_sim::sim::economy::Economies;
     use iron_tide_sim::sim::intel::Intel;
     use iron_tide_sim::sim::notifications::SideNews;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
     use iron_tide_sim::sim::production::{BuildItem, EnqueueRefusal, placement_context};
+    use iron_tide_sim::sim::production::{Lane, Production};
     use iron_tide_sim::sim::spawn::{spawn_building, spawn_unit};
     use iron_tide_sim::world::map::GameMap;
     use iron_tide_sim::world::map::map_bounds;
@@ -853,6 +960,126 @@ mod tests {
 
         let (_back, new_team) = enter_as(&mut host, &key);
         assert_ne!(new_team, team);
+    }
+
+    fn scratch_directory(name: &str) -> std::path::PathBuf {
+        let directory =
+            std::env::temp_dir().join(format!("iron_tide_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        directory
+    }
+
+    fn standing(host: &mut WorldHost) -> Vec<(Team, String)> {
+        let world = host.world();
+        let mut things: Vec<(Team, String)> = world
+            .query::<(&Team, Option<&Unit>, Option<&Building>)>()
+            .iter(world)
+            .filter_map(|(&team, unit, building)| match (unit, building) {
+                (Some(unit), _) => Some((team, format!("{:?}", unit.0))),
+                (None, Some(building)) => {
+                    Some((team, format!("{:?} {}", building.kind, building.origin)))
+                }
+                (None, None) => None,
+            })
+            .collect();
+        things.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        things
+    }
+
+    #[test]
+    fn a_saved_world_resumes_with_its_sides_players_and_ground() {
+        let directory = scratch_directory("resumed_world");
+        let mut host = WorldHost::new(29);
+        let key = PlayerKey::new_random();
+        let (_first, _) = enter(&mut host);
+        let (player, team) = enter_as(&mut host, &key);
+        let world = host.world();
+        let (_, tank_position) = own_unit(world, team, UnitKind::Tank);
+        let mut commands = world.commands();
+        spawn_unit(&mut commands, UnitKind::Harvester, team, tank_position, 0.0);
+        world.flush();
+        let power_plant = BuildItem::Structure(BuildingKind::PowerPlant);
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::Enqueue {
+                item: power_plant,
+                copies: 1,
+            }],
+        });
+        for _ in 0..20 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        let first = host
+            .keep_in(WorldStore::at(&directory), Duration::from_secs(60))
+            .unwrap();
+        assert_eq!(first.chunks_written, first.chunks);
+        let quiet = host.save().unwrap();
+        assert_eq!(
+            quiet.chunks_written, 0,
+            "an unchanged world wrote chunks again"
+        );
+        for _ in 0..5 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        let later = host.save().unwrap();
+        assert!(
+            later.chunks_written < later.chunks,
+            "every chunk written again"
+        );
+        println!(
+            "a saved world: {} chunks in {} bytes; 5 s later {} chunks in {} bytes",
+            first.chunks, first.bytes_written, later.chunks_written, later.bytes_written
+        );
+
+        let tick = host.tick();
+        let before = standing(&mut host);
+        let credits = host.world().resource::<Economies>().of(team).credits;
+        let lane = host
+            .world()
+            .resource::<Production>()
+            .lane(team, Lane::Structures)
+            .queue
+            .clone();
+        let crystal = host.world().resource::<GameMap>().crystal_amounts();
+        let explored = host
+            .world()
+            .resource::<Intel>()
+            .vision(team)
+            .explored_cells();
+
+        let saved = WorldStore::at(&directory).load().unwrap().unwrap();
+        let mut resumed = WorldHost::resume(&saved);
+        assert_eq!(resumed.tick(), tick);
+        assert_eq!(standing(&mut resumed), before);
+        let world = resumed.world();
+        assert_eq!(world.resource::<Economies>().of(team).credits, credits);
+        assert_eq!(
+            world
+                .resource::<Production>()
+                .lane(team, Lane::Structures)
+                .queue,
+            lane
+        );
+        assert_eq!(world.resource::<GameMap>().crystal_amounts(), crystal);
+        assert_eq!(
+            world.resource::<Intel>().vision(team).explored_cells(),
+            explored
+        );
+
+        let (mut back, world_end) = local_connection();
+        resumed.connect(Box::new(world_end));
+        back.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+            player: key.clone(),
+        });
+        resumed.step(SIMULATION_TICK);
+        assert_eq!(resumed.sides_of_players[&key], team);
+        let mut mirror = WorldMirror::default();
+        follow(&mut mirror, &mut back);
+        assert!(
+            !mirror.crystal.is_empty(),
+            "the mined crystal was not shown"
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     #[test]

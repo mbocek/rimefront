@@ -290,6 +290,26 @@ for ordinary network matches.
     once its first player's side is gone.
 15. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
     the JSON save format gives way to a compact binary one.
+    A world is kept in a directory (`world_store::WorldStore`): `world.bin` holds what is not kept by chunk
+    (seed, tick, bounds, every side's credits, production lanes, research and support charge, the claimed
+    starting sites, the computer commanders, and the host's players: keys, sides, sites, absences, shelter),
+    and `chunks/` a file for every chunk with its crystal, units, structures, mines and neutral sites and
+    which of its cells each side explored, one bit a cell. Units and structures are the records saved games
+    use (`sim::records`). Everything is postcard, a compact binary serde format.
+    A save writes only the chunks whose bytes changed since the last save, each to a new file named with
+    the tick, then writes `world.bin` naming every chunk's file (to a staged file renamed over the old one),
+    then removes the files no longer named; a save cut short at any point leaves the last whole save. Within
+    a chunk, units and structures are in simulation order, so a chunk nothing happened in keeps its bytes.
+    Measured in `world_host`'s test: a world widened by one newcomer, 36 chunks, saves in 43 kB; 5 seconds
+    later, with a harvester working, the next save writes 3 chunks in 6 kB.
+    `WorldHost::resume` starts a match on the saved seed without its forces (`RestoringSave`), widens it to
+    the saved bounds, takes away what the seed put down, lays the saved crystal and spawns the saved things,
+    sets the tick, and hands every player's side back to their key; nobody is connected, so everyone is
+    away from the tick of the save on. Cells whose crystal differs from what the seed grows are told to
+    players as mined, as their games grow the seed's fields. Shots in flight, the targets units had, and
+    harvesters' errands are not kept: the shots are gone, the rest is taken up again.
+    The dedicated server saves its world with `--world-dir DIR` (see [server.md](server.md)). The world's
+    views still travel as JSON.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing
     empty between players.
 

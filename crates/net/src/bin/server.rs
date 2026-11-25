@@ -1,10 +1,13 @@
 //! The dedicated network battle server:
 //! `iron-tide-server [--port 47300] [--world SEED] [--world-dir DIR] [--save-every SECS]`. Players join
 //! `ws://host:port/room/NAME`, and with `--world` or `--world-dir` enter a persistent world at
-//! `ws://host:port/world`; with `--world-dir` the world is saved there and resumed from there.
+//! `ws://host:port/world`; with `--world-dir` the world is saved there and resumed from there. Ctrl-C or
+//! a termination signal saves the world before the server stops.
 
 use std::net::TcpListener;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use iron_tide_net::lobby::DEFAULT_PORT;
@@ -70,12 +73,24 @@ fn main() -> std::io::Result<()> {
         Some(world) => Server::hosting(listener, world)?,
         None => Server::new(listener)?,
     };
+    let stopping = Arc::new(AtomicBool::new(false));
+    let asked_to_stop = Arc::clone(&stopping);
+    ctrlc::set_handler(move || asked_to_stop.store(true, Ordering::Relaxed))
+        .map_err(std::io::Error::other)?;
     println!(
         "Iron Tide server {} on port {port}",
         env!("CARGO_PKG_VERSION")
     );
-    loop {
+    while !stopping.load(Ordering::Relaxed) {
         server.step();
         std::thread::sleep(POLL_INTERVAL);
     }
+    if let Some(report) = server.save_world()? {
+        println!(
+            "World saved: {} of {} chunks written",
+            report.chunks_written, report.chunks
+        );
+    }
+    println!("Stopped");
+    Ok(())
 }

@@ -6,7 +6,8 @@ simulation. Hosting from the game on a local network works as before. With `--wo
 persistent world, entered at `ws://server:47300/world` from the game's network page (see
 [persistent-world.md](persistent-world.md)). With `--world-dir DIR` the world is saved in `DIR` every 30 seconds
 of world time (`--save-every SECS`) and resumed from there when the server starts again; `--world SEED` then
-only grows a world when `DIR` holds none. Stopping the server loses at most the time since the last save.
+only grows a world when `DIR` holds none. Ctrl-C or a termination signal (`SIGTERM`, as a service manager
+sends) saves the world before the server stops; a crash loses at most the time since the last save.
 
 ## Playing through it
 

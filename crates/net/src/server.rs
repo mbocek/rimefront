@@ -6,6 +6,7 @@ use crate::lobby::MOST_PLAYERS;
 use crate::network::{Arrival, Link, MOST_SPECTATORS, Message};
 use crate::relay::Relay;
 use crate::world_host::WorldHost;
+use crate::world_store::SaveReport;
 use iron_tide_sim::levels::LevelDefinition;
 use iron_tide_sim::sim::catalog::Team;
 
@@ -73,6 +74,15 @@ impl Server {
         let mut server = Self::new(listener)?;
         server.world = Some(world);
         Ok(server)
+    }
+
+    /// Saves the world, if the server runs one kept in a directory.
+    pub fn save_world(&mut self) -> std::io::Result<Option<SaveReport>> {
+        self.world
+            .as_mut()
+            .filter(|world| world.is_kept())
+            .map(WorldHost::save)
+            .transpose()
     }
 
     pub fn room_count(&self) -> usize {

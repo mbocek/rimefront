@@ -202,6 +202,10 @@ impl WorldHost {
         self.save()
     }
 
+    pub fn is_kept(&self) -> bool {
+        self.store.is_some()
+    }
+
     pub fn save(&mut self) -> io::Result<SaveReport> {
         let tick = self.tick();
         let hosting = self.hosting_record();

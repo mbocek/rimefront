@@ -44,7 +44,7 @@ the Apple Silicon runner) and Windows x86_64 (zip) builds; both macOS builds als
 packages:
 
 ```sh
-git tag v1.6.0 && git push origin v1.6.0   # the tag should match the version in Cargo.toml
+git tag v2.0.0 && git push origin v2.0.0   # the tag should match the version in Cargo.toml
 ```
 
 ## Tests

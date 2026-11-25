@@ -4844,7 +4844,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "rimefront"
-version = "1.6.0"
+version = "2.0.0"
 dependencies = [
  "bevy",
  "rand",
@@ -4861,7 +4861,7 @@ dependencies = [
 
 [[package]]
 name = "rimefront_net"
-version = "1.6.0"
+version = "2.0.0"
 dependencies = [
  "bevy",
  "ctrlc",
@@ -4880,7 +4880,7 @@ dependencies = [
 
 [[package]]
 name = "rimefront_sim"
-version = "1.6.0"
+version = "2.0.0"
 dependencies = [
  "bevy",
  "libm",

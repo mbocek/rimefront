@@ -1,6 +1,6 @@
 [package]
 name = "rimefront_sim"
-version = "1.6.0"
+version = "2.0.0"
 edition = "2024"
 rust-version = "1.100"
 description = "The battle simulation of Rimefront: rules, map and levels, without drawing, sound or interface"

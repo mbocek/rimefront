@@ -51,17 +51,24 @@ fn attack_with_tanks(battle: &mut Battle, team: Team, goal: IVec2) {
 }
 
 /// Steps both battles in turns until both have played `ticks`; neither may run ahead of the other's orders.
+/// A round in which neither advanced waits a moment for the other's turns to cross the connection.
 fn play_until(host: &mut Battle, guest: &mut Battle, ticks: u64) {
-    let mut rounds = 0;
+    let started = std::time::Instant::now();
     while host.tick() < ticks || guest.tick() < ticks {
+        let before = (host.tick(), guest.tick());
         if host.tick() < ticks {
             host.run_for(LIMIT_SECS);
         }
         if guest.tick() < ticks {
             guest.run_for(LIMIT_SECS);
         }
-        rounds += 1;
-        assert!(rounds < 20 * ticks, "the battles stopped advancing");
+        if (host.tick(), guest.tick()) == before {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            started.elapsed() < LOBBY_PATIENCE,
+            "the battles stopped advancing"
+        );
         assert_eq!(host.session_state(), Some(SessionState::InStep));
         assert_eq!(guest.session_state(), Some(SessionState::InStep));
     }

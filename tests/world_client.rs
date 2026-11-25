@@ -2,21 +2,21 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
-use iron_tide::SimulationPlugin;
-use iron_tide::app::match_flow::{GameState, MirroredBattle};
-use iron_tide::net::network::LockstepPlugin;
-use iron_tide::net::world_client::{OwnWorld, WorldClient, WorldClientPlugin};
-use iron_tide::net::world_host::PlayerKey;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{Building, Unit};
-use iron_tide::sim::determinism::{SimEntities, SimId, run_schedules_on_one_thread};
-use iron_tide::sim::player_commands::{
+use rimefront::SimulationPlugin;
+use rimefront::app::match_flow::{GameState, MirroredBattle};
+use rimefront::net::network::LockstepPlugin;
+use rimefront::net::world_client::{OwnWorld, WorldClient, WorldClientPlugin};
+use rimefront::net::world_host::PlayerKey;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{Building, Unit};
+use rimefront::sim::determinism::{SimEntities, SimId, run_schedules_on_one_thread};
+use rimefront::sim::player_commands::{
     CommandQueue, GroundOrder, LocalTeam, PlayerCommand, SimulationTick,
 };
-use iron_tide::sim::production::{BuildItem, Lane, Production};
-use iron_tide::world::map::world_to_cell;
+use rimefront::sim::production::{BuildItem, Lane, Production};
+use rimefront::world::map::world_to_cell;
 
-const STEP: Duration = iron_tide::SIMULATION_TICK;
+const STEP: Duration = rimefront::SIMULATION_TICK;
 
 fn player_of_a_world_alone() -> App {
     player_of(WorldClient::alone(29))
@@ -131,7 +131,7 @@ fn entered_with_forces(app: &mut App) -> bool {
 #[test]
 fn a_world_played_alone_is_there_the_next_time() {
     let directory =
-        std::env::temp_dir().join(format!("iron_tide_own_world_{}", std::process::id()));
+        std::env::temp_dir().join(format!("rimefront_own_world_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&directory);
     let player = PlayerKey::new_random();
     let own = || OwnWorld {
@@ -191,7 +191,7 @@ fn a_world_played_alone_is_there_the_next_time() {
 
 #[test]
 fn a_new_world_alone_puts_the_kept_one_aside_in_place_of_the_last() {
-    let root = std::env::temp_dir().join(format!("iron_tide_put_aside_{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("rimefront_put_aside_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let own = OwnWorld {
         directory: root.join("own"),

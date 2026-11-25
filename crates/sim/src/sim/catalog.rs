@@ -74,7 +74,7 @@ struct SideLook {
     name: &'static str,
     color: Color,
     /// Linear, as the models' palettes are painted; the first four are the tints the models were once
-    /// exported in, in tools/blender/irontide_models/materials.py.
+    /// exported in, in tools/blender/rimefront_models/materials.py.
     model_tint: Color,
 }
 

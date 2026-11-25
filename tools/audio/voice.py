@@ -46,7 +46,7 @@ def espeak():
 
 def spoken(language, text, pitch=PITCH, rate=SPEAKING_RATE_WPM, variant=""):
     """espeak-ng's dry mono recording, resampled to the game's rate."""
-    with tempfile.TemporaryDirectory(prefix="iron_tide_voice_") as scratch:
+    with tempfile.TemporaryDirectory(prefix="rimefront_voice_") as scratch:
         path = Path(scratch) / "speech.wav"
         voice = LANGUAGES[language] + variant
         subprocess.run([espeak(), "-v", voice, "-s", rate, "-p", pitch, "-w", str(path), text], check=True)

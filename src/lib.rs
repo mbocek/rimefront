@@ -7,7 +7,7 @@ pub mod net;
 pub mod ui;
 pub mod view;
 
-pub use iron_tide_sim::{
+pub use rimefront_sim::{
     FramePhase, MatchStart, SIMULATION_TICK, SimulationPlugin, StartupPhase, TickStep, sim, world,
 };
 

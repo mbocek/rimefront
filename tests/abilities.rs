@@ -2,13 +2,13 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::abilities::{Camouflage, MINE_COST, Mine};
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::components::Mobile;
-use iron_tide::sim::components::{Health, Weapon};
-use iron_tide::sim::movement::order_move;
-use iron_tide::sim::player_commands::PlayerCommand;
-use iron_tide::world::map::GameMap;
+use rimefront::sim::abilities::{Camouflage, MINE_COST, Mine};
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::components::Mobile;
+use rimefront::sim::components::{Health, Weapon};
+use rimefront::sim::movement::order_move;
+use rimefront::sim::player_commands::PlayerCommand;
+use rimefront::world::map::GameMap;
 
 const FIELD: IVec2 = IVec2::new(24, 45);
 
@@ -127,7 +127,7 @@ fn the_computer_mines_the_approach_to_its_base_once_it_has_money_to_spare() {
 
 #[test]
 fn buried_mines_survive_saving_and_loading() {
-    use iron_tide::app::savegame::SaveRequests;
+    use rimefront::app::savegame::SaveRequests;
     let mut battle = Battle::standard();
     bury_a_mine_at_the_field(&mut battle);
     assert_eq!(mines(&mut battle), 1);

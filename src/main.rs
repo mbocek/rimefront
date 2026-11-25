@@ -3,12 +3,12 @@
 use bevy::prelude::*;
 use bevy::render::RenderPlugin;
 use bevy::render::settings::{RenderCreation, WgpuFeatures, WgpuSettings};
-use iron_tide::sim::determinism::run_schedules_on_one_thread;
-use iron_tide::{GamePlugin, app::capture};
+use rimefront::sim::determinism::run_schedules_on_one_thread;
+use rimefront::{GamePlugin, app::capture};
 
 fn game_window() -> Window {
     let window = Window {
-        title: "Iron Tide".into(),
+        title: "Rimefront".into(),
         resolution: (1600_u32, 900_u32).into(),
         ..default()
     };
@@ -36,6 +36,7 @@ fn gpu_settings() -> WgpuSettings {
 }
 
 fn main() {
+    rimefront::app::settings::bring_over_data_from_before_the_rename();
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins

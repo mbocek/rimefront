@@ -2,14 +2,14 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::{BaseSite, Difficulty, LevelDefinition};
-use iron_tide::sim::catalog::{BuildingKind, Team};
-use iron_tide::sim::combat::DamageSource;
-use iron_tide::sim::components::{Building, Health};
-use iron_tide::sim::intel::Intel;
-use iron_tide::sim::player_commands::PlayerCommand;
-use iron_tide::sim::support_powers::SupportPower;
-use iron_tide::world::map::cell_center;
+use rimefront::missions::levels::{BaseSite, Difficulty, LevelDefinition};
+use rimefront::sim::catalog::{BuildingKind, Team};
+use rimefront::sim::combat::DamageSource;
+use rimefront::sim::components::{Building, Health};
+use rimefront::sim::intel::Intel;
+use rimefront::sim::player_commands::PlayerCommand;
+use rimefront::sim::support_powers::SupportPower;
+use rimefront::world::map::cell_center;
 
 const HOME: IVec2 = IVec2::new(8, 50);
 const TARGET: IVec2 = IVec2::new(40, 20);

@@ -2,10 +2,10 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{AttackTarget, Health, Mobile};
-use iron_tide::sim::production::BuildItem;
-use iron_tide::world::map::{GameMap, cell_center, footprint_center};
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{AttackTarget, Health, Mobile};
+use rimefront::sim::production::BuildItem;
+use rimefront::world::map::{GameMap, cell_center, footprint_center};
 
 const NORTH_BANK: IVec2 = IVec2::new(20, 24);
 const SOUTH_BANK: IVec2 = IVec2::new(20, 40);

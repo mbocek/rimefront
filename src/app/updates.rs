@@ -97,7 +97,7 @@ fn latest_release_url() -> Option<String> {
 
 /// The game names itself without any detail about the player.
 fn user_agent() -> String {
-    format!("iron-tide/{}", env!("CARGO_PKG_VERSION"))
+    format!("rimefront/{}", env!("CARGO_PKG_VERSION"))
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -341,8 +341,8 @@ mod tests {
     fn release_json(tag: &str) -> String {
         format!(
             r#"{{"tag_name": "{tag}", "assets": [
-                {{"name": "iron-tide-9.0.0-{SUFFIX}", "browser_download_url": "https://example.invalid/pkg"}},
-                {{"name": "iron-tide-9.0.0-unknown-os.zip", "browser_download_url": "https://example.invalid/other"}},
+                {{"name": "rimefront-9.0.0-{SUFFIX}", "browser_download_url": "https://example.invalid/pkg"}},
+                {{"name": "rimefront-9.0.0-unknown-os.zip", "browser_download_url": "https://example.invalid/other"}},
                 {{"name": "SHA256SUMS.txt", "browser_download_url": "https://example.invalid/sums"}}
             ]}}"#
         )

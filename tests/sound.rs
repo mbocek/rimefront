@@ -1,12 +1,12 @@
 mod common;
-use iron_tide::sim::structures::StructureOrderKind;
+use rimefront::sim::structures::StructureOrderKind;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::Health;
-use iron_tide::sim::cues::Sound;
-use iron_tide::sim::production::BuildItem;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::Health;
+use rimefront::sim::cues::Sound;
+use rimefront::sim::production::BuildItem;
 
 const OPEN_FIELD: IVec2 = IVec2::new(30, 45);
 
@@ -56,7 +56,7 @@ fn destruction_is_heard() {
     let world = battle.world();
     world.get_mut::<Health>(tank).unwrap().current = 0.0;
     let plant = world
-        .query_filtered::<Entity, With<iron_tide::sim::components::Building>>()
+        .query_filtered::<Entity, With<rimefront::sim::components::Building>>()
         .single(world)
         .unwrap();
     world.get_mut::<Health>(plant).unwrap().current = 0.0;

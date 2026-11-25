@@ -1,10 +1,10 @@
 mod common;
 
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::LevelDefinition;
-use iron_tide::sim::catalog::{BuildingKind, Team};
-use iron_tide::world::map::MapSize;
-use iron_tide::world::terrain::Landscape;
+use rimefront::missions::levels::LevelDefinition;
+use rimefront::sim::catalog::{BuildingKind, Team};
+use rimefront::world::map::MapSize;
+use rimefront::world::terrain::Landscape;
 
 #[test]
 fn the_computer_builds_a_base_in_the_wilds() {

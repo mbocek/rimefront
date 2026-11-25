@@ -1,4 +1,4 @@
-# Iron Tide
+# Rimefront
 
 Original real-time strategy game in Rust and Bevy. What lives where: [docs/architecture.md](docs/architecture.md);
 building, tests and releases: [docs/development.md](docs/development.md).

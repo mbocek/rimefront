@@ -7,29 +7,29 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::world_host::PlayerKey;
-use iron_tide_sim::levels::ActiveLevel;
-use iron_tide_sim::match_flow::MatchClock;
-use iron_tide_sim::sim::abilities::{Mine, bury};
-use iron_tide_sim::sim::ai::AiCommanders;
-use iron_tide_sim::sim::catalog::{BuildingKind, SideColor, Team};
-use iron_tide_sim::sim::components::{Building, Unit};
-use iron_tide_sim::sim::determinism::SimId;
-use iron_tide_sim::sim::economy::Economies;
-use iron_tide_sim::sim::intel::Intel;
-use iron_tide_sim::sim::neutral_sites::{UnclaimedSite, spawn_unclaimed_site};
-use iron_tide_sim::sim::production::{BuildItem, Lane, Production};
-use iron_tide_sim::sim::records::{
+use rimefront_sim::levels::ActiveLevel;
+use rimefront_sim::match_flow::MatchClock;
+use rimefront_sim::sim::abilities::{Mine, bury};
+use rimefront_sim::sim::ai::AiCommanders;
+use rimefront_sim::sim::catalog::{BuildingKind, SideColor, Team};
+use rimefront_sim::sim::components::{Building, Unit};
+use rimefront_sim::sim::determinism::SimId;
+use rimefront_sim::sim::economy::Economies;
+use rimefront_sim::sim::intel::Intel;
+use rimefront_sim::sim::neutral_sites::{UnclaimedSite, spawn_unclaimed_site};
+use rimefront_sim::sim::production::{BuildItem, Lane, Production};
+use rimefront_sim::sim::records::{
     SavableBuilding, SavableUnit, SavedBuilding, SavedUnit, respawn_building, respawn_unit,
 };
-use iron_tide_sim::sim::research::Upgrade;
-use iron_tide_sim::sim::sides::{RetiredSides, Sides};
-use iron_tide_sim::sim::structures::BeingSold;
-use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
-use iron_tide_sim::world::map::{
+use rimefront_sim::sim::research::Upgrade;
+use rimefront_sim::sim::sides::{RetiredSides, Sides};
+use rimefront_sim::sim::structures::BeingSold;
+use rimefront_sim::sim::support_powers::{SupportPower, SupportPowers};
+use rimefront_sim::world::map::{
     CrystalVisual, GameMap, MapBounds, chunk_of, map_bounds, spawn_crystal_visual, world_to_cell,
 };
-use iron_tide_sim::world::sites::StartingSites;
-use iron_tide_sim::world::wilds::{crystal_look, widen_world};
+use rimefront_sim::world::sites::StartingSites;
+use rimefront_sim::world::wilds::{crystal_look, widen_world};
 
 /// The layout of a saved world: what its files hold and in what order. It is the first thing in the world
 /// file, so a world saved by another layout is recognised before anything else is read; raising it needs a
@@ -598,7 +598,7 @@ mod tests {
         assert!(
             recorded == record,
             "what a saved world holds changed: raise STORE_VERSION, read the layout before in \
-             read_world_record, then re-record with UPDATE_WORLD_LAYOUT=1 cargo test -p iron_tide_net \
+             read_world_record, then re-record with UPDATE_WORLD_LAYOUT=1 cargo test -p rimefront_net \
              the_layout"
         );
     }

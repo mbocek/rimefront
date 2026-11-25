@@ -1,6 +1,6 @@
 # Development
 
-Building, testing and packaging Iron Tide, and the contract between the Blender models and the game.
+Building, testing and packaging Rimefront, and the contract between the Blender models and the game.
 
 ## Building and running
 
@@ -10,21 +10,21 @@ make models           # regenerate the models in Blender 5.x (ONLY=tank,scout fo
 make models-fast      # export only, without rendering previews (no GPU needed)
 make check            # cargo fmt --check + clippy -D warnings + tests
 make package          # release build bundled with its assets in dist/
-make dmg              # macOS: Iron Tide.app on a disk image in dist/
+make dmg              # macOS: Rimefront.app on a disk image in dist/
 make capture CAPTURE=shot.png CAPTURE_AFTER=30 CAPTURE_FOCUS=52,10
 make server           # the dedicated network battle server (PORT=47300), see docs/server.md
 make help             # every target
 ```
 
-Capture runs (`IRON_TIDE_CAPTURE=shot.png`, options in `src/app/capture.rs`) can also play a mouse script through
+Capture runs (`RIMEFRONT_CAPTURE=shot.png`, options in `src/app/capture.rs`) can also play a mouse script through
 the real input path, interface picking included, without moving the desktop cursor. It is how menu clicks, box
 selection, minimap orders, wall dragging and clicking aircraft in the air are checked without a person at the
 mouse:
 
 ```sh
-IRON_TIDE_CAPTURE=run.png IRON_TIDE_CAPTURE_MISSION=7 IRON_TIDE_CAPTURE_AFTER_SECS=10 \
-IRON_TIDE_CAPTURE_POINTER="3 move 1355 760; 3.2 press left; 3.3 release left; 4 move 560 650; 4.3 press left; 5 move 960 700; 6 shot; 6.5 release left; 8 shot" \
-  ./target/release/iron-tide
+RIMEFRONT_CAPTURE=run.png RIMEFRONT_CAPTURE_MISSION=7 RIMEFRONT_CAPTURE_AFTER_SECS=10 \
+RIMEFRONT_CAPTURE_POINTER="3 move 1355 760; 3.2 press left; 3.3 release left; 4 move 560 650; 4.3 press left; 5 move 960 700; 6 shot; 6.5 release left; 8 shot" \
+  ./target/release/rimefront
 ```
 
 Each step is seconds since start, then `move x y` (pixels of the 1600 x 900 capture), `press` / `release`
@@ -33,14 +33,14 @@ Each step is seconds since start, then `move x y` (pixels of the 1600 x 900 capt
 ## Packages and releases
 
 ```sh
-make package          # dist/iron-tide-<version>-<os>-<arch>.tar.gz: the release binary, its assets, the README and docs/
+make package          # dist/rimefront-<version>-<os>-<arch>.tar.gz: the release binary, its assets, the README and docs/
 ```
 
 The game loads its assets from the folder next to the executable, so a package just needs unpacking.
 CI (`.github/workflows/ci.yml`) runs `make check` on every push and pull request. Pushing a version tag (or
 starting the workflow by hand) also packages Linux x86_64, macOS arm64, macOS x86_64 (Intel, cross-compiled on
 the Apple Silicon runner) and Windows x86_64 (zip) builds; both macOS builds also come as a disk image with
-`Iron Tide.app` (`make dmg` builds one locally). A version tag then publishes a GitHub release with all the
+`Rimefront.app` (`make dmg` builds one locally). A version tag then publishes a GitHub release with all the
 packages:
 
 ```sh
@@ -62,8 +62,8 @@ cargo test --release --test sound      # the simulation asks for the right sound
 cargo test --release --test orders     # attack-move, patrol, waypoint queues, rally points
 cargo test --release --test crowd_bench -- --ignored --nocapture   # simulation time of up to 1920 fighting units
 cargo test --release --test world_bench -- --ignored --nocapture   # a world's tick and views with up to 64 players
-UPDATE_WORLD_PROTOCOL=1 cargo test -p iron_tide_net the_world_protocol   # re-record after raising WORLD_PROTOCOL
-UPDATE_WORLD_LAYOUT=1 cargo test -p iron_tide_net the_layout             # re-record after raising STORE_VERSION
+UPDATE_WORLD_PROTOCOL=1 cargo test -p rimefront_net the_world_protocol   # re-record after raising WORLD_PROTOCOL
+UPDATE_WORLD_LAYOUT=1 cargo test -p rimefront_net the_layout             # re-record after raising STORE_VERSION
 ```
 
 When to raise the world protocol or a saved world's layout, and how a server is updated, is in
@@ -81,7 +81,7 @@ scripted army wins, and saving then loading restores the battle.
 its footprint on the ground. Rotating turrets are separate objects named `Turret` with their pivot at the origin.
 A unit or structure is exported once, as `<id>.glb`, whatever side it is drawn for.
 
-Units and structures are exported with a single material, `Palette` (`tools/blender/irontide_models/palette.py`):
+Units and structures are exported with a single material, `Palette` (`tools/blender/rimefront_models/palette.py`):
 every surface of the palette in `materials.py` becomes a cell of three small textures (colour,
 roughness/metallic, glow) and each face's UVs point at its cell, so a mesh is one glTF primitive and Bevy one
 entity. The side's colour cell is painted the key colour, pure magenta (1, 0, 1), and the game's

@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn custom_levels_round_trip_through_files() {
         let directory =
-            std::env::temp_dir().join(format!("iron_tide_levels_test_{}", std::process::id()));
+            std::env::temp_dir().join(format!("rimefront_levels_test_{}", std::process::id()));
         let level = SkirmishOptions {
             enemies: 2,
             ..default()

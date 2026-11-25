@@ -445,7 +445,7 @@ pub fn spawn_menu(commands: &mut Commands, fonts: &UiFonts, place: MenuPlace) {
                         ..default()
                     })
                     .with_children(|header| {
-                        header.spawn(fonts.heading("IRON TIDE", 30.0, ACCENT));
+                        header.spawn(fonts.heading("RIMEFRONT", 30.0, ACCENT));
                         header.spawn(fonts.text(hint, 15.0, TEXT_DIM));
                     });
                 panel

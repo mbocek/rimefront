@@ -193,7 +193,7 @@ for ordinary network matches.
     the view follows it during a match: the ground patches and the water are planned again, the minimap
     redrawn in the same image, the crystal fields lit, the outlands' trees cleared from the new ground and
     planted along the new edge; the fog texture, the ground material and the camera follow the bounds by
-    themselves. `IRON_TIDE_CAPTURE_CLAIM_SITES=6` gives out sites two seconds into a capture run, to look
+    themselves. `RIMEFRONT_CAPTURE_CLAIM_SITES=6` gives out sites two seconds into a capture run, to look
     at it.
 11. **Sides as data.** Done. A `Team` is a side number; the four a level names keep their names
     (`Team::Player` and the rest), and their look (name, colour, model tint) comes from a table that repeats
@@ -208,27 +208,27 @@ for ordinary network matches.
 
 ### C. A world on a server
 
-12. **The world runs on the server.** `iron-tide-server` gains a world mode that runs `SimulationPlugin`
+12. **The world runs on the server.** `rimefront-server` gains a world mode that runs `SimulationPlugin`
     headless (as the tests already do) and takes player commands from the network instead of relaying them.
     The simulation is a crate of its own (`crates/sim`, see [architecture.md](architecture.md)): it reaches
     into nothing of drawing, sound, the interface or the network, and the network session and saving add
     their systems through the steps of a tick and of a match's start. It builds on Bevy without rendering,
     windows or audio, and the network has a crate of its own on top of it (`crates/net`), so the dedicated
     server links no renderer.
-    Done: `iron_tide_net::world_host::WorldHost` runs a wilds world (`world_level`) without drawing, on the
+    Done: `rimefront_net::world_host::WorldHost` runs a wilds world (`world_level`) without drawing, on the
     thread that made it, and takes its players through `WorldConnection`s: a network `Link`, or a
     `local_connection` within one process. A player sends `EnterWorld` and gets `Entered` with their side:
     the first takes the level's own side, everyone after a generated site of their own with the usual
     starting force (`match_flow::deploy_newcomer`); `Orders` from a player run for that player's side only,
     after the usual command delay. The level's opponents are the world's computer sides until step 16.
-    `iron-tide-server --world SEED` runs one beside the rooms, entered at `ws://host:port/world`; the server
+    `rimefront-server --world SEED` runs one beside the rooms, entered at `ws://host:port/world`; the server
     is 10 MB now that it links the simulation's systems, and with nobody connected and the computer sides
     building it used 0.16 s of processor time in 10 s. The game does not run a world yet: it needs the state
     a client is sent (step 13) to draw one.
 13. **Areas of interest.** Each client is sent the state of the chunks its units and structures see: a full
     snapshot on entering a chunk, then changes per tick; the replay snapshots are the starting point of the
     format. Clients draw it with the existing interpolation; orders go to the server as today.
-    Done in the protocol (`iron_tide_net::world_view`): after every tick a world sends each player a
+    Done in the protocol (`rimefront_net::world_view`): after every tick a world sends each player a
     `WorldView` of what changed in what their side sees, nothing when nothing did: the units and structures
     in the chunks within sight of their side's and allies' units and structures (`chunks_in_sight`) that the
     fog does not hide from them, each with its kind, side, position (hundredths of a cell), facing, health
@@ -244,7 +244,7 @@ for ordinary network matches.
     and structures the world showed appear, move and go with the world's ids, so selection, orders, the fog
     and the minimap work as in any battle; the player's orders go to the world instead of the queue. A test
     (`tests/world_client.rs`) enters a world run on its own thread and drives a tank there;
-    `IRON_TIDE_CAPTURE_WORLD=29` (or a server address) captures one.
+    `RIMEFRONT_CAPTURE_WORLD=29` (or a server address) captures one.
     The player's own side travels with the view whenever it changes (`SideState`): the production lanes
     with their queues, progress in percent and the structure ready to place, research done, and the tick
     each support power is charged at, a tick rather than a countdown so that a recharge sends nothing until

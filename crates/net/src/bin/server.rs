@@ -1,5 +1,5 @@
 //! The dedicated network battle server:
-//! `iron-tide-server [--port 47300] [--world SEED] [--world-dir DIR] [--save-every SECS]`. Players join
+//! `rimefront-server [--port 47300] [--world SEED] [--world-dir DIR] [--save-every SECS]`. Players join
 //! `ws://host:port/room/NAME`, and with `--world` or `--world-dir` enter a persistent world at
 //! `ws://host:port/world`; with `--world-dir` the world is saved there and resumed from there. Ctrl-C or
 //! a termination signal saves the world before the server stops.
@@ -10,10 +10,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use iron_tide_net::lobby::DEFAULT_PORT;
-use iron_tide_net::server::Server;
-use iron_tide_net::world_host::WorldHost;
-use iron_tide_net::world_store::WorldStore;
+use rimefront_net::lobby::DEFAULT_PORT;
+use rimefront_net::server::Server;
+use rimefront_net::world_host::WorldHost;
+use rimefront_net::world_store::WorldStore;
 
 /// Short enough that relaying adds no noticeable delay to a turn, long enough to leave the processor idle.
 const POLL_INTERVAL: Duration = Duration::from_millis(2);
@@ -78,7 +78,7 @@ fn main() -> std::io::Result<()> {
     ctrlc::set_handler(move || asked_to_stop.store(true, Ordering::Relaxed))
         .map_err(std::io::Error::other)?;
     println!(
-        "Iron Tide server {} on port {port}",
+        "Rimefront server {} on port {port}",
         env!("CARGO_PKG_VERSION")
     );
     while !stopping.load(Ordering::Relaxed) {

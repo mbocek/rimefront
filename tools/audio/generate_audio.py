@@ -1,4 +1,4 @@
-"""Regenerates every Iron Tide sound effect and music track from code.
+"""Regenerates every Rimefront sound effect and music track from code.
 
 Usage: python3 tools/audio/generate_audio.py --out assets/audio [--only sfx/ui_click music/victory]
 """
@@ -93,7 +93,7 @@ def main():
     names.sort(key=lambda n: n not in MUSIC)
     ffmpeg = find_ffmpeg()
     started = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="iron_tide_audio_") as scratch_dir:
+    with tempfile.TemporaryDirectory(prefix="rimefront_audio_") as scratch_dir:
         jobs = [(name, arguments.out, scratch_dir, ffmpeg) for name in names]
         with multiprocessing.Pool(min(arguments.jobs, len(jobs))) as pool:
             for name, seconds in pool.imap_unordered(render_asset, jobs):

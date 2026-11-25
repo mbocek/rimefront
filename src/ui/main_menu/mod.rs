@@ -345,7 +345,7 @@ fn spawn_title_bar(root: &mut ChildSpawnerCommands, fonts: &UiFonts, settings: &
             ..default()
         })
         .with_children(|title| {
-            title.spawn(fonts.heading("IRON TIDE", 46.0, ACCENT));
+            title.spawn(fonts.heading("RIMEFRONT", 46.0, ACCENT));
             title.spawn(fonts.text(
                 format!(
                     "{}  ·  v{}",

@@ -6,8 +6,13 @@ Settings (graphics: preset, shadows, AO, bloom, SMAA, vegetation, wind, VSync, f
 gameplay: language, side colour, game speed, edge scrolling, scroll speed, damage numbers, health bars, overlay; key
 bindings, stored by key name and only where they differ from the defaults; won missions and field tips
 already read) are saved
-automatically to `~/.config/iron_tide/settings.json` (Windows: `%APPDATA%\iron_tide`). Saved games live in
+automatically to `~/.config/rimefront/settings.json` (Windows: `%APPDATA%\rimefront`). Saved games live in
 the `saves/` directory next to it: a quick save plus 3 slots.
+
+The game was called Iron Tide before ([rename.md](rename.md)) and kept its data in `iron_tide`. The first time
+Rimefront starts and finds no `rimefront` directory but an `iron_tide` one, it moves that over, settings, saves,
+replays, levels and worlds alike (`bring_over_data_from_before_the_rename`); where the two lie on different
+volumes it copies them instead and leaves the old directory in place.
 
 The frame rate limit (30 / 60 / 120 fps or unlimited, default 60) keeps the game from spending CPU on frames
 a display cannot show. While the window is in the background the game keeps playing, but at no more than
@@ -52,13 +57,13 @@ colours the same way, and every player is sent each side's colour once, and agai
 ## Updates
 
 At start-up the game asks GitHub for the latest release of this repository (one request to
-`api.github.com`, sent as `iron-tide/<version>` with nothing about the player). When a newer version has a
+`api.github.com`, sent as `rimefront/<version>` with nothing about the player). When a newer version has a
 package for this computer, the main menu shows a banner, and one click updates the game
 (`self_update`): it downloads the package that matches how this copy is installed (the disk image for
-`Iron Tide.app`, the archive for a folder holding the executable beside `assets`), checks it against the
+`Rimefront.app`, the archive for a folder holding the executable beside `assets`), checks it against the
 release's `SHA256SUMS.txt`, unpacks it next to the installation and moves the new files in, the old ones
 aside, then starts the new version and quits. If a move fails the old files go back. The next start removes
-the staging folder (`.update` inside a folder installation, `.iron-tide-update` beside the app) with the old
+the staging folder (`.update` inside a folder installation, `.rimefront-update` beside the app) with the old
 copy in it. A copy that cannot write where it is installed, or a development build with no assets beside
 its executable, keeps the old behaviour: the package is saved into the Downloads folder and opened (a disk
 image is mounted on macOS, the zip or archive is shown in its folder on Windows and Linux). Release builds are signed and notarized once the certificates are configured in CI (see [docs/signing.md](signing.md)); until then they are unsigned. The check

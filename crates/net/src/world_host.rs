@@ -11,20 +11,20 @@ use serde::{Deserialize, Serialize};
 use crate::network::{Arrival, Link, Message};
 use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews, WorldSnapshot};
-use iron_tide_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
-use iron_tide_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
-use iron_tide_sim::sim::ai::{AiCommander, AiCommanders};
-use iron_tide_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
-use iron_tide_sim::sim::components::Health;
-use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
-use iron_tide_sim::sim::economy::Economies;
-use iron_tide_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
-use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
-use iron_tide_sim::sim::sides::{Shelter, retire_side, side_stands};
-use iron_tide_sim::world::map::{GameMap, base_sites, map_bounds};
-use iron_tide_sim::world::sites::{free_starting_site, neutral_site_in_square, squares_within};
-use iron_tide_sim::world::terrain::Landscape;
-use iron_tide_sim::{SIMULATION_TICK, SimulationPlugin};
+use rimefront_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
+use rimefront_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
+use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
+use rimefront_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
+use rimefront_sim::sim::components::Health;
+use rimefront_sim::sim::determinism::run_schedules_on_one_thread;
+use rimefront_sim::sim::economy::Economies;
+use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
+use rimefront_sim::sim::player_commands::{CommandQueue, SimulationTick};
+use rimefront_sim::sim::sides::{Shelter, retire_side, side_stands};
+use rimefront_sim::world::map::{GameMap, base_sites, map_bounds};
+use rimefront_sim::world::sites::{free_starting_site, neutral_site_in_square, squares_within};
+use rimefront_sim::world::terrain::Landscape;
+use rimefront_sim::{SIMULATION_TICK, SimulationPlugin};
 
 /// A connection to one player of a world: a network link, or a channel when the game runs the world itself.
 pub trait WorldConnection: Send {
@@ -748,24 +748,24 @@ mod tests {
     use super::*;
     use crate::world_view::{Thing, WorldMirror, things_in_view};
     use bevy::ecs::system::SystemState;
-    use iron_tide_sim::SIMULATION_TICK;
-    use iron_tide_sim::sim::catalog::ProjectileStyle;
-    use iron_tide_sim::sim::catalog::{BuildingKind, UnitKind};
-    use iron_tide_sim::sim::components::Building;
-    use iron_tide_sim::sim::components::Unit;
-    use iron_tide_sim::sim::determinism::SimId;
-    use iron_tide_sim::sim::economy::Economies;
-    use iron_tide_sim::sim::intel::Intel;
-    use iron_tide_sim::sim::neutral_sites::UnclaimedSite;
-    use iron_tide_sim::sim::notifications::SideNews;
-    use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
-    use iron_tide_sim::sim::production::{BuildItem, EnqueueRefusal, placement_context};
-    use iron_tide_sim::sim::production::{Lane, Production};
-    use iron_tide_sim::sim::spawn::{spawn_building, spawn_unit};
-    use iron_tide_sim::world::map::GameMap;
-    use iron_tide_sim::world::map::cell_center;
-    use iron_tide_sim::world::map::world_to_cell;
-    use iron_tide_sim::world::sites::StartingSites;
+    use rimefront_sim::SIMULATION_TICK;
+    use rimefront_sim::sim::catalog::ProjectileStyle;
+    use rimefront_sim::sim::catalog::{BuildingKind, UnitKind};
+    use rimefront_sim::sim::components::Building;
+    use rimefront_sim::sim::components::Unit;
+    use rimefront_sim::sim::determinism::SimId;
+    use rimefront_sim::sim::economy::Economies;
+    use rimefront_sim::sim::intel::Intel;
+    use rimefront_sim::sim::neutral_sites::UnclaimedSite;
+    use rimefront_sim::sim::notifications::SideNews;
+    use rimefront_sim::sim::player_commands::{GroundOrder, PlayerCommand};
+    use rimefront_sim::sim::production::{BuildItem, EnqueueRefusal, placement_context};
+    use rimefront_sim::sim::production::{Lane, Production};
+    use rimefront_sim::sim::spawn::{spawn_building, spawn_unit};
+    use rimefront_sim::world::map::GameMap;
+    use rimefront_sim::world::map::cell_center;
+    use rimefront_sim::world::map::world_to_cell;
+    use rimefront_sim::world::sites::StartingSites;
 
     fn follow(mirror: &mut WorldMirror, player: &mut LocalConnection) -> usize {
         let mut bytes = 0;
@@ -827,7 +827,7 @@ mod tests {
             .find(|thing| thing.team == Some(team) && thing.thing == Thing::Unit(UnitKind::Tank))
             .copied()
             .expect("the player sees their tank");
-        let goal = iron_tide_sim::world::map::world_to_cell(tank.position()) + IVec2::new(0, -12);
+        let goal = rimefront_sim::world::map::world_to_cell(tank.position()) + IVec2::new(0, -12);
         player.send(&Message::Orders {
             commands: vec![PlayerCommand::Ground {
                 units: vec![tank.id],
@@ -1198,7 +1198,7 @@ mod tests {
 
     fn scratch_directory(name: &str) -> std::path::PathBuf {
         let directory =
-            std::env::temp_dir().join(format!("iron_tide_{name}_{}", std::process::id()));
+            std::env::temp_dir().join(format!("rimefront_{name}_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         directory
     }
@@ -1558,7 +1558,7 @@ mod tests {
             .find(|(_, unit, team, ..)| **team == second_team && unit.0 == UnitKind::Tank)
             .map(|(entity, _, _, id, transform)| (entity, *id, transform.translation))
             .expect("the newcomer has a starting tank");
-        let goal = iron_tide_sim::world::map::world_to_cell(start) + IVec2::new(0, 6);
+        let goal = rimefront_sim::world::map::world_to_cell(start) + IVec2::new(0, 6);
         second.send(&Message::Orders {
             commands: vec![PlayerCommand::Ground {
                 units: vec![id],

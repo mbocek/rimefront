@@ -20,7 +20,7 @@ if [ -z "${signtool}" ]; then
   exit 1
 fi
 
-certificate="${RUNNER_TEMP:-/tmp}/iron-tide-certificate.pfx"
+certificate="${RUNNER_TEMP:-/tmp}/rimefront-certificate.pfx"
 echo "${WINDOWS_CERTIFICATE}" | base64 --decode > "${certificate}"
 trap 'rm -f "${certificate}"' EXIT
 

@@ -1,4 +1,4 @@
-pub use iron_tide_sim::{i18n, match_flow};
+pub use rimefront_sim::{i18n, match_flow};
 
 pub mod capture;
 pub mod capture_pointer;

@@ -1,7 +1,7 @@
-# Iron Tide
+# Rimefront
 
-[![CI](https://github.com/mbocek/iron-tide/actions/workflows/ci.yml/badge.svg)](https://github.com/mbocek/iron-tide/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/mbocek/iron-tide)](https://github.com/mbocek/iron-tide/releases/latest)
+[![CI](https://github.com/mbocek/rimefront/actions/workflows/ci.yml/badge.svg)](https://github.com/mbocek/rimefront/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/mbocek/rimefront)](https://github.com/mbocek/rimefront/releases/latest)
 ![Rust](https://img.shields.io/badge/rust-1.100%2B-orange?logo=rust)
 ![Bevy](https://img.shields.io/badge/bevy-0.20-232326)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-blue)
@@ -27,13 +27,13 @@ and explosions, which are built from public-domain recordings.
 
 ## Play
 
-Download the package for your system from the [latest release](https://github.com/mbocek/iron-tide/releases/latest),
-unpack it and run `iron-tide` (on macOS open the disk image and start *Iron Tide*).
+Download the package for your system from the [latest release](https://github.com/mbocek/rimefront/releases/latest),
+unpack it and run `rimefront` (on macOS open the disk image and start *Rimefront*).
 Press **F1** in a battle to see the controls.
 
 Release builds are not yet signed with a Developer ID, so macOS refuses the first start: open *System
-Settings → Privacy & Security* and click *Open Anyway* next to Iron Tide. For packages up to 1.3.0, which
-macOS calls "damaged", run `xattr -dr com.apple.quarantine "/Applications/Iron Tide.app"` once instead.
+Settings → Privacy & Security* and click *Open Anyway* next to Rimefront. For packages up to 1.3.0, which
+macOS calls "damaged", run `xattr -dr com.apple.quarantine "/Applications/Rimefront.app"` once instead.
 
 ## Build from source
 
@@ -54,11 +54,12 @@ make help          # every target
 | [Sound and music](docs/audio.md) | effects, recorded gunfire, music, positional sound, voice reports |
 | [Languages](docs/languages.md) | translations and how to edit them |
 | [Determinism and multiplayer](docs/determinism.md) | lockstep simulation, network play, replays |
-| [Dedicated server](docs/server.md) | `iron-tide-server`: rooms on an internet server, how to play through it, what is left |
+| [Dedicated server](docs/server.md) | `rimefront-server`: rooms on an internet server, how to play through it, what is left |
 | [Balance](docs/balance.md) | the balance tool and its latest results |
 | [Development](docs/development.md) | building, tests, packages and releases, the Blender model contract |
 | [Code layout](docs/architecture.md) | what each module is responsible for |
 | [Persistent world](docs/persistent-world.md) | the steps towards a permanent world far larger than a match map |
+| [Renaming to Rimefront](docs/rename.md) | why the game is being renamed and everything the rename touches |
 | [Signing](docs/signing.md) | signing and notarizing release builds |
 
 ## Third-party assets
@@ -71,4 +72,4 @@ make help          # every target
   [Tiny Naval Battle Sounds Set](https://opengameart.org/content/tiny-naval-battle-sounds-set) (Iwan Gabovitch).
 - Font Rajdhani (`assets/fonts/`): Indian Type Foundry, SIL Open Font License 1.1 (`assets/fonts/OFL.txt`).
 
-(c) 2026 Iron Tide
+(c) 2026 Rimefront

@@ -193,7 +193,7 @@ fn spawn_header(
             ..default()
         })
         .with_children(|header| {
-            header.spawn(fonts.heading("IRON TIDE", 30.0, ACCENT));
+            header.spawn(fonts.heading("RIMEFRONT", 30.0, ACCENT));
             header.spawn(fonts.heading(title, 16.0, team.ui_color()));
             header
                 .spawn((

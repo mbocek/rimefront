@@ -1,4 +1,4 @@
-"""Builds every Iron Tide model procedurally, exports .glb files and renders previews (and optionally UI icons).
+"""Builds every Rimefront model procedurally, exports .glb files and renders previews (and optionally UI icons).
 
 blender -b --factory-startup --python tools/blender/build_models.py -- \
     --out assets/models --previews assets/previews --icons assets/icons
@@ -10,11 +10,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from irontide_models import buildings, decorations, nature, ore, soldier, units, upgrades, vegetation  # noqa: E402
-from irontide_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # noqa: E402
-from irontide_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
-from irontide_models.parts import TURRET, begin_model  # noqa: E402
-from irontide_models.pipeline import export_glb, inspect_glb, render_icon, render_preview, reset_scene  # noqa: E402
+from rimefront_models import buildings, decorations, nature, ore, soldier, units, upgrades, vegetation  # noqa: E402
+from rimefront_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # noqa: E402
+from rimefront_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
+from rimefront_models.parts import TURRET, begin_model  # noqa: E402
+from rimefront_models.pipeline import export_glb, inspect_glb, render_icon, render_preview, reset_scene  # noqa: E402
 
 # A model is exported once, its side's colour a key the game replaces; previews and icons show the first side.
 EXPORTED_TEAM = "key"
@@ -212,7 +212,7 @@ def build_all(arguments):
         report.append(f"{path.name:28s} {summary.triangles:6d} tris  nodes={summary.node_names}")
         for name, (duration, targets) in summary.animations.items():
             report.append(f"{'':28s} anim {name} {duration:.2f}s -> {targets}")
-        print(f"[iron-tide] built {model_id} in {time.time() - started:.1f}s", flush=True)
+        print(f"[rimefront] built {model_id} in {time.time() - started:.1f}s", flush=True)
 
     if arguments.icons:
         for model_id, builder in ICON_ONLY_MODELS.items():
@@ -221,11 +221,11 @@ def build_all(arguments):
             set_team_color(PREVIEW_TEAM)
             render_icon(build_model(model_id, builder), arguments.icons / f"{model_id}.png")
 
-    print("\n[iron-tide] export summary")
+    print("\n[rimefront] export summary")
     for line in report:
         print("  " + line)
     if failures:
-        print("[iron-tide] FAILURES:\n  " + "\n  ".join(failures))
+        print("[rimefront] FAILURES:\n  " + "\n  ".join(failures))
         sys.exit(1)
 
 

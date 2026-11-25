@@ -28,8 +28,8 @@ disk image, submits it to Apple's notary service, waits for the verdict and stap
 the certificate but without the three notarization secrets the build is signed but not notarized, which
 Gatekeeper still blocks on first launch.
 
-Check a downloaded image with `spctl -a -t open --context context:primary-signature -v Iron-Tide.dmg` and the
-installed app with `spctl -a -v "/Applications/Iron Tide.app"`.
+Check a downloaded image with `spctl -a -t open --context context:primary-signature -v Rimefront.dmg` and the
+installed app with `spctl -a -v "/Applications/Rimefront.app"`.
 
 ## Windows: Authenticode
 
@@ -42,11 +42,11 @@ certificate needs that provider's signing tool in `tools/sign_windows.sh` instea
 | `WINDOWS_CERTIFICATE` | `base64 -w0 certificate.pfx` |
 | `WINDOWS_CERTIFICATE_PASSWORD` | the `.pfx` password |
 
-`tools/sign_windows.sh` signs `iron-tide.exe` with SHA-256 and a timestamp before it is zipped, then verifies
+`tools/sign_windows.sh` signs `rimefront.exe` with SHA-256 and a timestamp before it is zipped, then verifies
 the signature. SmartScreen may still warn about a new certificate until it has built up a reputation; an
 EV certificate skips that.
 
 ## Trying it
 
 Run the signing scripts locally with the same variables exported, e.g.
-`MACOS_CERTIFICATE=$(base64 -i cert.p12) ... tools/package_dmg.sh macos-arm64 target/release/iron-tide`.
+`MACOS_CERTIFICATE=$(base64 -i cert.p12) ... tools/package_dmg.sh macos-arm64 target/release/rimefront`.

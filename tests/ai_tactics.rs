@@ -2,11 +2,11 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::{Difficulty, LevelDefinition};
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{Building, Health, Order, Orders, Unit};
-use iron_tide::sim::engineers::EngineerTask;
-use iron_tide::world::map::{footprint_center, world_to_cell};
+use rimefront::missions::levels::{Difficulty, LevelDefinition};
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{Building, Health, Order, Orders, Unit};
+use rimefront::sim::engineers::EngineerTask;
+use rimefront::world::map::{footprint_center, world_to_cell};
 
 fn fogless_match() -> Battle {
     Battle::new(BattleSetup {

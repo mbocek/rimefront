@@ -2,11 +2,11 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::determinism::simulation_checksum;
-use iron_tide::sim::player_commands::{GroundOrder, PlayerCommand};
-use iron_tide::sim::production::BuildItem;
-use iron_tide::world::map::{cell_center, player_base_cell};
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::determinism::simulation_checksum;
+use rimefront::sim::player_commands::{GroundOrder, PlayerCommand};
+use rimefront::sim::production::BuildItem;
+use rimefront::world::map::{cell_center, player_base_cell};
 
 const FIELD: IVec2 = IVec2::new(20, 45);
 

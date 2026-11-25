@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::LevelDefinition;
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::world::map::MapSize;
+use rimefront::missions::levels::LevelDefinition;
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::world::map::MapSize;
 
 const UNITS_PER_SIDE_IN_A_FIGHT: i32 = 80;
 const SECONDS_OF_FIGHTING: f32 = 20.0;
@@ -59,8 +59,8 @@ fn simulation_time_of_spread_out_fights() {
 #[test]
 #[ignore]
 fn fog_update_time_on_growing_maps() {
-    use iron_tide::sim::fog::FogOfWar;
-    use iron_tide::world::map::{MapBounds, set_map_bounds};
+    use rimefront::sim::fog::FogOfWar;
+    use rimefront::world::map::{MapBounds, set_map_bounds};
     const VIEWERS: i32 = 300;
     const UPDATES: i32 = 50;
     for cells in [256, 1024, 2048] {
@@ -70,7 +70,7 @@ fn fog_update_time_on_growing_maps() {
         for update in 0..UPDATES {
             let viewers = (0..VIEWERS).map(|i| {
                 let spot = IVec2::new(20 + (i % 20) * 9 + update, 20 + (i / 20) * 9);
-                (iron_tide::world::map::cell_center(spot), 12.0)
+                (rimefront::world::map::cell_center(spot), 12.0)
             });
             fog.reveal_around(viewers);
         }

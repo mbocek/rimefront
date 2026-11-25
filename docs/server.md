@@ -1,6 +1,6 @@
 # Dedicated server
 
-`iron-tide-server` (`crates/net/src/bin/server.rs`, `make server`) is a dedicated server for network battles: every player
+`rimefront-server` (`crates/net/src/bin/server.rs`, `make server`) is a dedicated server for network battles: every player
 connects to it, so nobody forwards a port and no player's computer is the hub. Its battle rooms run no
 simulation. Hosting from the game on a local network works as before. With `--world SEED` it also runs a
 persistent world, entered at `ws://server:47300/world` from the game's network page (see
@@ -13,7 +13,7 @@ change between versions, is in [compatibility.md](compatibility.md).
 
 ## Playing through it
 
-1. Run `iron-tide-server --port 47300` somewhere every player can reach, plain or behind a proxy that adds TLS
+1. Run `rimefront-server --port 47300` somewhere every player can reach, plain or behind a proxy that adds TLS
    (see below); players then use `ws://server:47300/room/NAME` or `wss://domain/room/NAME`.
 2. One player types `ws://server:47300/room/NAME` in the network page's address field, sets the battle in the
    battle editor's settings (number of players included) and clicks *Open this room on the server*. They play
@@ -55,7 +55,7 @@ apart, a late spectator and a returning player catching up, an address without a
 - **Limits.** A link takes no more messages once more than 256 kB wait for a reader that does not keep up
   (`MOST_UNSENT_BYTES`), and a world lets go of a player whose link refuses their view; they enter again
   when their connection recovers. Still open: rooms per server and idle rooms. The binary is small (10 MB) when built on its own,
-  `cargo build --release -p iron_tide_net --bin iron-tide-server`; a workspace build gives it the game's
+  `cargo build --release -p rimefront_net --bin rimefront-server`; a workspace build gives it the game's
   Bevy features and the game's size.
 - **A world on its own thread.** A world lives on the thread that made it (map queries are per thread), so
   `Server::with_world` must be called on the thread that steps the server.
@@ -69,17 +69,17 @@ The server is one binary listening on one port; a reverse proxy adds TLS and a c
 FROM rust:1.100 AS build
 WORKDIR /src
 COPY . .
-RUN cargo build --release -p iron_tide_net --bin iron-tide-server
+RUN cargo build --release -p rimefront_net --bin rimefront-server
 
 FROM debian:stable-slim
-COPY --from=build /src/target/release/iron-tide-server /usr/local/bin/
+COPY --from=build /src/target/release/rimefront-server /usr/local/bin/
 EXPOSE 47300
-CMD ["iron-tide-server", "--port", "47300"]
+CMD ["rimefront-server", "--port", "47300"]
 ```
 
 ```caddyfile
 play.example.org {
-    reverse_proxy iron-tide-server:47300
+    reverse_proxy rimefront-server:47300
 }
 ```
 

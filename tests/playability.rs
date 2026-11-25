@@ -2,14 +2,14 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::app::savegame::SaveRequests;
-use iron_tide::missions::levels::{LevelDefinition, campaign};
-use iron_tide::sim::catalog::{BuildingKind, Diplomacy, STARTING_CREDITS, Team, UnitKind};
-use iron_tide::sim::components::*;
-use iron_tide::sim::movement::order_move;
-use iron_tide::sim::outcome::GameOutcome;
-use iron_tide::sim::production::BuildItem;
-use iron_tide::world::map::{
+use rimefront::app::savegame::SaveRequests;
+use rimefront::missions::levels::{LevelDefinition, campaign};
+use rimefront::sim::catalog::{BuildingKind, Diplomacy, STARTING_CREDITS, Team, UnitKind};
+use rimefront::sim::components::*;
+use rimefront::sim::movement::order_move;
+use rimefront::sim::outcome::GameOutcome;
+use rimefront::sim::production::BuildItem;
+use rimefront::world::map::{
     GameMap, cell_center, footprint_cells, map_bounds, opposite_cell, world_to_cell,
 };
 

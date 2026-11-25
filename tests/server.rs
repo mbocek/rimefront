@@ -7,14 +7,14 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::missions::levels::{ActiveLevel, LevelDefinition};
-use iron_tide::net::lobby::{BattleStart, NetLobby};
-use iron_tide::net::network::{Arrival, Dialling, Link, Message, SessionState};
-use iron_tide::net::server::Server;
-use iron_tide::net::world_host::{PlayerKey, WORLD_PROTOCOL};
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::determinism::simulation_checksum;
-use iron_tide::sim::player_commands::{GroundOrder, PlayerCommand};
+use rimefront::missions::levels::{ActiveLevel, LevelDefinition};
+use rimefront::net::lobby::{BattleStart, NetLobby};
+use rimefront::net::network::{Arrival, Dialling, Link, Message, SessionState};
+use rimefront::net::server::Server;
+use rimefront::net::world_host::{PlayerKey, WORLD_PROTOCOL};
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::determinism::simulation_checksum;
+use rimefront::sim::player_commands::{GroundOrder, PlayerCommand};
 
 const STEP_SECS: f32 = 0.05;
 

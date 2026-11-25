@@ -1,22 +1,22 @@
 [package]
-name = "iron_tide"
-default-run = "iron-tide"
+name = "rimefront"
+default-run = "rimefront"
 version = "1.6.0"
 edition = "2024"
 rust-version = "1.100"
-description = "Iron Tide - an original real-time strategy game (c) 2026"
-repository = "https://github.com/mbocek/iron-tide"
+description = "Rimefront - an original real-time strategy game (c) 2026"
+repository = "https://github.com/mbocek/rimefront"
 
 [[bin]]
-name = "iron-tide"
+name = "rimefront"
 path = "src/main.rs"
 
 [workspace]
 members = [".", "crates/sim", "crates/net"]
 
 [dependencies]
-iron_tide_sim = { path = "crates/sim" }
-iron_tide_net = { path = "crates/net" }
+rimefront_sim = { path = "crates/sim" }
+rimefront_net = { path = "crates/net" }
 bevy = { version = "0.20.1", features = ["jpeg"] }
 rand = "0.10.4"
 serde = { version = "1", features = ["derive"] }

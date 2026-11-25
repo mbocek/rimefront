@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::LevelDefinition;
-use iron_tide::sim::catalog::{BuildingKind, Team};
-use iron_tide::world::map::{GameMap, MapBounds, MapSize, base_sites, map_bounds, opposite_cell};
+use rimefront::missions::levels::LevelDefinition;
+use rimefront::sim::catalog::{BuildingKind, Team};
+use rimefront::world::map::{GameMap, MapBounds, MapSize, base_sites, map_bounds, opposite_cell};
 
 fn crystal_cells(map: &GameMap) -> Vec<IVec2> {
     map_bounds()

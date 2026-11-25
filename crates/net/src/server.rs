@@ -7,8 +7,8 @@ use crate::network::{Arrival, Link, MOST_SPECTATORS, Message};
 use crate::relay::Relay;
 use crate::world_host::WorldHost;
 use crate::world_store::SaveReport;
-use iron_tide_sim::levels::LevelDefinition;
-use iron_tide_sim::sim::catalog::Team;
+use rimefront_sim::levels::LevelDefinition;
+use rimefront_sim::sim::catalog::Team;
 
 const ROOM_PATH: &str = "/room/";
 const WORLD_PATH: &str = "/world";

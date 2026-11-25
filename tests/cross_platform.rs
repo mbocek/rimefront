@@ -3,9 +3,9 @@
 mod common;
 
 use common::Battle;
-use iron_tide::missions::levels::{BaseSite, Difficulty};
-use iron_tide::sim::catalog::Team;
-use iron_tide::sim::determinism::simulation_checksum;
+use rimefront::missions::levels::{BaseSite, Difficulty};
+use rimefront::sim::catalog::Team;
+use rimefront::sim::determinism::simulation_checksum;
 
 const FINGERPRINT_FILE: &str = "tests/fingerprints.txt";
 const UPDATE_VAR: &str = "UPDATE_FINGERPRINTS";

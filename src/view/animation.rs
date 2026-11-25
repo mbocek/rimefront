@@ -11,7 +11,7 @@ use crate::sim::components::*;
 use crate::sim::medical::Healer;
 use crate::view::side_tint::Painted;
 
-/// Clip names authored in Blender; tools/blender/irontide_models exports them with exactly these names.
+/// Clip names authored in Blender; tools/blender/rimefront_models exports them with exactly these names.
 const IDLE: &str = "Idle";
 const WALK: &str = "Walk";
 const KNEEL_FIRE: &str = "KneelFire";

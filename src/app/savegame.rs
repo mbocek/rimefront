@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn saves_from_other_versions_are_refused() {
         let directory = SaveDirectory(
-            std::env::temp_dir().join(format!("iron_tide_version_test_{}", std::process::id())),
+            std::env::temp_dir().join(format!("rimefront_version_test_{}", std::process::id())),
         );
         std::fs::create_dir_all(&directory.0).unwrap();
         std::fs::write(slot_path(&directory, 1), r#"{"version": 999}"#).unwrap();

@@ -2,10 +2,10 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::LevelDefinition;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{Building, Health, Stance};
-use iron_tide::sim::player_commands::PlayerCommand;
+use rimefront::missions::levels::LevelDefinition;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{Building, Health, Stance};
+use rimefront::sim::player_commands::PlayerCommand;
 
 const POST: IVec2 = IVec2::new(20, 45);
 

@@ -4,22 +4,22 @@ use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 
-use iron_tide_sim::match_flow::GameState;
+use rimefront_sim::match_flow::GameState;
 use serde::{Deserialize, Serialize};
 
 use crate::relay::Relay;
 use crate::world_host::PlayerKey;
 use crate::world_view::ViewChange;
-use iron_tide_sim::i18n::{tr, tr_fmt};
-use iron_tide_sim::levels::LevelDefinition;
-use iron_tide_sim::sim::ai::AiCommanders;
-use iron_tide_sim::sim::catalog::{SideColor, Team};
-use iron_tide_sim::sim::determinism::simulation_checksum;
-use iron_tide_sim::sim::notifications::Notifications;
-use iron_tide_sim::sim::player_commands::{
+use rimefront_sim::i18n::{tr, tr_fmt};
+use rimefront_sim::levels::LevelDefinition;
+use rimefront_sim::sim::ai::AiCommanders;
+use rimefront_sim::sim::catalog::{SideColor, Team};
+use rimefront_sim::sim::determinism::simulation_checksum;
+use rimefront_sim::sim::notifications::Notifications;
+use rimefront_sim::sim::player_commands::{
     CommandQueue, CommandTiming, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
 };
-use iron_tide_sim::sim::sides::PerSide;
+use rimefront_sim::sim::sides::PerSide;
 
 pub use crate::link::{Arrival, Dialling, JoinTarget, Link, Side};
 
@@ -645,7 +645,7 @@ impl Plugin for LockstepPlugin {
         app.init_resource::<CatchingUp>()
             .configure_sets(
                 FixedUpdate,
-                iron_tide_sim::FramePhase::Simulation.run_if(simulation_may_advance),
+                rimefront_sim::FramePhase::Simulation.run_if(simulation_may_advance),
             )
             .add_systems(FixedFirst, receive_turns)
             .add_systems(
@@ -654,15 +654,15 @@ impl Plugin for LockstepPlugin {
             )
             .add_systems(
                 OnEnter(GameState::Playing),
-                retire_commanders_of_players.in_set(iron_tide_sim::MatchStart::Players),
+                retire_commanders_of_players.in_set(rimefront_sim::MatchStart::Players),
             )
             .add_systems(
                 FixedUpdate,
-                send_turn.in_set(iron_tide_sim::TickStep::SendOrders),
+                send_turn.in_set(rimefront_sim::TickStep::SendOrders),
             )
             .add_systems(
                 FixedUpdate,
-                fingerprint_tick.in_set(iron_tide_sim::TickStep::Fingerprint),
+                fingerprint_tick.in_set(rimefront_sim::TickStep::Fingerprint),
             );
     }
 }

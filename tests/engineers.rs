@@ -2,10 +2,10 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{Building, Health};
-use iron_tide::sim::engineers::{EngineerJob, EngineerTask};
-use iron_tide::sim::production::BuildItem;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{Building, Health};
+use rimefront::sim::engineers::{EngineerJob, EngineerTask};
+use rimefront::sim::production::BuildItem;
 
 const PLANT_SITE: IVec2 = IVec2::new(30, 46);
 

@@ -6,14 +6,14 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use bevy::prelude::*;
-use iron_tide::app::headless::{Battle, BattleSetup};
-use iron_tide::missions::levels::{BaseSite, Difficulty, LevelDefinition, Personality};
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::combat::DamageSource;
-use iron_tide::sim::components::{Health, Order, Orders};
-use iron_tide::sim::economy::Economies;
-use iron_tide::sim::outcome::GameOutcome;
-use iron_tide::world::map::GameMap;
+use rimefront::app::headless::{Battle, BattleSetup};
+use rimefront::missions::levels::{BaseSite, Difficulty, LevelDefinition, Personality};
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::combat::DamageSource;
+use rimefront::sim::components::{Health, Order, Orders};
+use rimefront::sim::economy::Economies;
+use rimefront::sim::outcome::GameOutcome;
+use rimefront::world::map::GameMap;
 
 const COMBAT_UNITS: [UnitKind; 16] = [
     UnitKind::Rifleman,
@@ -50,7 +50,7 @@ fn fogless(level: LevelDefinition) -> LevelDefinition {
 fn army_value(battle: &mut Battle, team: Team) -> f32 {
     let world = battle.world();
     world
-        .query::<(&iron_tide::sim::components::Unit, &Team, &Health)>()
+        .query::<(&rimefront::sim::components::Unit, &Team, &Health)>()
         .iter(world)
         .filter(|(_, owner, _)| **owner == team)
         .map(|(unit, _, health)| health.fraction() * unit.0.spec().cost as f32)
@@ -414,7 +414,7 @@ fn main() {
         .and_then(|value| value.parse().ok())
         .unwrap_or(DEFAULT_MATCHES_PER_PAIRING);
     let started = std::time::Instant::now();
-    println!("# Iron Tide balance report\n");
+    println!("# Rimefront balance report\n");
     if std::env::args().any(|arg| arg == "--personalities") {
         print_tournament(matches, &PERSONALITY_PAIRINGS);
     } else {

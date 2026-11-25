@@ -93,7 +93,7 @@ pub struct BattleSetup {
 impl Battle {
     pub fn new(setup: BattleSetup) -> Self {
         let save_directory = std::env::temp_dir().join(format!(
-            "iron_tide_test_{}_{}",
+            "rimefront_test_{}_{}",
             std::process::id(),
             rand_suffix()
         ));

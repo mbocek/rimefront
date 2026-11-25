@@ -1,16 +1,16 @@
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
-use iron_tide::SIMULATION_TICK;
-use iron_tide::net::link::encode;
-use iron_tide::net::network::{Arrival, Message};
-use iron_tide::net::world_host::{
+use rimefront::SIMULATION_TICK;
+use rimefront::net::link::encode;
+use rimefront::net::network::{Arrival, Message};
+use rimefront::net::world_host::{
     LocalConnection, PlayerKey, WORLD_PROTOCOL, WorldConnection, WorldHost, local_connection,
 };
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{Building, Unit};
-use iron_tide::sim::spawn::spawn_unit;
-use iron_tide::world::map::cell_center;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{Building, Unit};
+use rimefront::sim::spawn::spawn_unit;
+use rimefront::world::map::cell_center;
 
 const SECONDS_TO_SETTLE: u64 = 30;
 const SECONDS_MEASURED: u64 = 120;
@@ -102,7 +102,7 @@ fn a_world_with_many_players() {
         let per_tick = started.elapsed() / ticks(SECONDS_MEASURED) as u32;
         let units = count::<Unit>(&mut host);
         let structures = count::<Building>(&mut host);
-        let bounds = iron_tide::world::map::map_bounds().size;
+        let bounds = rimefront::world::map::map_bounds().size;
         println!(
             "{players} players: {units} units, {structures} structures on {}x{} cells; a tick {:.2} ms \
              on average, {:.2} ms at most; {:.0} B/s to each player",

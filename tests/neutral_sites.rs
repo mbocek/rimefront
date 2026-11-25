@@ -2,12 +2,12 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::{BaseSite, Difficulty, LevelDefinition};
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::{Building, Health};
-use iron_tide::sim::neutral_sites::UnclaimedSite;
-use iron_tide::sim::player_commands::PlayerCommand;
-use iron_tide::world::map::opposite_origin;
+use rimefront::missions::levels::{BaseSite, Difficulty, LevelDefinition};
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::{Building, Health};
+use rimefront::sim::neutral_sites::UnclaimedSite;
+use rimefront::sim::player_commands::PlayerCommand;
+use rimefront::world::map::opposite_origin;
 
 fn level_with_sites() -> LevelDefinition {
     LevelDefinition {
@@ -153,8 +153,8 @@ fn the_computer_sends_an_engineer_to_take_a_site() {
 
 #[test]
 fn sites_never_cut_the_bases_off_from_each_other() {
-    use iron_tide::missions::random_battle::{RandomBattleOptions, generate};
-    use iron_tide::world::map::{GameMap, base_sites};
+    use rimefront::missions::random_battle::{RandomBattleOptions, generate};
+    use rimefront::world::map::{GameMap, base_sites};
     for seed in 1..=8 {
         let level = generate(&RandomBattleOptions::default(), seed);
         let mut battle = Battle::new(BattleSetup {

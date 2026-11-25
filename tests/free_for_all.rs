@@ -2,11 +2,11 @@ mod common;
 
 use bevy::prelude::*;
 use common::{Battle, BattleSetup};
-use iron_tide::missions::levels::{EnemySetup, LevelDefinition};
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::components::Health;
-use iron_tide::sim::intel::Intel;
-use iron_tide::world::map::cell_center;
+use rimefront::missions::levels::{EnemySetup, LevelDefinition};
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::components::Health;
+use rimefront::sim::intel::Intel;
+use rimefront::world::map::cell_center;
 
 const FIELD: IVec2 = IVec2::new(30, 45);
 

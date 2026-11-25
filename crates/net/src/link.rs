@@ -13,9 +13,9 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Connector, Message as WsMessage, WebSocket};
 
 use crate::network::{LARGEST_MESSAGE_BYTES, LobbyNews, Message, Offer, chat_line};
-use iron_tide_sim::i18n::tr;
-use iron_tide_sim::levels::LevelDefinition;
-use iron_tide_sim::sim::catalog::Team;
+use rimefront_sim::i18n::tr;
+use rimefront_sim::levels::LevelDefinition;
+use rimefront_sim::sim::catalog::Team;
 
 pub enum Arrival {
     Message(Message),
@@ -555,7 +555,7 @@ impl Drop for Link {
 mod tests {
     use super::*;
     use crate::world_view::ViewChange;
-    use iron_tide_sim::sim::player_commands::PlayerCommand;
+    use rimefront_sim::sim::player_commands::PlayerCommand;
 
     #[test]
     fn a_link_whose_other_end_reads_nothing_takes_no_more_than_its_share() {

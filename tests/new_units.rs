@@ -2,8 +2,8 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::components::Health;
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::components::Health;
 
 const FIELD: IVec2 = IVec2::new(20, 45);
 
@@ -87,7 +87,7 @@ fn a_stealth_tank_keeping_still_blends_into_the_ground() {
     battle.run_for(4.0);
     let concealed = battle
         .world()
-        .get::<iron_tide::sim::abilities::Camouflage>(stealth_tank)
+        .get::<rimefront::sim::abilities::Camouflage>(stealth_tank)
         .is_some_and(|camouflage| camouflage.concealed);
     assert!(concealed, "the stealth tank stayed in plain sight");
 }
@@ -144,8 +144,8 @@ fn riflemen_shoot_raider_bikes_off_the_road() {
 
 #[test]
 fn a_bomber_strikes_once_then_lands_on_its_helipad_to_rearm() {
-    use iron_tide::sim::catalog::BuildingKind;
-    use iron_tide::sim::player_commands::PlayerCommand;
+    use rimefront::sim::catalog::BuildingKind;
+    use rimefront::sim::player_commands::PlayerCommand;
     let mut battle = Battle::sandbox();
     let pad_origin = IVec2::new(12, 50);
     battle.construct(BuildingKind::Helipad, Team::Player, pad_origin);
@@ -211,7 +211,7 @@ fn a_waiting_fighter_circles_where_it_stopped() {
 
 #[test]
 fn a_bomber_lifts_straight_off_its_pad_before_flying_away() {
-    use iron_tide::sim::catalog::BuildingKind;
+    use rimefront::sim::catalog::BuildingKind;
     let mut battle = Battle::sandbox();
     let pad_origin = IVec2::new(12, 50);
     battle.construct(BuildingKind::Helipad, Team::Player, pad_origin);

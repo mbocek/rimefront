@@ -1,4 +1,4 @@
-pub use iron_tide_sim::{level_events, levels};
+pub use rimefront_sim::{level_events, levels};
 
 pub mod campaigns;
 pub mod event_editing;

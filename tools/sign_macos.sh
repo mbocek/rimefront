@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Signs "Iron Tide.app" or the disk image with a Developer ID, and notarizes the disk image.
+# Signs "Rimefront.app" or the disk image with a Developer ID, and notarizes the disk image.
 # Usage: tools/sign_macos.sh app <path.app> | tools/sign_macos.sh dmg <path.dmg>
 # Without the secrets below it leaves the build unsigned and says so; see docs/signing.md.
 #   MACOS_CERTIFICATE           base64 of the Developer ID Application .p12
@@ -22,10 +22,10 @@ if [ -z "${MACOS_CERTIFICATE:-}" ] || [ -z "${MACOS_SIGNING_IDENTITY:-}" ]; then
   exit 0
 fi
 
-keychain="${RUNNER_TEMP:-/tmp}/iron-tide-signing.keychain-db"
+keychain="${RUNNER_TEMP:-/tmp}/rimefront-signing.keychain-db"
 if [ ! -f "${keychain}" ]; then
   keychain_password="$(openssl rand -hex 16)"
-  certificate="${RUNNER_TEMP:-/tmp}/iron-tide-certificate.p12"
+  certificate="${RUNNER_TEMP:-/tmp}/rimefront-certificate.p12"
   echo "${MACOS_CERTIFICATE}" | base64 --decode > "${certificate}"
   security create-keychain -p "${keychain_password}" "${keychain}"
   security set-keychain-settings -lut 21600 "${keychain}"

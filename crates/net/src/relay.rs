@@ -2,9 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::time::{Duration, Instant};
 
 use crate::network::{Arrival, Link, LobbyNews, MOST_SPECTATORS, Message};
-use iron_tide_sim::levels::LevelDefinition;
-use iron_tide_sim::sim::catalog::Team;
-use iron_tide_sim::sim::player_commands::PlayerCommand;
+use rimefront_sim::levels::LevelDefinition;
+use rimefront_sim::sim::catalog::Team;
+use rimefront_sim::sim::player_commands::PlayerCommand;
 
 /// How long the hub holds a battle for a player whose connection dropped before giving up on them.
 const REJOIN_WINDOW: Duration = Duration::from_secs(180);

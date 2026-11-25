@@ -2,14 +2,14 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::app::savegame::SaveRequests;
-use iron_tide::missions::levels::{LevelDefinition, Weather};
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::combat::Targets;
-use iron_tide::sim::components::{Building, Health};
-use iron_tide::sim::fog::CellSight;
-use iron_tide::sim::intel::Intel;
-use iron_tide::world::map::base_sites;
+use rimefront::app::savegame::SaveRequests;
+use rimefront::missions::levels::{LevelDefinition, Weather};
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::combat::Targets;
+use rimefront::sim::components::{Building, Health};
+use rimefront::sim::fog::CellSight;
+use rimefront::sim::intel::Intel;
+use rimefront::world::map::base_sites;
 
 const OPEN_FIELD: IVec2 = IVec2::new(30, 45);
 

@@ -43,22 +43,22 @@ jobs:
           - os: ubuntu-latest
             platform: linux-x86_64
             target: x86_64-unknown-linux-gnu
-            executable: iron-tide
+            executable: rimefront
           - os: macos-latest
             platform: macos-arm64
             target: aarch64-apple-darwin
-            executable: iron-tide
+            executable: rimefront
             dmg: true
           # Intel Macs: cross-compiled on the Apple Silicon runner.
           - os: macos-latest
             platform: macos-x86_64
             target: x86_64-apple-darwin
-            executable: iron-tide
+            executable: rimefront
             dmg: true
           - os: windows-latest
             platform: windows-x86_64
             target: x86_64-pc-windows-msvc
-            executable: iron-tide.exe
+            executable: rimefront.exe
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
@@ -85,7 +85,7 @@ jobs:
           key: ${{ matrix.platform }}
 
       - name: Build the game
-        run: cargo build --release --bin iron-tide --target ${{ matrix.target }}
+        run: cargo build --release --bin rimefront --target ${{ matrix.target }}
 
       # Networked players must compute the same battle on every processor and operating system.
       - name: Same battle as the recorded one
@@ -116,8 +116,8 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: iron-tide-${{ matrix.platform }}
-          path: dist/iron-tide-*
+          name: rimefront-${{ matrix.platform }}
+          path: dist/rimefront-*
           if-no-files-found: error
 
   release:

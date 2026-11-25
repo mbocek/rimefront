@@ -6,7 +6,7 @@ make balance MATCHES=40   # tighter numbers
 cargo run --release --bin balance -- --matches 40 --personalities   # each commander personality against Balanced
 ```
 
-`src/bin/balance.rs` runs the headless simulation (`iron_tide::headless`) in parallel and prints a Markdown report:
+`src/bin/balance.rs` runs the headless simulation (`rimefront::headless`) in parallel and prints a Markdown report:
 
 - **Equal-cost duels:** $3000 of one unit type attack-moves into $3000 of another, on both sides of the river.
   The score is the row's remaining army value minus the column's (+100 = the row wins untouched).

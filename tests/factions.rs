@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::components::Health;
-use iron_tide::sim::production::BuildItem;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::components::Health;
+use rimefront::sim::production::BuildItem;
 
 const FIELD: IVec2 = IVec2::new(20, 45);
 const BASE: IVec2 = IVec2::new(14, 50);
@@ -101,10 +101,10 @@ fn a_missile_truck_outranges_a_gun_turret() {
 
 #[test]
 fn a_syndicate_campaign_level_swaps_the_armouries() {
-    let level = iron_tide::missions::levels::campaign()
+    let level = rimefront::missions::levels::campaign()
         .into_iter()
         .map(|entry| entry.level)
-        .find(|level| level.player_faction == iron_tide::sim::catalog::Faction::Syndicate)
+        .find(|level| level.player_faction == rimefront::sim::catalog::Faction::Syndicate)
         .expect("the campaign has Syndicate missions");
     let mut battle = Battle::on_level(level);
     battle.set_credits(Team::Player, 20_000);

@@ -196,7 +196,7 @@ pub fn show_own_mines(
 #[derive(Component)]
 pub struct LandingGear(Vec<(Entity, Vec3)>);
 
-/// Model nodes whose names start with this fold away in flight (tools/blender/irontide_models/units.py).
+/// Model nodes whose names start with this fold away in flight (tools/blender/rimefront_models/units.py).
 const LANDING_GEAR_NODE: &str = "LandingGear";
 /// Height above the pad by which the gear is fully folded.
 const GEAR_FOLDED_ABOVE_PAD: f32 = 1.2;

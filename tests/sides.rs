@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::combat::Targets;
-use iron_tide::sim::sides::admit_side;
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::combat::Targets;
+use rimefront::sim::sides::admit_side;
 
 #[test]
 fn a_side_that_joins_sees_for_itself_and_fights_everyone() {
@@ -29,9 +29,9 @@ fn a_side_that_joins_sees_for_itself_and_fights_everyone() {
 
 #[test]
 fn a_sheltered_side_neither_suffers_nor_deals_harm() {
-    use iron_tide::sim::catalog::BuildingKind;
-    use iron_tide::sim::player_commands::PlayerCommand;
-    use iron_tide::sim::sides::Shelter;
+    use rimefront::sim::catalog::BuildingKind;
+    use rimefront::sim::player_commands::PlayerCommand;
+    use rimefront::sim::sides::Shelter;
     let mut battle = Battle::sandbox();
     let away = admit_side(battle.world());
     battle.world().resource_mut::<Shelter>().0.insert(away);
@@ -67,7 +67,7 @@ fn a_sheltered_side_neither_suffers_nor_deals_harm() {
 
 #[test]
 fn a_side_that_joins_charges_its_support_powers() {
-    use iron_tide::sim::support_powers::{SupportPower, SupportPowers};
+    use rimefront::sim::support_powers::{SupportPower, SupportPowers};
     let mut battle = Battle::sandbox();
     let newcomer = admit_side(battle.world());
     battle.run_for(SupportPower::ReconSweep.recharge_secs() + 1.0);
@@ -77,9 +77,9 @@ fn a_side_that_joins_charges_its_support_powers() {
 
 #[test]
 fn a_retired_side_leaves_nothing_and_its_number_is_given_out_again() {
-    use iron_tide::sim::catalog::BuildingKind;
-    use iron_tide::sim::economy::Economies;
-    use iron_tide::sim::sides::retire_side;
+    use rimefront::sim::catalog::BuildingKind;
+    use rimefront::sim::economy::Economies;
+    use rimefront::sim::sides::retire_side;
     let mut battle = Battle::sandbox();
     let gone = admit_side(battle.world());
     battle.construct(BuildingKind::Wall, gone, IVec2::new(30, 45));

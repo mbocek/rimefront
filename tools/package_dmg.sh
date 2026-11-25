@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Wraps the release binary and assets into "Iron Tide.app" on dist/iron-tide-<version>-<platform>.dmg (macOS).
+# Wraps the release binary and assets into "Rimefront.app" on dist/rimefront-<version>-<platform>.dmg (macOS).
 # Usage: tools/package_dmg.sh <platform> [binary-path]
 set -euo pipefail
 
 platform="${1:?platform name, e.g. macos-arm64}"
-binary="${2:-target/release/iron-tide}"
+binary="${2:-target/release/rimefront}"
 version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
-name="iron-tide-${version}-${platform}"
+name="rimefront-${version}-${platform}"
 stage="dist/${name}-dmg"
-app="${stage}/Iron Tide.app"
+app="${stage}/Rimefront.app"
 icon_source="assets/icons/command_center.png"
 
 rm -rf "${stage}" "dist/${name}.dmg"
 mkdir -p "${app}/Contents/MacOS" "${app}/Contents/Resources"
-cp "${binary}" "${app}/Contents/MacOS/iron-tide"
+cp "${binary}" "${app}/Contents/MacOS/rimefront"
 # Bevy looks for assets next to the executable.
 cp -R assets "${app}/Contents/MacOS/"
 rm -rf "${app}/Contents/MacOS/assets/previews"
@@ -35,10 +35,10 @@ cat > "${app}/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Iron Tide</string>
-  <key>CFBundleDisplayName</key><string>Iron Tide</string>
-  <key>CFBundleIdentifier</key><string>org.irontide.game</string>
-  <key>CFBundleExecutable</key><string>iron-tide</string>
+  <key>CFBundleName</key><string>Rimefront</string>
+  <key>CFBundleDisplayName</key><string>Rimefront</string>
+  <key>CFBundleIdentifier</key><string>org.rimefront.game</string>
+  <key>CFBundleExecutable</key><string>rimefront</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${version}</string>
@@ -51,9 +51,12 @@ cat > "${app}/Contents/Info.plist" <<PLIST
 PLIST
 
 tools/sign_macos.sh app "${app}"
+# Bridge release: installations from before the rename update themselves from "Iron Tide.app" on the image.
+# Drop with the release after the bridge (docs/rename.md).
+cp -R "${app}" "${stage}/Iron Tide.app"
 
 ln -s /Applications "${stage}/Applications"
-hdiutil create -quiet -volname "Iron Tide" -srcfolder "${stage}" -ov -format UDZO "dist/${name}.dmg"
+hdiutil create -quiet -volname "Rimefront" -srcfolder "${stage}" -ov -format UDZO "dist/${name}.dmg"
 rm -rf "${stage}"
 tools/sign_macos.sh dmg "dist/${name}.dmg"
 ls -lh "dist/${name}.dmg"

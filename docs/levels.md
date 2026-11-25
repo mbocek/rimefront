@@ -73,7 +73,7 @@ opens a screen with a *Back* button; Esc goes back too.
 - **Battle editor:** 1-3 enemy commanders (allied or free-for-all), landscape, difficulty Easy/Normal/Hard/Brutal, starting credits, objective
   (destroy everything / destroy Command Centers / survive 10 minutes / stockpile credits), available units,
   map variant and your starting corner. *Save as custom level* writes a JSON file to
-  `~/.config/iron_tide/levels/`; every valid file there is listed under *Custom levels*.
+  `~/.config/rimefront/levels/`; every valid file there is listed under *Custom levels*.
 - **Quick battle:** the first page of *Skirmish*: pick a side (or random) and a difficulty, and one click starts
   a battle against one opponent on a standard map whose land, season, weather and corners are rolled anew.
 - **Mission generator:** the second page of *Skirmish*: with the same side and difficulty choices it rolls a
@@ -81,14 +81,14 @@ opens a screen with a *Back* button; Esc goes back too.
   (destroy everything, destroy the Command Centers, capture a Command Center, survive 8-14 minutes or stockpile
   $6,000-12,000), an English code name (*Operation Silent Anvil*) and a briefing written for the objective in the
   menu's language. *New mission* rolls another; it can also be saved as a custom level.
-- **Custom campaigns:** a JSON file in `~/.config/iron_tide/levels/campaigns/` chains custom levels into a
+- **Custom campaigns:** a JSON file in `~/.config/rimefront/levels/campaigns/` chains custom levels into a
   campaign listed beside the built-in ones, with the same unlocking, progress and difficulty:
   `{ "title": "Border Raids", "faction": "Coalition", "levels": ["a.json", "b.json"] }` (level file names in the
   custom levels folder, in order). *Add to my campaign* on a custom level appends it to `my_campaign.json`; a
   campaign whose level files are missing or invalid is left out.
 - **Continue:** resumes the quick save. Saves remember their level.
 - **Replays:** every match is recorded and saved when it ends (or as *Unfinished* when you leave it or close
-  the game). The newest 10 are listed under *Replays* and kept in `~/.config/iron_tide/replays/`. Watching one
+  the game). The newest 10 are listed under *Replays* and kept in `~/.config/rimefront/replays/`. Watching one
   rebuilds the map and shows every unit and structure where it was, walking and driving, with shells,
   missiles and explosions, without the fog of war: Space pauses, `+` / `-` changes the speed (1x-8x), the Left
   and Right arrows jump 10 s, Home starts over, Esc returns to the menu. The bar along the bottom shows how much

@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
-use iron_tide::sim::match_stats::MatchStats;
-use iron_tide::sim::production::BuildItem;
+use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::match_stats::MatchStats;
+use rimefront::sim::production::BuildItem;
 
 const FIELD: IVec2 = IVec2::new(20, 45);
 
@@ -41,7 +41,7 @@ fn the_tally_counts_kills_losses_damage_and_new_units() {
 
 #[test]
 fn an_attack_on_a_harvester_is_announced_with_its_place() {
-    use iron_tide::sim::notifications::{LastAlert, Notifications};
+    use rimefront::sim::notifications::{LastAlert, Notifications};
     let mut battle = Battle::sandbox();
     let field = IVec2::new(24, 45);
     battle.spawn_unit(UnitKind::Harvester, Team::Player, field);
@@ -53,7 +53,7 @@ fn an_attack_on_a_harvester_is_announced_with_its_place() {
         .0
         .expect("no alert was recorded");
     let first_shots_land_near_the_spawn =
-        iron_tide::world::map::cell_center(field).distance(spot) < 8.0;
+        rimefront::world::map::cell_center(field).distance(spot) < 8.0;
     assert!(first_shots_land_near_the_spawn, "alert at {spot}");
     assert!(
         world
@@ -65,9 +65,9 @@ fn an_attack_on_a_harvester_is_announced_with_its_place() {
 
 #[test]
 fn only_the_local_side_is_told_its_news() {
-    use iron_tide::sim::cues::Sound;
-    use iron_tide::sim::notifications::Notifications;
-    use iron_tide::sim::player_commands::PlayerCommand;
+    use rimefront::sim::cues::Sound;
+    use rimefront::sim::notifications::Notifications;
+    use rimefront::sim::player_commands::PlayerCommand;
     let mut battle = Battle::sandbox();
     battle.construct(BuildingKind::CommandCenter, Team::Player, IVec2::new(6, 47));
     battle.set_credits(Team::Player, 1000);

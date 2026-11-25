@@ -21,7 +21,7 @@ BEVEL_FACE_MAX_AREA = 0.02
 TOP_BEVEL_NORMAL_Z = (0.3, 0.95)
 TURRET = "Turret"
 
-DEBUG_TRIANGLES = bool(os.environ.get("IRONTIDE_DEBUG_TRIANGLES"))
+DEBUG_TRIANGLES = bool(os.environ.get("RIMEFRONT_DEBUG_TRIANGLES"))
 
 _assembly = None
 

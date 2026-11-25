@@ -982,7 +982,7 @@ mod tests {
     #[test]
     fn only_the_newest_replays_are_kept() {
         let directory =
-            std::env::temp_dir().join(format!("iron_tide_replays_{}", std::process::id()));
+            std::env::temp_dir().join(format!("rimefront_replays_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         let replay = Replay {
             version: REPLAY_VERSION,

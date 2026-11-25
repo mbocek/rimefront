@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn a_custom_campaign_chains_levels_from_the_custom_folder_and_skips_broken_ones() {
         let folder =
-            std::env::temp_dir().join(format!("iron_tide_campaigns_{}", std::process::id()));
+            std::env::temp_dir().join(format!("rimefront_campaigns_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         let level = LevelDefinition::default();

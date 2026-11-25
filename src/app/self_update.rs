@@ -2,9 +2,15 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// The bundle's name inside the macOS disk image (tools/package_dmg.sh).
-const APP_NAME: &str = "Iron Tide.app";
+const APP_NAME: &str = "Rimefront.app";
+/// What the bundle and the executable were called before the game was renamed. An installation of then is
+/// updated to the new names, and the packages of the bridge release carry the old ones as well so that
+/// installations of then find them (docs/rename.md).
+const APP_NAME_BEFORE_RENAME: &str = "Iron Tide.app";
+const EXECUTABLE_BEFORE_RENAME: &str = "iron-tide";
+const EXECUTABLE: &str = "rimefront";
 const STAGING_IN_FOLDER: &str = ".update";
-const STAGING_BESIDE_APP: &str = ".iron-tide-update";
+const STAGING_BESIDE_APP: &str = ".rimefront-update";
 const UNPACKED: &str = "unpacked";
 const PREVIOUS: &str = "previous";
 const DISK_IMAGE_MOUNT: &str = "mount";
@@ -12,7 +18,7 @@ const DISK_IMAGE_MOUNT: &str = "mount";
 /// Where this copy of the game is installed, laid out as a release package lays it out.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Installation {
-    /// `Iron Tide.app`, from the macOS disk image.
+    /// `Rimefront.app`, from the macOS disk image.
     MacApp(PathBuf),
     /// A folder holding the executable beside `assets`, `docs` and the README, from an archive.
     Folder { root: PathBuf, executable: String },
@@ -87,12 +93,22 @@ impl Installation {
         self.put_in_place(&fresh, &staging.join(PREVIOUS))
     }
 
+    /// Starts the copy just put in place, under the game's new name if it has one now.
     pub fn relaunch(&self) -> std::io::Result<()> {
         match self {
-            Installation::MacApp(bundle) => Command::new("open").arg("-n").arg(bundle).spawn(),
-            Installation::Folder { root, executable } => Command::new(root.join(executable))
-                .current_dir(root)
+            Installation::MacApp(bundle) => Command::new("open")
+                .arg("-n")
+                .arg(bundle.with_file_name(APP_NAME))
                 .spawn(),
+            Installation::Folder { root, executable } => {
+                let renamed = root.join(renamed_executable(executable));
+                let launched = if renamed.is_file() {
+                    renamed
+                } else {
+                    root.join(executable)
+                };
+                Command::new(launched).current_dir(root).spawn()
+            }
         }
         .map(drop)
     }
@@ -107,7 +123,8 @@ impl Installation {
                     .arg(package)
                     .arg("-C")
                     .arg(into))?;
-                packaged_folder(into, executable)
+                packaged_folder(into, &renamed_executable(executable))
+                    .or_else(|_| packaged_folder(into, executable))
             }
         }
     }
@@ -116,15 +133,43 @@ impl Installation {
         std::fs::create_dir_all(previous).map_err(|error| error.to_string())?;
         match self {
             Installation::MacApp(bundle) => {
-                let old = previous.join(APP_NAME);
+                let old = previous.join(bundle.file_name().unwrap_or(APP_NAME.as_ref()));
                 rename(bundle, &old)?;
-                rename(fresh, bundle).inspect_err(|_| {
+                rename(fresh, &bundle.with_file_name(APP_NAME)).inspect_err(|_| {
                     let _ = std::fs::rename(&old, bundle);
                 })
             }
-            Installation::Folder { root, .. } => replace_folder_contents(root, fresh, previous),
+            Installation::Folder { root, executable } => {
+                replace_folder_contents(root, fresh, previous)?;
+                set_aside_executable_of_before_the_rename(root, fresh, executable, previous)
+            }
         }
     }
+}
+
+/// The executable's name after the rename: `iron-tide` became `rimefront`, `iron-tide.exe` `rimefront.exe`.
+fn renamed_executable(executable: &str) -> String {
+    match executable.strip_prefix(EXECUTABLE_BEFORE_RENAME) {
+        Some(extension) => format!("{EXECUTABLE}{extension}"),
+        None => executable.to_string(),
+    }
+}
+
+/// An installation from before the rename keeps its old executable beside the new one unless the package
+/// brought one of that name; it goes aside with the rest of the old copy, so nobody starts the old game.
+fn set_aside_executable_of_before_the_rename(
+    root: &Path,
+    fresh: &Path,
+    executable: &str,
+    previous: &Path,
+) -> Result<(), String> {
+    let renamed = renamed_executable(executable);
+    let stale = root.join(executable);
+    let replaced_by_the_package = fresh.join(executable).exists();
+    if renamed == executable || replaced_by_the_package || !stale.exists() {
+        return Ok(());
+    }
+    rename(&stale, &previous.join(executable))
 }
 
 fn platform() -> &'static str {
@@ -161,9 +206,19 @@ fn copy_app_from_disk_image(image: &Path, into: &Path) -> Result<PathBuf, String
         .arg(&mount)
         .arg(image))?;
     let fresh = into.join(APP_NAME);
-    let copied = run(Command::new("ditto").arg(mount.join(APP_NAME)).arg(&fresh));
+    let copied = run(Command::new("ditto").arg(app_in_image(&mount)).arg(&fresh));
     let _ = run(Command::new("hdiutil").arg("detach").arg(&mount));
     copied.map(|()| fresh)
+}
+
+/// The game's bundle on a mounted disk image, under its new name or, on an image from before it, the old.
+fn app_in_image(mount: &Path) -> PathBuf {
+    let renamed = mount.join(APP_NAME);
+    if renamed.exists() {
+        renamed
+    } else {
+        mount.join(APP_NAME_BEFORE_RENAME)
+    }
 }
 
 /// Moves each top-level entry of the fresh copy into `root`, the old one aside into `previous`, and puts
@@ -270,7 +325,7 @@ mod tests {
 
     fn scratch(name: &str) -> PathBuf {
         let directory = std::env::temp_dir().join(format!(
-            "iron_tide_self_update_{}_{name}",
+            "rimefront_self_update_{}_{name}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&directory);
@@ -289,19 +344,19 @@ mod tests {
 
     #[test]
     fn a_bundle_or_a_folder_with_assets_is_an_installation_and_a_development_build_is_not() {
-        let bundle = Path::new("/Applications/Iron Tide.app");
+        let bundle = Path::new("/Applications/Rimefront.app");
         assert_eq!(
-            Installation::locate(&bundle.join("Contents/MacOS/iron-tide")),
+            Installation::locate(&bundle.join("Contents/MacOS/rimefront")),
             Some(Installation::MacApp(bundle.to_path_buf()))
         );
         let root = scratch("locate");
-        assert_eq!(Installation::locate(&root.join("iron-tide")), None);
+        assert_eq!(Installation::locate(&root.join("rimefront")), None);
         std::fs::create_dir_all(root.join("assets")).unwrap();
         assert_eq!(
-            Installation::locate(&root.join("iron-tide")),
+            Installation::locate(&root.join("rimefront")),
             Some(Installation::Folder {
                 root: root.clone(),
-                executable: "iron-tide".to_string(),
+                executable: "rimefront".to_string(),
             })
         );
     }
@@ -309,18 +364,18 @@ mod tests {
     #[test]
     fn a_package_must_match_its_published_checksum() {
         let directory = scratch("checksum");
-        let package = directory.join("iron-tide-9.0.0-linux-x86_64.tar.gz");
+        let package = directory.join("rimefront-9.0.0-linux-x86_64.tar.gz");
         write(&package, "abc");
         let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        let other = "iron-tide-9.0.0-windows-x86_64.zip";
-        let listed = format!("{abc}  iron-tide-9.0.0-linux-x86_64.tar.gz\n{abc}  {other}\n");
+        let other = "rimefront-9.0.0-windows-x86_64.zip";
+        let listed = format!("{abc}  rimefront-9.0.0-linux-x86_64.tar.gz\n{abc}  {other}\n");
         assert_eq!(
-            verify_checksum(&listed, "iron-tide-9.0.0-linux-x86_64.tar.gz", &package),
+            verify_checksum(&listed, "rimefront-9.0.0-linux-x86_64.tar.gz", &package),
             Ok(())
         );
         let tampered = listed.replacen("ba78", "0000", 1);
         assert!(
-            verify_checksum(&tampered, "iron-tide-9.0.0-linux-x86_64.tar.gz", &package).is_err()
+            verify_checksum(&tampered, "rimefront-9.0.0-linux-x86_64.tar.gz", &package).is_err()
         );
         assert!(verify_checksum(&listed, "missing.tar.gz", &package).is_err());
     }
@@ -328,53 +383,96 @@ mod tests {
     #[test]
     fn an_archive_replaces_the_folder_and_keeps_the_old_files_aside_until_forgotten() {
         let base = scratch("install");
-        let root = base.join("iron-tide-1.0.0-linux-x86_64");
-        write(&root.join("iron-tide"), "old game");
+        let root = base.join("rimefront-1.0.0-linux-x86_64");
+        write(&root.join("rimefront"), "old game");
         write(&root.join("assets/models/tank.glb"), "old tank");
         write(&root.join("README.md"), "old readme");
-        let packaged = base.join("source/iron-tide-9.0.0-linux-x86_64");
-        write(&packaged.join("iron-tide"), "new game");
+        let packaged = base.join("source/rimefront-9.0.0-linux-x86_64");
+        write(&packaged.join("rimefront"), "new game");
         write(&packaged.join("assets/models/tank.glb"), "new tank");
         write(&packaged.join("docs/rules.md"), "new rules");
         write(&packaged.join("README.md"), "new readme");
-        let package = base.join("iron-tide-9.0.0-linux-x86_64.tar.gz");
+        let package = base.join("rimefront-9.0.0-linux-x86_64.tar.gz");
         run(Command::new("tar")
             .arg("-czf")
             .arg(&package)
             .arg("-C")
             .arg(base.join("source"))
-            .arg("iron-tide-9.0.0-linux-x86_64"))
+            .arg("rimefront-9.0.0-linux-x86_64"))
         .unwrap();
 
-        let installation = Installation::locate(&root.join("iron-tide")).unwrap();
+        let installation = Installation::locate(&root.join("rimefront")).unwrap();
         installation.prepare_staging().unwrap();
         installation.install(&package).unwrap();
 
-        assert_eq!(read(&root.join("iron-tide")), "new game");
+        assert_eq!(read(&root.join("rimefront")), "new game");
         assert_eq!(read(&root.join("assets/models/tank.glb")), "new tank");
         assert_eq!(read(&root.join("docs/rules.md")), "new rules");
         let previous = installation.staging().join(PREVIOUS);
-        assert_eq!(read(&previous.join("iron-tide")), "old game");
+        assert_eq!(read(&previous.join("rimefront")), "old game");
         installation.forget_finished_update();
         assert!(!installation.staging().exists());
         assert_eq!(read(&root.join("README.md")), "new readme");
     }
 
     #[test]
+    fn an_installation_from_before_the_rename_takes_the_renamed_package() {
+        let base = scratch("renamed");
+        let root = base.join("iron-tide-1.0.0-linux-x86_64");
+        write(&root.join("iron-tide"), "old game");
+        write(&root.join("assets/a.txt"), "old asset");
+        let packaged = base.join("source/rimefront-9.0.0-linux-x86_64");
+        write(&packaged.join("rimefront"), "new game");
+        write(&packaged.join("assets/a.txt"), "new asset");
+        let package = base.join("rimefront-9.0.0-linux-x86_64.tar.gz");
+        run(Command::new("tar")
+            .arg("-czf")
+            .arg(&package)
+            .arg("-C")
+            .arg(base.join("source"))
+            .arg("rimefront-9.0.0-linux-x86_64"))
+        .unwrap();
+
+        let installation = Installation::locate(&root.join("iron-tide")).unwrap();
+        installation.prepare_staging().unwrap();
+        installation.install(&package).unwrap();
+
+        assert_eq!(read(&root.join("rimefront")), "new game");
+        assert_eq!(read(&root.join("assets/a.txt")), "new asset");
+        assert!(
+            !root.join("iron-tide").exists(),
+            "the old game stayed to be started"
+        );
+        let previous = installation.staging().join(PREVIOUS);
+        assert_eq!(read(&previous.join("iron-tide")), "old game");
+    }
+
+    #[test]
+    fn an_image_from_before_the_rename_still_holds_the_game() {
+        let mount = scratch("image");
+        std::fs::create_dir_all(mount.join(APP_NAME_BEFORE_RENAME)).unwrap();
+        assert_eq!(app_in_image(&mount), mount.join(APP_NAME_BEFORE_RENAME));
+        std::fs::create_dir_all(mount.join(APP_NAME)).unwrap();
+        assert_eq!(app_in_image(&mount), mount.join(APP_NAME));
+        assert_eq!(renamed_executable("iron-tide.exe"), "rimefront.exe");
+        assert_eq!(renamed_executable("rimefront"), "rimefront");
+    }
+
+    #[test]
     fn a_failed_move_puts_the_old_files_back() {
         let base = scratch("rollback");
         let root = base.join("game");
-        write(&root.join("iron-tide"), "old game");
+        write(&root.join("rimefront"), "old game");
         write(&root.join("assets/a.txt"), "old asset");
         let fresh = base.join("fresh");
-        write(&fresh.join("iron-tide"), "new game");
+        write(&fresh.join("rimefront"), "new game");
         write(&fresh.join("assets/a.txt"), "new asset");
         let previous = base.join("previous");
         std::fs::create_dir_all(&previous).unwrap();
         write(&previous.join("assets"), "a file where a folder has to go");
 
         assert!(replace_folder_contents(&root, &fresh, &previous).is_err());
-        assert_eq!(read(&root.join("iron-tide")), "old game");
+        assert_eq!(read(&root.join("rimefront")), "old game");
         assert_eq!(read(&root.join("assets/a.txt")), "old asset");
     }
 }

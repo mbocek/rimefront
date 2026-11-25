@@ -34,7 +34,7 @@
 | 1-9 / twice quickly | select a group / move the camera to it |
 | Shift+1-9 | add a group to the selection |
 | F1 | show controls in-game |
-| F2 | graphics quality Low / Medium / High (also `IRON_TIDE_QUALITY=low\|medium\|high`) |
+| F2 | graphics quality Low / Medium / High (also `RIMEFRONT_QUALITY=low\|medium\|high`) |
 | F3 | performance overlay: FPS, frame time, GPU time (not on macOS, see `src/main.rs`), CPU (game / system), memory, entities |
 | F5 / F9 | quick save / quick load |
 | F10, Esc (when nothing is selected), MENU button | menu: game, graphics, gameplay, keys, audio, save/load (pauses the game) |

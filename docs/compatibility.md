@@ -40,7 +40,7 @@ message and records the bytes, with how many kinds of units, structures, sounds,
 are. When it fails:
 
 1. Raise `WORLD_PROTOCOL` by one.
-2. Re-record: `UPDATE_WORLD_PROTOCOL=1 cargo test -p iron_tide_net the_world_protocol`.
+2. Re-record: `UPDATE_WORLD_PROTOCOL=1 cargo test -p rimefront_net the_world_protocol`.
 3. Say in the release notes that servers and games of the release before cannot meet.
 
 Variants added to `PlayerCommand`, `SideNews`, `Effect` or `BuildingKind`, whose counts the sample does not
@@ -54,7 +54,7 @@ the world and chunk files. When it fails:
 1. Raise `STORE_VERSION` by one.
 2. Keep the structs of the layout before, renamed for it, and read them in `read_world_record`, turning
    them into the current ones, so worlds saved before still open.
-3. Re-record: `UPDATE_WORLD_LAYOUT=1 cargo test -p iron_tide_net the_layout`.
+3. Re-record: `UPDATE_WORLD_LAYOUT=1 cargo test -p rimefront_net the_layout`.
 
 A saved world reads `SavedUnit` and `SavedBuilding` (`sim::records`), so their fields belong to the layout
 too.

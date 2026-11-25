@@ -1,9 +1,9 @@
 mod common;
 
 use common::Battle;
-use iron_tide::missions::levels::{BaseSite, Difficulty};
-use iron_tide::sim::catalog::Team;
-use iron_tide::sim::determinism::simulation_checksum;
+use rimefront::missions::levels::{BaseSite, Difficulty};
+use rimefront::sim::catalog::Team;
+use rimefront::sim::determinism::simulation_checksum;
 
 const CHECK_EVERY_SECS: f32 = 15.0;
 const MATCH_SECS: f32 = 8.0 * 60.0;
@@ -41,8 +41,8 @@ struct DrawnBySomeone;
 
 fn shuffle_query_order(battle: &mut Battle, round: u32) {
     use bevy::prelude::*;
-    use iron_tide::sim::combat::Projectile;
-    use iron_tide::sim::components::{Building, Unit};
+    use rimefront::sim::combat::Projectile;
+    use rimefront::sim::components::{Building, Unit};
     let world = battle.world();
     let units: Vec<Entity> = world
         .query_filtered::<Entity, Or<(With<Unit>, With<Building>, With<Projectile>)>>()
@@ -92,7 +92,7 @@ fn step_to_tick(battle: &mut Battle, tick: u64) {
 
 fn restart_match(battle: &mut Battle) {
     use bevy::prelude::*;
-    use iron_tide::app::match_flow::GameState;
+    use rimefront::app::match_flow::GameState;
     battle
         .world()
         .resource_mut::<NextState<GameState>>()

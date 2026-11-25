@@ -4,23 +4,23 @@ use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use iron_tide_sim::sim::catalog::{
+use rimefront_sim::sim::catalog::{
     BuildingKind, Diplomacy, ProjectileStyle, SideColor, Team, UnitKind,
 };
-use iron_tide_sim::sim::combat::{Projectile, Targets};
-use iron_tide_sim::sim::components::{Building, HarvestState, Harvester, Health, Unit};
-use iron_tide_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
-use iron_tide_sim::sim::determinism::{SimEntities, SimId};
-use iron_tide_sim::sim::economy::Economies;
-use iron_tide_sim::sim::fog::{FogOfWar, Sight};
-use iron_tide_sim::sim::intel::Intel;
-use iron_tide_sim::sim::notifications::{News, SideNews};
-use iron_tide_sim::sim::production::{BuildItem, Lane, Production};
-use iron_tide_sim::sim::research::Upgrade;
-use iron_tide_sim::sim::sides::SideSet;
-use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
-use iron_tide_sim::sim::transport::Embarked;
-use iron_tide_sim::world::map::{GameMap, MapBounds, chunk_of, map_bounds, world_to_cell};
+use rimefront_sim::sim::combat::{Projectile, Targets};
+use rimefront_sim::sim::components::{Building, HarvestState, Harvester, Health, Unit};
+use rimefront_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
+use rimefront_sim::sim::determinism::{SimEntities, SimId};
+use rimefront_sim::sim::economy::Economies;
+use rimefront_sim::sim::fog::{FogOfWar, Sight};
+use rimefront_sim::sim::intel::Intel;
+use rimefront_sim::sim::notifications::{News, SideNews};
+use rimefront_sim::sim::production::{BuildItem, Lane, Production};
+use rimefront_sim::sim::research::Upgrade;
+use rimefront_sim::sim::sides::SideSet;
+use rimefront_sim::sim::support_powers::{SupportPower, SupportPowers};
+use rimefront_sim::sim::transport::Embarked;
+use rimefront_sim::world::map::{GameMap, MapBounds, chunk_of, map_bounds, world_to_cell};
 
 /// Positions travel in hundredths of a cell, facings in thousandths of a radian, health in percent: finer
 /// than anything drawn, coarse enough that a unit standing still sends nothing.
@@ -174,7 +174,7 @@ impl SideState {
 }
 
 fn tick_secs() -> f32 {
-    iron_tide_sim::SIMULATION_TICK.as_secs_f32()
+    rimefront_sim::SIMULATION_TICK.as_secs_f32()
 }
 
 /// A shot as it left the muzzle: enough to show its flight, not to land it.
@@ -684,10 +684,10 @@ mod tests {
     use crate::link::encode;
     use crate::network::Message;
     use crate::world_host::{PlayerKey, WORLD_PROTOCOL};
-    use iron_tide_sim::sim::components::Stance;
-    use iron_tide_sim::sim::notifications::SideNews;
-    use iron_tide_sim::sim::player_commands::PlayerCommand;
-    use iron_tide_sim::sim::research::Upgrade;
+    use rimefront_sim::sim::components::Stance;
+    use rimefront_sim::sim::notifications::SideNews;
+    use rimefront_sim::sim::player_commands::PlayerCommand;
+    use rimefront_sim::sim::research::Upgrade;
 
     const PROTOCOL_FIXTURE: &str =
         concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/world_protocol.txt");
@@ -825,7 +825,7 @@ mod tests {
         assert!(
             recorded == record,
             "what a world says changed: {step} with \
-             UPDATE_WORLD_PROTOCOL=1 cargo test -p iron_tide_net the_world_protocol"
+             UPDATE_WORLD_PROTOCOL=1 cargo test -p rimefront_net the_world_protocol"
         );
     }
 }

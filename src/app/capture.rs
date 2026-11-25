@@ -25,42 +25,42 @@ use crate::world::map::cell_center;
 use crate::world::map_edits::Brush;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
-const CAPTURE_PATH_VAR: &str = "IRON_TIDE_CAPTURE";
-const CAPTURE_DELAY_VAR: &str = "IRON_TIDE_CAPTURE_AFTER_SECS";
-const CAPTURE_FOCUS_VAR: &str = "IRON_TIDE_CAPTURE_FOCUS_CELL";
-const CAPTURE_SAVE_SLOT_VAR: &str = "IRON_TIDE_CAPTURE_SAVE_SLOT";
-const CAPTURE_LOAD_SLOT_VAR: &str = "IRON_TIDE_CAPTURE_LOAD_SLOT";
-const CAPTURE_MISSION_VAR: &str = "IRON_TIDE_CAPTURE_MISSION";
-const CAPTURE_REPLAY_VAR: &str = "IRON_TIDE_CAPTURE_REPLAY";
-const CAPTURE_SELECT_ALL_VAR: &str = "IRON_TIDE_CAPTURE_SELECT_ALL";
-const CAPTURE_ZOOM_VAR: &str = "IRON_TIDE_CAPTURE_ZOOM";
-const CAPTURE_MENU_VAR: &str = "IRON_TIDE_CAPTURE_MENU";
-/// `IRON_TIDE_CAPTURE_EDITOR=1` opens the map editor on the chosen mission instead of playing it;
-/// `IRON_TIDE_CAPTURE_EDITOR=paint` also drags each brush across the ground beside the player's base, and
-/// `IRON_TIDE_CAPTURE_EDITOR=level` shows the level settings page.
-const CAPTURE_EDITOR_VAR: &str = "IRON_TIDE_CAPTURE_EDITOR";
-/// `IRON_TIDE_CAPTURE_OUTCOME=victory` (or `defeat`) ends the battle that way after two seconds.
-const CAPTURE_OUTCOME_VAR: &str = "IRON_TIDE_CAPTURE_OUTCOME";
-/// `IRON_TIDE_CAPTURE_LANGUAGE=Slovak` (or `Czech`, `English`) shows the interface in that language.
-const CAPTURE_LANGUAGE_VAR: &str = "IRON_TIDE_CAPTURE_LANGUAGE";
-/// `IRON_TIDE_CAPTURE_RANDOM=42` plays the random battle rolled from that seed with default options, without
+const CAPTURE_PATH_VAR: &str = "RIMEFRONT_CAPTURE";
+const CAPTURE_DELAY_VAR: &str = "RIMEFRONT_CAPTURE_AFTER_SECS";
+const CAPTURE_FOCUS_VAR: &str = "RIMEFRONT_CAPTURE_FOCUS_CELL";
+const CAPTURE_SAVE_SLOT_VAR: &str = "RIMEFRONT_CAPTURE_SAVE_SLOT";
+const CAPTURE_LOAD_SLOT_VAR: &str = "RIMEFRONT_CAPTURE_LOAD_SLOT";
+const CAPTURE_MISSION_VAR: &str = "RIMEFRONT_CAPTURE_MISSION";
+const CAPTURE_REPLAY_VAR: &str = "RIMEFRONT_CAPTURE_REPLAY";
+const CAPTURE_SELECT_ALL_VAR: &str = "RIMEFRONT_CAPTURE_SELECT_ALL";
+const CAPTURE_ZOOM_VAR: &str = "RIMEFRONT_CAPTURE_ZOOM";
+const CAPTURE_MENU_VAR: &str = "RIMEFRONT_CAPTURE_MENU";
+/// `RIMEFRONT_CAPTURE_EDITOR=1` opens the map editor on the chosen mission instead of playing it;
+/// `RIMEFRONT_CAPTURE_EDITOR=paint` also drags each brush across the ground beside the player's base, and
+/// `RIMEFRONT_CAPTURE_EDITOR=level` shows the level settings page.
+const CAPTURE_EDITOR_VAR: &str = "RIMEFRONT_CAPTURE_EDITOR";
+/// `RIMEFRONT_CAPTURE_OUTCOME=victory` (or `defeat`) ends the battle that way after two seconds.
+const CAPTURE_OUTCOME_VAR: &str = "RIMEFRONT_CAPTURE_OUTCOME";
+/// `RIMEFRONT_CAPTURE_LANGUAGE=Slovak` (or `Czech`, `English`) shows the interface in that language.
+const CAPTURE_LANGUAGE_VAR: &str = "RIMEFRONT_CAPTURE_LANGUAGE";
+/// `RIMEFRONT_CAPTURE_RANDOM=42` plays the random battle rolled from that seed with default options, without
 /// fog so the whole map shows.
-const CAPTURE_RANDOM_VAR: &str = "IRON_TIDE_CAPTURE_RANDOM";
-/// `IRON_TIDE_CAPTURE_HOST=2` hosts a network battle for that many players and `IRON_TIDE_CAPTURE_JOIN=127.0.0.1`
+const CAPTURE_RANDOM_VAR: &str = "RIMEFRONT_CAPTURE_RANDOM";
+/// `RIMEFRONT_CAPTURE_HOST=2` hosts a network battle for that many players and `RIMEFRONT_CAPTURE_JOIN=127.0.0.1`
 /// joins one.
-const CAPTURE_HOST_VAR: &str = "IRON_TIDE_CAPTURE_HOST";
-/// `IRON_TIDE_CAPTURE_MAIN_MENU=1` stays on the main menu's start screen; a page name opens that page
+const CAPTURE_HOST_VAR: &str = "RIMEFRONT_CAPTURE_HOST";
+/// `RIMEFRONT_CAPTURE_MAIN_MENU=1` stays on the main menu's start screen; a page name opens that page
 /// (`campaign`, `random`, `custom`, `editor`, `network`, `replays`).
-const CAPTURE_MAIN_MENU_VAR: &str = "IRON_TIDE_CAPTURE_MAIN_MENU";
-const CAPTURE_JOIN_VAR: &str = "IRON_TIDE_CAPTURE_JOIN";
-/// `IRON_TIDE_CAPTURE_OPEN_ROOM=ws://host:port/room/NAME` opens a two-player room on a dedicated server.
-const CAPTURE_OPEN_ROOM_VAR: &str = "IRON_TIDE_CAPTURE_OPEN_ROOM";
-/// `IRON_TIDE_CAPTURE_CLAIM_SITES=6` gives out that many starting sites of a wilds level two seconds in,
+const CAPTURE_MAIN_MENU_VAR: &str = "RIMEFRONT_CAPTURE_MAIN_MENU";
+const CAPTURE_JOIN_VAR: &str = "RIMEFRONT_CAPTURE_JOIN";
+/// `RIMEFRONT_CAPTURE_OPEN_ROOM=ws://host:port/room/NAME` opens a two-player room on a dedicated server.
+const CAPTURE_OPEN_ROOM_VAR: &str = "RIMEFRONT_CAPTURE_OPEN_ROOM";
+/// `RIMEFRONT_CAPTURE_CLAIM_SITES=6` gives out that many starting sites of a wilds level two seconds in,
 /// widening the world as it would for newcomers.
-const CAPTURE_CLAIM_SITES_VAR: &str = "IRON_TIDE_CAPTURE_CLAIM_SITES";
-/// `IRON_TIDE_CAPTURE_WORLD=29` plays the world grown from that seed, run by the game itself;
-/// `IRON_TIDE_CAPTURE_WORLD=ws://host:port/world` enters a server's world.
-const CAPTURE_WORLD_VAR: &str = "IRON_TIDE_CAPTURE_WORLD";
+const CAPTURE_CLAIM_SITES_VAR: &str = "RIMEFRONT_CAPTURE_CLAIM_SITES";
+/// `RIMEFRONT_CAPTURE_WORLD=29` plays the world grown from that seed, run by the game itself;
+/// `RIMEFRONT_CAPTURE_WORLD=ws://host:port/world` enters a server's world.
+const CAPTURE_WORLD_VAR: &str = "RIMEFRONT_CAPTURE_WORLD";
 const LOAD_AFTER_SECS: f32 = 1.5;
 /// A hosting capture run starts the battle only after this, so spectators can join too.
 const HOST_WAITS_FOR_GUESTS_SECS: f32 = 10.0;
@@ -72,8 +72,8 @@ pub fn is_capture_run() -> bool {
     std::env::var_os(CAPTURE_PATH_VAR).is_some()
 }
 
-/// Development aid: with `IRON_TIDE_CAPTURE=shot.png` the game saves one screenshot and quits.
-/// `IRON_TIDE_CAPTURE_SAVE_SLOT` / `_LOAD_SLOT` exercise saving and loading in the same unattended run.
+/// Development aid: with `RIMEFRONT_CAPTURE=shot.png` the game saves one screenshot and quits.
+/// `RIMEFRONT_CAPTURE_SAVE_SLOT` / `_LOAD_SLOT` exercise saving and loading in the same unattended run.
 /// Input is ignored meanwhile so a stray mouse on the desktop cannot steer the run.
 pub struct CapturePlugin;
 
@@ -254,7 +254,7 @@ fn focus_camera(focus: Res<CaptureFocus>, mut cameras: Query<&mut RtsCamera>) {
     }
 }
 
-/// `IRON_TIDE_CAPTURE_SELECT_ALL=1` selects every own unit, to show the selection marks.
+/// `RIMEFRONT_CAPTURE_SELECT_ALL=1` selects every own unit, to show the selection marks.
 fn select_all_own_units(
     mut commands: Commands,
     units: Query<(Entity, &Team), (With<Unit>, Without<Selected>)>,
@@ -269,7 +269,7 @@ fn select_all_own_units(
     }
 }
 
-/// `IRON_TIDE_CAPTURE_ZOOM=150` sets the camera distance in meters.
+/// `RIMEFRONT_CAPTURE_ZOOM=150` sets the camera distance in meters.
 fn zoom_camera(mut cameras: Query<&mut RtsCamera>) {
     let Some(distance) = std::env::var(CAPTURE_ZOOM_VAR)
         .ok()
@@ -283,7 +283,7 @@ fn zoom_camera(mut cameras: Query<&mut RtsCamera>) {
     }
 }
 
-/// `IRON_TIDE_CAPTURE_MENU=keys` opens the pause menu on that page (game, graphics, keys, ...).
+/// `RIMEFRONT_CAPTURE_MENU=keys` opens the pause menu on that page (game, graphics, keys, ...).
 fn open_requested_menu_page(mut menu: ResMut<MenuState>) {
     if let Ok(page) = std::env::var(CAPTURE_MENU_VAR) {
         menu.show_page_named(&page);
@@ -420,9 +420,9 @@ fn discard_keyboard(mut keys: ResMut<ButtonInput<KeyCode>>) {
     keys.reset_all();
 }
 
-/// `IRON_TIDE_CAPTURE_MISSION=2` starts the second campaign mission instead of waiting in the main menu;
+/// `RIMEFRONT_CAPTURE_MISSION=2` starts the second campaign mission instead of waiting in the main menu;
 /// numbers past the campaign continue with the custom levels.
-/// `IRON_TIDE_CAPTURE_REPLAY=1` watches the newest replay instead of playing.
+/// `RIMEFRONT_CAPTURE_REPLAY=1` watches the newest replay instead of playing.
 fn start_requested_mission(
     mut commands: Commands,
     mut next_state: ResMut<NextState<GameState>>,

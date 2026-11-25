@@ -3,7 +3,7 @@ MODELS_DIR := assets/models
 PREVIEWS_DIR := assets/previews
 BLENDER_SCRIPT := tools/blender/build_models.py
 BLENDER_RUN := $(BLENDER) -b --factory-startup --python $(BLENDER_SCRIPT) -- --out $(MODELS_DIR) --previews $(PREVIEWS_DIR)
-RELEASE_BIN := target/release/iron-tide
+RELEASE_BIN := target/release/rimefront
 CAPTURE ?= screenshot.png
 CAPTURE_AFTER ?= 5
 CAPTURE_FOCUS ?=
@@ -36,11 +36,11 @@ models-fast: ## Export the models without rendering previews (works without a GP
 	$(BLENDER_RUN) --no-previews $(if $(ONLY),--only $(ONLY))
 
 server: ## Build and run the dedicated network battle server (PORT=47300)
-	cargo run --release -p iron_tide_net --bin iron-tide-server -- --port $(or $(PORT),47300)
+	cargo run --release -p rimefront_net --bin rimefront-server -- --port $(or $(PORT),47300)
 
 capture: release ## Save one screenshot and quit (CAPTURE=, CAPTURE_AFTER=secs, CAPTURE_FOCUS=x,y)
-	BEVY_ASSET_ROOT=$(CURDIR) IRON_TIDE_CAPTURE=$(abspath $(CAPTURE)) IRON_TIDE_CAPTURE_AFTER_SECS=$(CAPTURE_AFTER) \
-		$(if $(CAPTURE_FOCUS),IRON_TIDE_CAPTURE_FOCUS_CELL=$(CAPTURE_FOCUS)) ./$(RELEASE_BIN)
+	BEVY_ASSET_ROOT=$(CURDIR) RIMEFRONT_CAPTURE=$(abspath $(CAPTURE)) RIMEFRONT_CAPTURE_AFTER_SECS=$(CAPTURE_AFTER) \
+		$(if $(CAPTURE_FOCUS),RIMEFRONT_CAPTURE_FOCUS_CELL=$(CAPTURE_FOCUS)) ./$(RELEASE_BIN)
 
 test: ## All tests: logic unit tests and headless playability scenarios
 	cargo test --release --workspace
@@ -54,7 +54,7 @@ test-playability: ## Headless matches: movement, economy, production, combat, AI
 package: release ## Bundle the release binary and assets into dist/ (PLATFORM=, defaults to this machine)
 	tools/package.sh $(PLATFORM) $(RELEASE_BIN)
 
-dmg: release ## macOS only: "Iron Tide.app" on a disk image in dist/ (PLATFORM=, defaults to this machine)
+dmg: release ## macOS only: "Rimefront.app" on a disk image in dist/ (PLATFORM=, defaults to this machine)
 	tools/package_dmg.sh $(PLATFORM) $(RELEASE_BIN)
 
 balance: ## AI-against-AI balance report: unit duels and difficulty tournaments (MATCHES=per pairing)

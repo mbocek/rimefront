@@ -2,9 +2,9 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use iron_tide::missions::levels::{BaseSite, Difficulty};
-use iron_tide::sim::catalog::{Team, UnitKind};
-use iron_tide::sim::components::{Health, Mobile, Order, Orders};
+use rimefront::missions::levels::{BaseSite, Difficulty};
+use rimefront::sim::catalog::{Team, UnitKind};
+use rimefront::sim::components::{Health, Mobile, Order, Orders};
 
 #[test]
 fn soldiers_at_home_rush_to_a_harvester_under_fire() {
@@ -49,7 +49,7 @@ fn a_rocketeer_picks_the_tank_over_a_closer_rifleman() {
     battle.run_for(1.0);
     let target = battle
         .world()
-        .get::<iron_tide::sim::components::AttackTarget>(rocketeer)
+        .get::<rimefront::sim::components::AttackTarget>(rocketeer)
         .and_then(|attack| attack.entity());
     assert_eq!(target, Some(tank));
 }

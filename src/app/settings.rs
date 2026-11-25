@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
 use bevy::window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode};
@@ -9,10 +9,12 @@ use crate::missions::levels::Difficulty;
 use crate::sim::catalog::SideColor;
 use crate::ui::key_bindings::KeyBindings;
 
-const GAME_DIRECTORY: &str = "iron_tide";
+const GAME_DIRECTORY: &str = "rimefront";
+/// What the game's data directory was called before the game was renamed (docs/rename.md).
+const GAME_DIRECTORY_BEFORE_RENAME: &str = "iron_tide";
 const CUSTOM_LEVELS_DIRECTORY: &str = "levels";
 const SETTINGS_FILE: &str = "settings.json";
-const QUALITY_VAR: &str = "IRON_TIDE_QUALITY";
+const QUALITY_VAR: &str = "RIMEFRONT_QUALITY";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum QualityPreset {
@@ -240,13 +242,57 @@ impl GameSettings {
     }
 }
 
-pub fn game_data_directory() -> PathBuf {
-    let base = std::env::var_os("APPDATA")
+fn data_directories() -> PathBuf {
+    std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from))
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join(GAME_DIRECTORY)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+pub fn game_data_directory() -> PathBuf {
+    data_directories().join(GAME_DIRECTORY)
+}
+
+/// The first time the renamed game starts, the settings, saves, replays, levels and worlds kept under its old
+/// name move to the new one, so nobody loses them.
+pub fn bring_over_data_from_before_the_rename() {
+    let old = data_directories().join(GAME_DIRECTORY_BEFORE_RENAME);
+    if let Err(error) = move_game_data(&old, &game_data_directory()) {
+        warn!(
+            "could not bring over the data in {}: {error}",
+            old.display()
+        );
+    }
+}
+
+/// Moves `old` to `new` unless `new` is there already; across volumes, where a move cannot be, copies it and
+/// leaves `old` in place. Whether anything was brought over.
+fn move_game_data(old: &Path, new: &Path) -> std::io::Result<bool> {
+    if new.exists() || !old.is_dir() {
+        return Ok(false);
+    }
+    if let Some(parent) = new.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if std::fs::rename(old, new).is_err() {
+        copy_directory(old, new)?;
+    }
+    Ok(true)
+}
+
+fn copy_directory(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_directory(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn custom_levels_directory() -> PathBuf {
@@ -328,6 +374,45 @@ pub fn apply_game_speed(settings: Res<GameSettings>, mut time: ResMut<Time<Virtu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_data_kept_under_the_old_name_moves_to_the_new_one_once() {
+        let root = std::env::temp_dir().join(format!("rimefront_rename_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (old, new) = (
+            root.join(GAME_DIRECTORY_BEFORE_RENAME),
+            root.join(GAME_DIRECTORY),
+        );
+        std::fs::create_dir_all(old.join("saves")).unwrap();
+        std::fs::write(old.join(SETTINGS_FILE), "{}").unwrap();
+        std::fs::write(old.join("saves/slot1.json"), "saved").unwrap();
+
+        assert!(move_game_data(&old, &new).unwrap());
+        assert!(!old.exists());
+        assert_eq!(
+            std::fs::read_to_string(new.join("saves/slot1.json")).unwrap(),
+            "saved"
+        );
+
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join(SETTINGS_FILE), "older").unwrap();
+        assert!(
+            !move_game_data(&old, &new).unwrap(),
+            "the new directory was replaced"
+        );
+        assert_eq!(
+            std::fs::read_to_string(new.join(SETTINGS_FILE)).unwrap(),
+            "{}"
+        );
+
+        let copied = root.join("copied");
+        copy_directory(&new, &copied).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(copied.join("saves/slot1.json")).unwrap(),
+            "saved"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn presets_drive_every_detail_option() {

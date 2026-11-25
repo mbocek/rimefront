@@ -1,10 +1,10 @@
 [package]
-name = "iron_tide_sim"
+name = "rimefront_sim"
 version = "1.6.0"
 edition = "2024"
 rust-version = "1.100"
-description = "The battle simulation of Iron Tide: rules, map and levels, without drawing, sound or interface"
-repository = "https://github.com/mbocek/iron-tide"
+description = "The battle simulation of Rimefront: rules, map and levels, without drawing, sound or interface"
+repository = "https://github.com/mbocek/rimefront"
 
 [dependencies]
 bevy = { version = "0.20.1", default-features = false, features = [

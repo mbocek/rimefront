@@ -10,10 +10,10 @@ use bevy::window::PrimaryWindow;
 use crate::app::capture::CaptureTarget;
 use crate::view::camera::ScriptedPointer;
 
-/// `IRON_TIDE_CAPTURE_POINTER="2 move 640 400; 2.2 press left; 2.4 release left; 3 shot"` plays a mouse script
+/// `RIMEFRONT_CAPTURE_POINTER="2 move 640 400; 2.2 press left; 2.4 release left; 3 shot"` plays a mouse script
 /// in a capture run: seconds since start, then `move x y` (interface pixels of the 1600 x 900 capture),
 /// `press` / `release` `left` or `right`, or `shot`, which saves `<capture name>-<n>.png`.
-pub const CAPTURE_POINTER_VAR: &str = "IRON_TIDE_CAPTURE_POINTER";
+pub const CAPTURE_POINTER_VAR: &str = "RIMEFRONT_CAPTURE_POINTER";
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum PointerStep {

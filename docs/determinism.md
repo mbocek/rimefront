@@ -84,7 +84,7 @@ once connected, typing goes into a message line and Enter sends it; in the battl
 (the keyboard then types instead of commanding), Enter sends and Esc drops it, and lines appear among the
 notifications. Lines are trimmed to 120 printable characters. Restarting, saving and loading are disabled during a
 network battle; pausing one machine makes the other wait. Over the internet the host's port 47300 must be
-forwarded. Capture runs can automate this (`IRON_TIDE_CAPTURE_HOST=1`, `IRON_TIDE_CAPTURE_JOIN=127.0.0.1`).
+forwarded. Capture runs can automate this (`RIMEFRONT_CAPTURE_HOST=1`, `RIMEFRONT_CAPTURE_JOIN=127.0.0.1`).
 
 Both machines must compute floating point identically, also across processors and operating systems. Basic
 arithmetic and square roots are exact under IEEE 754 everywhere, but Rust's own `sin`, `atan2` and `powf`

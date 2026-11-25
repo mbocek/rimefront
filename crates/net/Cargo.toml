@@ -1,17 +1,17 @@
 [package]
-name = "iron_tide_net"
+name = "rimefront_net"
 version = "1.6.0"
 edition = "2024"
 rust-version = "1.100"
-description = "Network battles of Iron Tide: the lockstep session, its links, the relay and the dedicated server"
-repository = "https://github.com/mbocek/iron-tide"
+description = "Network battles of Rimefront: the lockstep session, its links, the relay and the dedicated server"
+repository = "https://github.com/mbocek/rimefront"
 
 [[bin]]
-name = "iron-tide-server"
+name = "rimefront-server"
 path = "src/bin/server.rs"
 
 [dependencies]
-iron_tide_sim = { path = "../sim" }
+rimefront_sim = { path = "../sim" }
 bevy = { version = "0.20.1", default-features = false, features = [
     "std",
     "async_executor",

@@ -1,5 +1,5 @@
 // A side's colour put where the model has the key colour: models are exported once, their side-coloured
-// surfaces painted TEAM_COLOR_KEY in the palette (tools/blender/irontide_models/materials.py), and every
+// surfaces painted TEAM_COLOR_KEY in the palette (tools/blender/rimefront_models/materials.py), and every
 // side's units draw with the same mesh and palette, only this colour apart.
 
 import bevy_pbr::render::{
@@ -9,7 +9,7 @@ import bevy_pbr::render::{
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
 };
 
-// Same as "key" in tools/blender/irontide_models/materials.py.
+// Same as "key" in tools/blender/rimefront_models/materials.py.
 const TEAM_COLOR_KEY: vec3<f32> = vec3<f32>(1.0, 0.0, 1.0);
 const KEY_TOLERANCE: f32 = 0.02;
 

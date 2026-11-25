@@ -426,14 +426,22 @@ impl WorldHost {
         };
         let snapshot = WorldSnapshot::of(self.app.world_mut());
         let world = self.app.world();
+        let mut kept_up = Vec::with_capacity(self.players.len());
         for player in &mut self.players {
-            let Some(team) = player.team else { continue };
-            if let Some(change) = player.sent.next(world, &snapshot, team, &news) {
-                player
+            let Some(team) = player.team else {
+                kept_up.push(true);
+                continue;
+            };
+            let sent = match player.sent.next(world, &snapshot, team, &news) {
+                Some(change) => player
                     .connection
-                    .send(&Message::WorldView(Box::new(change)));
-            }
+                    .send(&Message::WorldView(Box::new(change))),
+                None => true,
+            };
+            kept_up.push(sent);
         }
+        let mut kept_up = kept_up.into_iter();
+        self.players.retain(|_| kept_up.next().unwrap_or(true));
     }
 
     fn receive(&mut self) {

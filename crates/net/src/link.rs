@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -72,6 +72,8 @@ type Socket = WebSocket<MaybeTlsStream<TcpStream>>;
 /// queued by `send` for the connection's own threads.
 pub struct Link {
     outbox: Sender<Vec<u8>>,
+    /// Bytes queued and not yet written to the socket.
+    unsent: Arc<AtomicUsize>,
     /// The connection's thread has ended: the handshake failed or the connection went.
     failed: Arc<AtomicBool>,
     /// The handshake is done; from then on dropping the link sends what is queued before closing.
@@ -164,6 +166,10 @@ fn handshake(
     }
 }
 
+/// More than this waiting for a slow reader and a link takes no more messages: a quarter of a megabyte
+/// is minutes of a world's views, and keeping more would let one stalled player fill the server's memory.
+pub const MOST_UNSENT_BYTES: usize = 256 * 1024;
+
 /// The first byte of a message in postcard; a message in JSON never starts with either.
 const COMPACT: u8 = 0;
 /// The first byte of a message in postcard, then deflated.
@@ -240,6 +246,7 @@ fn serve_split(
     writer: TcpStream,
     side: Side,
     outbox: Receiver<Vec<u8>>,
+    unsent: Arc<AtomicUsize>,
     inbox: &Sender<Arrival>,
 ) {
     let role = match side {
@@ -250,9 +257,11 @@ fn serve_split(
         WebSocket::from_raw_socket(MaybeTlsStream::Plain(writer), role, Some(socket_config()));
     std::thread::spawn(move || {
         for bytes in outbox {
+            let length = bytes.len();
             if writer.send(WsMessage::Binary(bytes.into())).is_err() {
                 return;
             }
+            unsent.fetch_sub(length, Ordering::Relaxed);
         }
         if let MaybeTlsStream::Plain(stream) = writer.get_mut() {
             let _ = stream.shutdown(std::net::Shutdown::Both);
@@ -271,14 +280,21 @@ fn serve_split(
 
 /// A TLS connection keeps its state in one place, so one thread owns it: it reads with a short timeout and
 /// sends what was queued in between, at the cost of up to `SOCKET_POLL` before a message leaves.
-fn serve_polling(mut socket: Socket, outbox: &Receiver<Vec<u8>>, inbox: &Sender<Arrival>) {
+fn serve_polling(
+    mut socket: Socket,
+    outbox: &Receiver<Vec<u8>>,
+    unsent: &AtomicUsize,
+    inbox: &Sender<Arrival>,
+) {
     loop {
         loop {
             match outbox.try_recv() {
                 Ok(bytes) => {
+                    let length = bytes.len();
                     if socket.send(WsMessage::Binary(bytes.into())).is_err() {
                         return;
                     }
+                    unsent.fetch_sub(length, Ordering::Relaxed);
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
@@ -334,6 +350,8 @@ impl Link {
         let serving = Arc::new(AtomicBool::new(false));
         let requested_path = Arc::new(Mutex::new(None));
         let (outbox, queued) = channel::<Vec<u8>>();
+        let unsent = Arc::new(AtomicUsize::new(0));
+        let thread_unsent = Arc::clone(&unsent);
         let (arrived, inbox) = channel();
         let thread_failed = Arc::clone(&failed);
         let thread_serving = Arc::clone(&serving);
@@ -343,9 +361,9 @@ impl Link {
                 thread_serving.store(true, Ordering::Relaxed);
                 let encrypted = matches!(socket.get_ref(), MaybeTlsStream::Rustls(_));
                 if !encrypted {
-                    serve_split(socket, second_handle, side, queued, &arrived);
+                    serve_split(socket, second_handle, side, queued, thread_unsent, &arrived);
                 } else if second_handle.set_read_timeout(Some(SOCKET_POLL)).is_ok() {
-                    serve_polling(socket, &queued, &arrived);
+                    serve_polling(socket, &queued, &thread_unsent, &arrived);
                 }
             }
             thread_failed.store(true, Ordering::Relaxed);
@@ -353,6 +371,7 @@ impl Link {
         });
         Ok(Self {
             outbox,
+            unsent,
             failed,
             serving,
             requested_path,
@@ -375,12 +394,22 @@ impl Link {
         self.failed.load(Ordering::Relaxed)
     }
 
-    /// Queues the message for the connection's thread; false once the connection has gone.
+    /// Queues the message for the connection's thread; false once the connection has gone, or when the
+    /// other end has left more than `MOST_UNSENT_BYTES` unread, which the message is then dropped on.
     pub fn send(&self, message: &Message) -> bool {
         let Some(bytes) = encode(message) else {
             return true;
         };
-        !self.has_failed() && self.outbox.send(bytes).is_ok()
+        if self.has_failed() || self.is_falling_behind() {
+            return false;
+        }
+        self.unsent.fetch_add(bytes.len(), Ordering::Relaxed);
+        self.outbox.send(bytes).is_ok()
+    }
+
+    /// Whether the other end reads so slowly that more than `MOST_UNSENT_BYTES` wait for it.
+    pub fn is_falling_behind(&self) -> bool {
+        self.unsent.load(Ordering::Relaxed) > MOST_UNSENT_BYTES
     }
 
     pub fn drain(&mut self) -> Vec<Arrival> {
@@ -527,6 +556,31 @@ mod tests {
     use super::*;
     use crate::world_view::ViewChange;
     use iron_tide_sim::sim::player_commands::PlayerCommand;
+
+    #[test]
+    fn a_link_whose_other_end_reads_nothing_takes_no_more_than_its_share() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let stream = TcpStream::connect(address).unwrap();
+        let _silent = listener.accept().unwrap();
+        let dialling = Dialling {
+            url: format!("ws://{address}/world"),
+            trusted: None,
+        };
+        let link = Link::guest_side_to(stream, dialling).unwrap();
+        let line = Message::Chat {
+            team: Team::Player,
+            text: "x".repeat(100),
+        };
+        let taken = (0..10_000).take_while(|_| link.send(&line)).count();
+        assert!(link.is_falling_behind());
+        assert!(taken < 10_000, "the link took everything");
+        let line_bytes = encode(&line).unwrap().len();
+        assert!(
+            (taken - 1) * line_bytes <= MOST_UNSENT_BYTES && taken * line_bytes > MOST_UNSENT_BYTES,
+            "gave up after {taken} lines of {line_bytes} bytes"
+        );
+    }
 
     #[test]
     fn a_long_message_travels_packed_and_a_flood_is_refused() {

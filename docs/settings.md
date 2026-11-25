@@ -49,7 +49,7 @@ and a camera of its own draws it into a picture for the page, only while the pag
 (`ui::main_menu::color_picker`). Models carry a key colour the game
 paints the side's onto ([development.md](development.md)), so any side can take any colour. In a battle on
 this machine the player's side takes it; in a network battle every player tells the others theirs
-(`Message::Paint`), though a spectator who joins once the battle is under way sees the sides' own colours; in
+(`Message::Paint`), and the host keeps them for a guest who joins once the battle is under way; in
 a world the player asks for it on entering, and the world gives it unless another side's colour is too much
 like it, then the colour of the palette furthest from the others. Computer sides of a world get palette
 colours the same way, and every player is sent each side's colour once, and again when it changes.

@@ -59,6 +59,7 @@ make help          # every target
 | [Development](docs/development.md) | building, tests, packages and releases, the Blender model contract |
 | [Code layout](docs/architecture.md) | what each module is responsible for |
 | [Persistent world](docs/persistent-world.md) | the steps towards a permanent world far larger than a match map |
+| [Compatibility](docs/compatibility.md) | what a game, a server or a file of one version shares with another, and how to update a server |
 | [Renaming to Rimefront](docs/rename.md) | why the game is being renamed and everything the rename touches |
 | [Signing](docs/signing.md) | signing and notarizing release builds |
 

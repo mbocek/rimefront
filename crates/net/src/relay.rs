@@ -36,6 +36,8 @@ struct OpenDoor {
     /// Late guests considering the offer, with the seat they were offered; none to watch.
     newcomers: Vec<(Link, Option<Team>)>,
     history: TurnHistory,
+    /// The colour each player chose for their side, for a late guest to see the sides as everyone else does.
+    paints: BTreeMap<Team, Message>,
 }
 
 #[derive(Default)]
@@ -91,6 +93,7 @@ impl Relay {
             players,
             newcomers: Vec::new(),
             history: TurnHistory::default(),
+            paints: BTreeMap::new(),
         });
     }
 
@@ -122,7 +125,14 @@ impl Relay {
         }
     }
 
+    fn remember_paint(&mut self, message: &Message) {
+        if let (Some(door), Message::Paint { team, .. }) = (&mut self.door, message) {
+            door.paints.insert(*team, message.clone());
+        }
+    }
+
     pub fn send_all(&mut self, message: &Message) {
+        self.remember_paint(message);
         self.send_except(message, None);
     }
 
@@ -193,6 +203,7 @@ impl Relay {
                         tick,
                         commands,
                     } => self.record_turn(*team, *tick, commands),
+                    Message::Paint { .. } => self.remember_paint(&message),
                     Message::Ping { nonce } => {
                         self.links[index].send(&Message::Pong { nonce: *nonce });
                         continue;
@@ -242,6 +253,9 @@ impl Relay {
             } else if news.contains(&LobbyNews::GuestReady) {
                 let (link, seat) = door.newcomers.remove(index);
                 link.send(&door.history.catch_up());
+                for paint in door.paints.values() {
+                    link.send(paint);
+                }
                 link.go();
                 admitted.push((link, seat));
             } else {

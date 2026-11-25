@@ -390,7 +390,8 @@ impl Plugin for DisplayPlugin {
         .add_systems(
             Update,
             (
-                crate::view::side_tint::paint_other_players_sides,
+                crate::view::side_tint::paint_other_players_sides
+                    .run_if(in_state(match_flow::GameState::Playing)),
                 crate::view::side_tint::paint_new_parts,
                 crate::view::side_tint::repaint_parts,
             )

@@ -1,5 +1,6 @@
 use super::*;
 use crate::app::match_flow::MirroredBattle;
+use crate::view::side_tint::SideColors;
 
 #[derive(Component)]
 pub struct OutcomeOverlay;
@@ -280,7 +281,7 @@ pub(super) fn spawn_outcome_table(
     fonts: &UiFonts,
     rows: Vec<(&'static str, String, String)>,
     match_secs: f32,
-    team: Team,
+    yours: Color,
 ) {
     let row = |table: &mut ChildSpawnerCommands, cells: [(String, Color); 3]| {
         table
@@ -314,7 +315,7 @@ pub(super) fn spawn_outcome_table(
         table,
         [
             (String::new(), TEXT_DIM),
-            (tr("You").into(), team.ui_color()),
+            (tr("You").into(), yours),
             (tr("Enemies").into(), Team::Crimson.ui_color()),
         ],
     );
@@ -343,7 +344,11 @@ pub fn show_outcome(
     mut title: Query<(&mut Text, &mut TextColor), (With<OutcomeTitle>, Without<OutcomeSubtitle>)>,
     mut subtitle: Query<&mut Text, (With<OutcomeSubtitle>, Without<OutcomeTitle>)>,
     level: Res<ActiveLevel>,
-    (session, in_a_world): (Option<Res<NetSession>>, Option<Res<MirroredBattle>>),
+    (session, in_a_world, colors): (
+        Option<Res<NetSession>>,
+        Option<Res<MirroredBattle>>,
+        Res<SideColors>,
+    ),
     (run, library): (Option<Res<CampaignRun>>, Res<CampaignLibrary>),
     button_rows: Query<Entity, With<OutcomeButtons>>,
     tables: Query<Entity, With<OutcomeStats>>,
@@ -366,7 +371,7 @@ pub fn show_outcome(
         && let Ok((mut text, mut color)) = title.single_mut()
     {
         text.0 = message.into();
-        color.0 = team.ui_color();
+        color.0 = colors.ui_of(team);
     }
     if banner.is_some() {
         if let Ok(mut subtitle) = subtitle.single_mut() {
@@ -396,7 +401,13 @@ pub fn show_outcome(
         let rows = outcome_rows(&stats, &economies, local.0);
         commands.entity(table).despawn_related::<Children>();
         commands.entity(table).with_children(|table| {
-            spawn_outcome_table(table, &fonts, rows, clock.elapsed_secs, local.0);
+            spawn_outcome_table(
+                table,
+                &fonts,
+                rows,
+                clock.elapsed_secs,
+                colors.ui_of(local.0),
+            );
         });
     }
     if let Ok(mut visibility) = overlay.single_mut() {

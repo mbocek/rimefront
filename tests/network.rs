@@ -9,6 +9,7 @@ use rimefront::missions::levels::{BaseSite, EnemySetup, ForceSetup, LevelDefinit
 use rimefront::net::lobby::NetLobby;
 use rimefront::net::network::{Link, NetSession, SessionState, Side};
 use rimefront::sim::catalog::Alliance;
+use rimefront::sim::catalog::SideColor;
 use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
 use rimefront::sim::determinism::simulation_checksum;
 use rimefront::sim::economy::Economies;
@@ -610,6 +611,16 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
     attack_with_tanks(&mut host, Team::Player, IVec2::new(48, 16));
     attack_with_tanks(&mut guest, Team::Crimson, IVec2::new(16, 48));
     play_until(&mut host, &mut guest, 300);
+    let teal = SideColor([20, 170, 180]);
+    let gold = SideColor([230, 200, 40]);
+    host.world()
+        .resource_mut::<NetSession>()
+        .paint(Team::Player, teal);
+    guest
+        .world()
+        .resource_mut::<NetSession>()
+        .paint(Team::Crimson, gold);
+    play_until(&mut host, &mut guest, 310);
 
     let mut lobby = NetLobby::default();
     lobby.join(&door_address);
@@ -646,6 +657,13 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
     }
     assert_eq!(watcher.tick(), ticks, "the spectator did not catch up");
     assert_eq!(watcher.session_state(), Some(SessionState::InStep));
+    let mut seen = watcher.world().resource_mut::<NetSession>().take_paints();
+    seen.sort_by_key(|(team, _)| *team);
+    assert_eq!(
+        seen,
+        [(Team::Player, teal), (Team::Crimson, gold)],
+        "the late spectator sees the sides in other colours than the players chose"
+    );
     assert_eq!(
         simulation_checksum(watcher.world()),
         simulation_checksum(host.world())

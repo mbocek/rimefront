@@ -139,7 +139,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 6;
+pub const WORLD_PROTOCOL: u32 = 7;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {
@@ -1057,6 +1057,36 @@ mod tests {
             "the mirrored tank never moved"
         );
         println!("ten seconds of a tank driving: {moving_bytes} bytes");
+    }
+
+    #[test]
+    fn a_player_is_shown_where_a_unit_in_sight_fell() {
+        let mut host = WorldHost::new(29);
+        let (mut player, _) = enter(&mut host);
+        let world = host.world();
+        let (_, tank_position) = own_unit(world, Team::Player, UnitKind::Tank);
+        let fallen_at = tank_position + Vec3::new(3.0, 0.0, 0.0);
+        let mut commands = world.commands();
+        let fallen = spawn_unit(&mut commands, UnitKind::Tank, Team::Crimson, fallen_at, 0.0);
+        world.flush();
+        world.get_mut::<Health>(fallen).unwrap().current = 0.0;
+
+        let mut effects = Vec::new();
+        for _ in 0..4 {
+            host.step(SIMULATION_TICK);
+            for arrival in player.drain() {
+                if let Arrival::Message(Message::WorldView(change)) = arrival {
+                    effects.extend(change.effects);
+                }
+            }
+        }
+        let shown = effects.iter().find_map(|effect| match *effect {
+            Effect::Fell { unit, team, at, .. } => Some((unit, team, at.position())),
+            _ => None,
+        });
+        let (unit, team, at) = shown.expect("the fall was not shown");
+        assert_eq!((unit, team), (UnitKind::Tank, Team::Crimson));
+        assert!(at.xz().distance(fallen_at.xz()) < 0.5);
     }
 
     #[test]

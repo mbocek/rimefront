@@ -18,8 +18,11 @@ use crate::net::world_host::{
     PlayerKey, WORLD_PROTOCOL, WorldConnection, WorldHost, local_connection, world_level,
 };
 use crate::net::world_store::WorldStore;
-use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewChange};
+use crate::net::world_view::{
+    Effect, FACING_STEPS, SideState, Spot, Thing, ThingState, ViewChange,
+};
 use crate::sim::catalog::{SideColor, Team};
+use crate::sim::combat::{DamageSource, Destroyed};
 use crate::sim::components::{Building, Health};
 use crate::sim::cues::{BlastCue, SoundCue};
 use crate::sim::determinism::{SimEntities, SimId};
@@ -502,6 +505,20 @@ fn show_effect(world: &mut World, side: Team, effect: Effect) {
         }
         Effect::Sound { sound, at } => {
             world.write_message(SoundCue::at(sound, at.position()));
+        }
+        Effect::Fell {
+            unit,
+            team,
+            at,
+            facing,
+        } => {
+            world.write_message(Destroyed {
+                entity: Entity::PLACEHOLDER,
+                team,
+                what: DamageSource::Unit(unit),
+                position: at.position(),
+                rotation: Quat::from_rotation_y(facing as f32 / FACING_STEPS),
+            });
         }
         Effect::Told { news, at, .. } => {
             world.write_message(News {

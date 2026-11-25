@@ -168,6 +168,7 @@ pub enum DamageSource {
 /// Sent when a unit or structure is destroyed.
 #[derive(Message, Clone, Copy, Debug)]
 pub struct Destroyed {
+    /// `Entity::PLACEHOLDER` in the copy of a world a player is shown, where the unit was the world's.
     pub entity: Entity,
     pub team: Team,
     pub what: DamageSource,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use rimefront_sim::sim::catalog::{
     BuildingKind, Diplomacy, ProjectileStyle, SideColor, Team, UnitKind,
 };
-use rimefront_sim::sim::combat::{Projectile, Targets};
+use rimefront_sim::sim::combat::{DamageSource, Destroyed, Projectile, Targets};
 use rimefront_sim::sim::components::{Building, HarvestState, Harvester, Health, Unit};
 use rimefront_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
 use rimefront_sim::sim::determinism::{SimEntities, SimId};
@@ -25,7 +25,7 @@ use rimefront_sim::world::map::{GameMap, MapBounds, chunk_of, map_bounds, world_
 /// Positions travel in hundredths of a cell, facings in thousandths of a radian, health in percent: finer
 /// than anything drawn, coarse enough that a unit standing still sends nothing.
 const POSITION_STEPS: f32 = 100.0;
-const FACING_STEPS: f32 = 1000.0;
+pub const FACING_STEPS: f32 = 1000.0;
 
 /// A point of the world, in hundredths of a cell.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -209,6 +209,13 @@ pub enum Effect {
         sound: Sound,
         at: Spot,
     },
+    /// A unit destroyed, which leaves a wreck or a body where it stood.
+    Fell {
+        unit: UnitKind,
+        team: Team,
+        at: Spot,
+        facing: i32,
+    },
     /// News for one side only, wherever its player looks.
     Told {
         team: Team,
@@ -222,7 +229,9 @@ impl Effect {
         let in_sight = |spot: Spot| chunks.contains(&chunk_of(world_to_cell(spot.position())));
         match *self {
             Effect::Shot(shot) => in_sight(shot.start) || in_sight(shot.end),
-            Effect::Blast { at, .. } | Effect::Sound { at, .. } => in_sight(at),
+            Effect::Blast { at, .. } | Effect::Sound { at, .. } | Effect::Fell { at, .. } => {
+                in_sight(at)
+            }
             Effect::Told { team, .. } => team == viewer,
         }
     }
@@ -234,6 +243,7 @@ pub struct WorldEffects {
     blasts: MessageCursor<BlastCue>,
     sounds: MessageCursor<SoundCue>,
     news: MessageCursor<News>,
+    losses: MessageCursor<Destroyed>,
     flying: HashSet<SimId>,
 }
 
@@ -268,6 +278,19 @@ impl WorldEffects {
             Some(Effect::Sound {
                 sound: cue.sound,
                 at: Spot::at(cue.position?),
+            })
+        }));
+        let losses = world.resource::<Messages<Destroyed>>();
+        effects.extend(self.losses.read(losses).filter_map(|loss| {
+            let DamageSource::Unit(unit) = loss.what else {
+                return None;
+            };
+            let (facing, _, _) = loss.rotation.to_euler(EulerRot::YXZ);
+            Some(Effect::Fell {
+                unit,
+                team: loss.team,
+                at: Spot::at(loss.position),
+                facing: (facing * FACING_STEPS).round() as i32,
             })
         }));
         let news = world.resource::<Messages<News>>();

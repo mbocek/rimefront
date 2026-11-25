@@ -379,6 +379,8 @@ for ordinary network matches.
     until the side loses one, and the side is told (`SideNews::UnitLimitReached`). Battles have no limit.
     A newcomer, or a player whose side fell, is given the nearest free site with nobody's units or
     structures within 30 cells, so they do not start again among the army that beat them.
+    A unit destroyed in sight is sent as it falls (`Effect::Fell`: kind, side, spot, facing), so a world
+    shows wrecks and fallen infantry as a battle does.
     The world saves in the background: the world's thread takes what it holds into chunk records, and a
     thread of its own encodes and writes them while the world goes on (`WorldStore::save_in_background`);
     the save when the server stops waits until it is written.

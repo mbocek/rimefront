@@ -17,7 +17,7 @@ use crate::missions::levels::{
 };
 use crate::net::world_client::WorldClient;
 use crate::sim::catalog::Team;
-use crate::sim::components::{Selected, Unit};
+use crate::sim::components::{Health, Selected, Unit};
 use crate::ui::map_editor::open_map_editor;
 use crate::ui::menu::MenuState;
 use crate::view::camera::RtsCamera;
@@ -61,6 +61,8 @@ const CAPTURE_CLAIM_SITES_VAR: &str = "RIMEFRONT_CAPTURE_CLAIM_SITES";
 /// `RIMEFRONT_CAPTURE_WORLD=29` plays the world grown from that seed, run by the game itself;
 /// `RIMEFRONT_CAPTURE_WORLD=ws://host:port/world` enters a server's world.
 const CAPTURE_WORLD_VAR: &str = "RIMEFRONT_CAPTURE_WORLD";
+/// `RIMEFRONT_CAPTURE_DESTROY=1` destroys the player's vehicles two seconds in, to show their wrecks.
+const CAPTURE_DESTROY_VAR: &str = "RIMEFRONT_CAPTURE_DESTROY";
 const LOAD_AFTER_SECS: f32 = 1.5;
 /// A hosting capture run starts the battle only after this, so spectators can join too.
 const HOST_WAITS_FOR_GUESTS_SECS: f32 = 10.0;
@@ -132,6 +134,7 @@ impl Plugin for CapturePlugin {
                 open_requested_menu_page,
                 decide_requested_outcome,
                 claim_requested_sites,
+                destroy_own_vehicles.run_if(|| std::env::var_os(CAPTURE_DESTROY_VAR).is_some()),
             )
                 .run_if(in_state(GameState::Playing)),
         );
@@ -365,6 +368,28 @@ fn claim_requested_sites(world: &mut World) {
     let home = crate::world::map::base_sites()[0];
     for _ in claimed..sites {
         crate::world::sites::claim_starting_site(world, home);
+    }
+}
+
+fn destroy_own_vehicles(
+    mut done: Local<bool>,
+    clock: Res<crate::app::match_flow::MatchClock>,
+    player: Res<crate::sim::player_commands::LocalTeam>,
+    mut units: Query<(&Unit, &Team, &mut Health, &Transform)>,
+) {
+    if *done || clock.elapsed_secs < 2.0 {
+        return;
+    }
+    *done = true;
+    for (unit, &team, mut health, transform) in &mut units {
+        if team == player.0 && unit.0.spec().armor == crate::sim::catalog::ArmorClass::Vehicle {
+            health.current = 0.0;
+            let cell = crate::world::map::world_to_cell(transform.translation);
+            info!(
+                "capture: destroyed a {:?} at cell {},{}",
+                unit.0, cell.x, cell.y
+            );
+        }
     }
 }
 

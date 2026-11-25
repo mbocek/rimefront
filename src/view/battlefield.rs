@@ -7,7 +7,7 @@ use crate::missions::levels::ActiveLevel;
 use crate::sim::catalog::ArmorClass;
 use crate::sim::combat::{DamageSource, Destroyed, Impact};
 use crate::sim::cues::BlastSize;
-use crate::view::assets::ModelLibrary;
+use crate::view::assets::{ModelLibrary, named_node};
 use crate::view::camera::RtsCamera;
 use crate::view::effects::{EffectAssets, spawn_blast};
 use crate::view::local_view::LocalView;
@@ -19,11 +19,24 @@ const MAX_CRATERS: usize = 80;
 /// Crater opacity steps; a crater swaps to the next one as it fades instead of owning a material.
 const CRATER_FADE_STEPS: usize = 6;
 const CRATER_LIFT: f32 = 0.04;
-const WRECK_LIFETIME_SECS: f32 = 45.0;
+const WRECK_LIFETIME_SECS: f32 = 60.0;
 const WRECK_SINK_SECS: f32 = 3.0;
-const WRECK_SMOKE_SECS: f32 = 15.0;
+const WRECK_FIRE_SECS: f32 = 10.0;
+const WRECK_FIRE_INTERVAL_SECS: f32 = 0.25;
+const WRECK_SMOKE_SECS: f32 = 25.0;
 const WRECK_SMOKE_INTERVAL_SECS: f32 = 0.7;
 const WRECK_SINK_DEPTH: f32 = 1.6;
+/// How far a hull settles out of true, in radians either way about each level axis.
+const WRECK_TILT: std::ops::Range<f32> = 0.1..0.26;
+/// A burnt-out hull sits lower, its running gear gone.
+const WRECK_SQUASH: f32 = 0.82;
+const TURRET_FLIGHT_SECS: f32 = 0.7;
+const TURRET_THROW_DISTANCE: std::ops::Range<f32> = 2.8..3.8;
+const TURRET_THROW_HEIGHT: f32 = 3.0;
+const TURRET_LANDING_TILT: std::ops::Range<f32> = 0.5..1.3;
+const DEBRIS_PIECES: std::ops::Range<usize> = 7..12;
+const DEBRIS_SIZE: std::ops::Range<f32> = 0.3..0.75;
+const DEBRIS_SCATTER: std::ops::Range<f32> = 1.2..3.5;
 const RAIN_DROPS: usize = 700;
 const RAIN_AREA_HALF_SPAN: f32 = 40.0;
 const RAIN_HEIGHT: f32 = 24.0;
@@ -38,6 +51,7 @@ pub struct BattlefieldAssets {
     crater_mesh: Handle<Mesh>,
     crater_materials: Vec<Handle<StandardMaterial>>,
     charred: Handle<StandardMaterial>,
+    debris_mesh: Handle<Mesh>,
 }
 
 #[derive(Component)]
@@ -50,11 +64,24 @@ pub struct Wreck {
     age: f32,
     smoke_timer: f32,
     rest_height: f32,
+    burns: bool,
 }
 
 /// Set once every part of a wreck's model has been swapped to charred metal.
 #[derive(Component)]
 pub struct Charred;
+
+/// Set once a wreck's turret, if it has one, has been blown off.
+#[derive(Component)]
+pub struct TurretBlownOff;
+
+/// A turret flying off its hull, from where it sat to where it lands, both in the hull's frame.
+#[derive(Component)]
+pub struct ThrownTurret {
+    from: Transform,
+    to: Transform,
+    age: f32,
+}
 
 pub fn create_battlefield_assets(
     mut commands: Commands,
@@ -81,6 +108,7 @@ pub fn create_battlefield_assets(
             metallic: 0.3,
             ..default()
         }),
+        debris_mesh: meshes.add(Cuboid::new(1.0, 0.5, 0.8)),
     });
 }
 
@@ -140,11 +168,13 @@ pub fn fade_craters(
     }
 }
 
-/// A destroyed vehicle leaves its burnt-out hull behind for a while.
+/// A destroyed vehicle leaves its burnt-out hull behind for a while: settled askew and lower, burning and
+/// then smoking, with pieces of it strewn around.
 pub fn leave_wrecks(
     mut commands: Commands,
     mut losses: MessageReader<Destroyed>,
     models: Res<ModelLibrary>,
+    assets: Res<BattlefieldAssets>,
     view: LocalView,
     level: Res<ActiveLevel>,
 ) {
@@ -161,18 +191,115 @@ pub fn leave_wrecks(
             continue;
         }
         let ground = level.0.landscape.on_ground(loss.position);
-        let slump = Quat::from_rotation_z(rng.random_range(-0.06..0.06))
-            * Quat::from_rotation_x(rng.random_range(-0.06..0.06));
+        let mut tilt =
+            || rng.random_range(WRECK_TILT) * if rng.random_bool(0.5) { 1.0 } else { -1.0 };
+        let slump = Quat::from_rotation_z(tilt()) * Quat::from_rotation_x(tilt());
+        let (facing, _, _) = loss.rotation.to_euler(EulerRot::YXZ);
+        let (unpainted_model, _charred_over_any_paint) = models.unit(kind, loss.team);
         commands.spawn((
             Wreck {
                 age: 0.0,
                 smoke_timer: 0.0,
                 rest_height: ground.y - 0.12,
+                burns: true,
             },
-            models.unit(kind, loss.team),
+            unpainted_model,
             Transform::from_translation(ground)
-                .with_rotation(slump * Quat::from_rotation_y(rng.random_range(0.0..TAU))),
+                .with_rotation(slump * Quat::from_rotation_y(facing))
+                .with_scale(Vec3::new(1.0, WRECK_SQUASH, 1.0)),
         ));
+        strew_debris(&mut commands, &assets, &level, loss.position, &mut rng);
+    }
+}
+
+fn strew_debris(
+    commands: &mut Commands,
+    assets: &BattlefieldAssets,
+    level: &ActiveLevel,
+    around: Vec3,
+    rng: &mut impl RngExt,
+) {
+    for _ in 0..rng.random_range(DEBRIS_PIECES) {
+        let angle = rng.random_range(0.0..TAU);
+        let reach = rng.random_range(DEBRIS_SCATTER);
+        let spot = around + Vec3::new(angle.cos() * reach, 0.0, angle.sin() * reach);
+        let ground = level.0.landscape.on_ground(spot);
+        let size = rng.random_range(DEBRIS_SIZE);
+        let rotation = Quat::from_euler(
+            EulerRot::YXZ,
+            rng.random_range(0.0..TAU),
+            rng.random_range(-0.6..0.6),
+            rng.random_range(-0.6..0.6),
+        );
+        commands.spawn((
+            Wreck {
+                age: 0.0,
+                smoke_timer: 0.0,
+                rest_height: ground.y,
+                burns: false,
+            },
+            Charred,
+            TurretBlownOff,
+            Mesh3d(assets.debris_mesh.clone()),
+            MeshMaterial3d(assets.charred.clone()),
+            Transform::from_translation(ground)
+                .with_rotation(rotation)
+                .with_scale(Vec3::splat(size)),
+        ));
+    }
+}
+
+/// Once a wreck's model is in, its turret is thrown off to land tilted beside the hull.
+pub fn blow_off_turrets(
+    mut commands: Commands,
+    wrecks: Query<Entity, (With<Wreck>, With<Charred>, Without<TurretBlownOff>)>,
+    children: Query<&Children>,
+    nodes: Query<(&Name, &Transform)>,
+) {
+    let mut rng = rand::rng();
+    for wreck in &wrecks {
+        commands.entity(wreck).insert(TurretBlownOff);
+        let Some((turret, &from)) = named_node(wreck, "Turret", &children, &nodes) else {
+            continue;
+        };
+        let angle = rng.random_range(0.0..TAU);
+        let reach = rng.random_range(TURRET_THROW_DISTANCE);
+        let landing = Vec3::new(
+            from.translation.x + angle.cos() * reach,
+            from.translation.y * 0.3,
+            from.translation.z + angle.sin() * reach,
+        );
+        let tumble = Quat::from_axis_angle(
+            Vec3::new(angle.sin(), 0.0, -angle.cos()),
+            rng.random_range(TURRET_LANDING_TILT),
+        ) * Quat::from_rotation_y(rng.random_range(-1.5..1.5));
+        commands.entity(turret).insert(ThrownTurret {
+            from,
+            to: Transform {
+                translation: landing,
+                rotation: tumble * from.rotation,
+                scale: from.scale,
+            },
+            age: 0.0,
+        });
+    }
+}
+
+pub fn fly_thrown_turrets(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut turrets: Query<(Entity, &mut ThrownTurret, &mut Transform)>,
+) {
+    for (entity, mut thrown, mut transform) in &mut turrets {
+        thrown.age += time.delta_secs();
+        let flown = (thrown.age / TURRET_FLIGHT_SECS).min(1.0);
+        let arc = 4.0 * flown * (1.0 - flown) * TURRET_THROW_HEIGHT;
+        transform.translation =
+            thrown.from.translation.lerp(thrown.to.translation, flown) + Vec3::Y * arc;
+        transform.rotation = thrown.from.rotation.slerp(thrown.to.rotation, flown);
+        if flown >= 1.0 {
+            commands.entity(entity).remove::<ThrownTurret>();
+        }
     }
 }
 
@@ -213,17 +340,23 @@ pub fn smoulder_and_sink_wrecks(
         let sinking =
             (wreck.age - (WRECK_LIFETIME_SECS - WRECK_SINK_SECS)).max(0.0) / WRECK_SINK_SECS;
         transform.translation.y = wreck.rest_height - sinking * WRECK_SINK_DEPTH;
-        if wreck.age > WRECK_SMOKE_SECS {
+        if !wreck.burns || wreck.age > WRECK_SMOKE_SECS {
             continue;
         }
         wreck.smoke_timer -= dt;
         if wreck.smoke_timer <= 0.0 {
-            wreck.smoke_timer = WRECK_SMOKE_INTERVAL_SECS;
+            let burning = wreck.age < WRECK_FIRE_SECS;
+            let (interval, size) = if burning {
+                (WRECK_FIRE_INTERVAL_SECS, BlastSize::DamageFire)
+            } else {
+                (WRECK_SMOKE_INTERVAL_SECS, BlastSize::DamageSmoke)
+            };
+            wreck.smoke_timer = interval;
             spawn_blast(
                 &mut commands,
                 &effects,
                 transform.translation + Vec3::Y * 1.0,
-                BlastSize::DamageSmoke,
+                size,
             );
         }
     }

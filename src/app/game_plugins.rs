@@ -101,6 +101,8 @@ impl Plugin for BattleViewPlugin {
                     battlefield::fade_craters,
                     battlefield::leave_wrecks,
                     battlefield::char_wrecks,
+                    battlefield::blow_off_turrets,
+                    battlefield::fly_thrown_turrets,
                     wall_joints::join_walls,
                     battlefield::smoulder_and_sink_wrecks,
                     battlefield::draw_rain,

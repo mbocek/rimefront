@@ -118,25 +118,60 @@ def add_leaf_cards(bm, centre, radius, seed, count, amplitude):
         bm.faces.new((back[3], back[2], back[0]))
 
 
-def add_crown(limb_paths, rng, seed, centre, reach, height, cluster_count, cluster_size):
-    """A crown of many overlapping leaf clusters filling one lumpy envelope around the limb tips, shaded by
-    where light reaches: sunlit on top and outside, deep green underneath and within. A few big uniform
-    balls read as broccoli."""
+LEAF_LOBES = 9
+
+
+def add_leaf_rosette(bm, centre, radius, height, rng, spin):
+    """A low dome of leaves with a scalloped, drooping rim and a shallow underside."""
+    tip = bm.verts.new(centre + Vector((rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03), height)))
+    rim, under = [], []
+    for k in range(LEAF_LOBES * 2):
+        angle = spin + k * math.pi / LEAF_LOBES
+        direction = Vector((math.cos(angle), math.sin(angle), 0.0))
+        is_lobe = k % 2 == 0
+        reach = radius * (rng.uniform(0.95, 1.12) if is_lobe else rng.uniform(0.8, 0.9))
+        droop = radius * (rng.uniform(0.1, 0.2) if is_lobe else rng.uniform(0.0, 0.06))
+        rim.append(bm.verts.new(centre + direction * reach - UP * droop))
+        under.append(bm.verts.new(centre + direction * reach * 0.35 + UP * height * 0.1))
+    count = len(rim)
+    for k in range(count):
+        j = (k + 1) % count
+        bm.faces.new((rim[k], rim[j], tip))
+        bm.faces.new((under[k], under[j], rim[j], rim[k]))
+    bm.faces.new(list(reversed(under)))
+
+
+def leaf_clump(material_name, centre, size, rng):
+    """Two stacked rosettes of leaves, the upper smaller and turned: crisp lobed edges and dark gaps between
+    layers read as foliage from above and from the side, where smooth balls read as broccoli."""
+    spin = rng.uniform(0, math.tau)
+    shift = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), 0.0)) * size * 0.15
+    layers = [(centre - UP * size * 0.18, size * 1.05, spin),
+              (centre + UP * size * 0.22 + shift, size * 0.72, spin + math.pi / LEAF_LOBES)]
+    for middle, radius, turn in layers:
+        part(material_name, lambda bm, c=middle, r=radius, t=turn: add_leaf_rosette(bm, c, r, r * 0.45, rng, t),
+             shading=AUTO_SMOOTH, name="LeafClump")
+
+
+def add_crown(limb_paths, rng, centre, reach, height, cluster_count, cluster_size):
+    """A crown of leaf clumps filling one lumpy envelope around the limb tips, shaded by where light reaches:
+    sunlit on top and outside, deep green underneath and within."""
     centre = Vector(centre)
-    spots = [path[-1] + UP * cluster_size * 0.3 for path in limb_paths]
+    spots = [path[-1] + UP * cluster_size * 0.2 for path in limb_paths]
     while len(spots) < cluster_count:
         direction = Vector((rng.gauss(0, 1), rng.gauss(0, 1), rng.gauss(0, 1) + 0.25)).normalized()
-        depth = rng.uniform(0.5, 1.0) ** 0.5
-        flatten = 0.65 if direction.z < 0 else 1.0
+        depth = rng.uniform(0.45, 1.0) ** 0.5
+        flatten = 0.55 if direction.z < 0 else 1.0
         spots.append(centre + Vector((direction.x * reach, direction.y * reach,
                                       direction.z * height * flatten)) * depth)
-    for index, spot in enumerate(spots):
+    spots.sort(key=lambda spot: spot.z)
+    for spot in spots:
         offset = spot - centre
         uplift = (offset.z / height + 1.0) * 0.5
         outward = min(1.0, Vector((offset.x / reach, offset.y / reach, offset.z / height)).length)
         light = 0.65 * uplift + 0.35 * outward + rng.uniform(-0.08, 0.08)
-        size = cluster_size * rng.uniform(0.75, 1.2) * (0.85 + 0.3 * outward)
-        leaf_cluster(_leaf_in_light(light), spot, size, seed + index, subdivisions=2, amplitude=0.4, cards=14)
+        size = cluster_size * rng.uniform(0.8, 1.15) * (0.85 + 0.3 * outward)
+        leaf_clump(_leaf_in_light(light), spot, size, rng)
 
 
 def _leaf_in_light(light):
@@ -148,27 +183,25 @@ def _leaf_in_light(light):
 
 def build_tree_broadleaf():
     rng = random.Random(201)
-    add_trunk("Bark", [-0.1, 0.2, 0.7, 1.4, 2.1, 2.9], [0.62, 0.44, 0.36, 0.33, 0.29, 0.14], rng, segments=12)
-    add_roots("Bark", 6, 0.36, 0.75, rng)
-    limbs = [Limb(Vector((0, 0, rng.uniform(1.75, 2.2))), k * math.tau / 5 + rng.uniform(-0.25, 0.25),
-                  rng.uniform(1.6, 2.0), rng.uniform(1.0, 1.5), 0.17) for k in range(5)]
+    add_trunk("Bark", [-0.1, 0.2, 0.9, 1.8, 2.7, 3.6], [0.52, 0.4, 0.34, 0.3, 0.25, 0.12], rng, segments=12)
+    add_roots("Bark", 5, 0.34, 0.4, rng)
+    limbs = [Limb(Vector((0, 0, rng.uniform(2.2, 2.8))), k * math.tau / 5 + rng.uniform(-0.25, 0.25),
+                  rng.uniform(1.6, 2.0), rng.uniform(1.3, 1.7), 0.16) for k in range(5)]
     paths = add_limbs("Bark", limbs, rng)
     add_twigs("Bark", paths, rng)
-    add_crown(paths, rng, 2010, centre=(0.0, 0.0, 3.35), reach=2.0, height=1.25, cluster_count=22,
-              cluster_size=0.85)
+    add_crown(paths, rng, centre=(0.0, 0.0, 4.3), reach=2.2, height=1.4, cluster_count=24, cluster_size=0.95)
 
 
 def build_tree():
     rng = random.Random(211)
-    add_trunk("Bark", [-0.1, 0.2, 0.8, 1.6, 2.3, 3.3], [0.45, 0.3, 0.25, 0.22, 0.19, 0.09], rng, lean=(0.1, 0.05),
+    add_trunk("Bark", [-0.1, 0.2, 0.9, 1.8, 2.6, 3.5], [0.38, 0.27, 0.23, 0.2, 0.17, 0.08], rng, lean=(0.1, 0.05),
               segments=10)
-    add_roots("Bark", 5, 0.25, 0.55, rng)
-    limbs = [Limb(Vector((0.05, 0.02, rng.uniform(1.8, 2.4))), k * math.tau / 4 + rng.uniform(-0.3, 0.3),
-                  rng.uniform(0.9, 1.15), rng.uniform(1.0, 1.4), 0.12) for k in range(4)]
+    add_roots("Bark", 4, 0.24, 0.32, rng)
+    limbs = [Limb(Vector((0.05, 0.02, rng.uniform(2.1, 2.6))), k * math.tau / 4 + rng.uniform(-0.3, 0.3),
+                  rng.uniform(1.0, 1.25), rng.uniform(1.1, 1.5), 0.11) for k in range(4)]
     paths = add_limbs("Bark", limbs, rng, segments=6)
     add_twigs("Bark", paths, rng, length=0.45, radius=0.028)
-    add_crown(paths, rng, 2110, centre=(0.05, 0.02, 3.25), reach=1.4, height=1.1, cluster_count=15,
-              cluster_size=0.7)
+    add_crown(paths, rng, centre=(0.05, 0.02, 3.9), reach=1.5, height=1.2, cluster_count=17, cluster_size=0.75)
 
 
 def build_tree_birch():
@@ -192,12 +225,12 @@ def build_tree_birch():
                           rng.uniform(0.7, 1.1), 0.045))
     paths = add_limbs("BirchBark", limbs, rng, segments=5)
     for index, path in enumerate(paths):
-        material_name = ("BirchLeaf", "BirchLeafLight")[index % 2]
-        leaf_cluster(material_name, path[-1] + UP * 0.15, rng.uniform(0.5, 0.65), 2210 + index, 3, 0.36)
-        leaf_cluster(("BirchLeafLight", "BirchLeaf")[index % 2], path[1].lerp(path[2], 0.5) + UP * 0.2,
-                     rng.uniform(0.32, 0.42), 2230 + index, 2, 0.36)
-    leaf_cluster("BirchLeafLight", trunk[-1] + UP * 0.3, 0.6, 2250, 3, 0.36)
-    leaf_cluster("BirchLeaf", trunk[-3] + Vector((0.2, 0.3, 0.2)), 0.5, 2251, 3, 0.36)
+        shades = ("BirchLeaf", "BirchLeafLight")
+        leaf_clump(shades[index % 2], path[-1] + UP * 0.1, rng.uniform(0.42, 0.52), rng)
+        spot = path[1].lerp(path[-1], 0.5) + UP * 0.12
+        leaf_clump(shades[(index + 1) % 2], spot, rng.uniform(0.34, 0.42), rng)
+    leaf_clump("BirchLeafLight", trunk[-1] + UP * 0.3, 0.5, rng)
+    leaf_clump("BirchLeaf", trunk[-3] + Vector((0.2, 0.3, 0.2)), 0.42, rng)
 
 
 def build_tree_dead():

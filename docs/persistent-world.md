@@ -363,13 +363,20 @@ for ordinary network matches.
     with news to the one who ordered them (`SideNews::Sheltered`). Every player is also sent which sides are
     sheltered whenever that changes, and the game puts a glass dome over each one's structures it knows of,
     as wide as they spread and a little more (`view::shelter_dome`), gone when the side's player returns.
-    New crystal: a world grows a new deposit every ten minutes of world time while fewer deposits are fresh
-    (crystal still lies within 6 cells of the middle) than one more than the sides of players
-    (`world::deposits::lay_new_deposit`). It is a field like those the world grew with, on open ground at
-    least 16 cells from every structure and 4 from crystal already lying there, chosen from the map seed and
-    the turn alone; on a fresh 64-cell world 57 of 60 turns found a spot. Every player present is told that
-    crystal surfaced (`SideNews::CrystalSurfaced`) but not where, and is shown it once their side sees its
-    ground. A saved world keeps the deposits' middles.
+    New crystal: every ten minutes of world time a world grows a deposit for every four players present (at
+    least one), while fewer deposits are fresh (crystal still lies within 6 cells of the middle) than one
+    more than the sides of players (`world::deposits::lay_new_deposit`). It is a field like those the world
+    grew with, on open ground at least 16 cells from every structure and 4 from crystal already lying there,
+    chosen from the map seed and the turn alone; on a fresh 64-cell world 57 of 60 turns found a spot. Every
+    player present is told once a round that crystal surfaced (`SideNews::CrystalSurfaced`) but not where,
+    and is shown it once their side sees its ground. A saved world keeps the deposits' middles.
+    A side holds at most 120 units in a world (`UnitLimit`): a unit finished past that waits at its producer
+    until the side loses one, and the side is told (`SideNews::UnitLimitReached`). Battles have no limit.
+    A newcomer, or a player whose side fell, is given the nearest free site with nobody's units or
+    structures within 30 cells, so they do not start again among the army that beat them.
+    The world saves in the background: the world's thread takes what it holds into chunk records, and a
+    thread of its own encodes and writes them while the world goes on (`WorldStore::save_in_background`);
+    the save when the server stops waits until it is written.
 
 ## Decisions
 
@@ -422,3 +429,35 @@ Sixty-four players with 4700 units take a sixth of the budget on average; the sl
 it, which bounds a world's players for now. Views ten times a second and deflated long messages (step 13 above)
 brought what each of them is sent from 803 B/s to 434 B/s: 64 players take about 28 kB/s of the server's
 upload in all.
+
+### Measured: days of a world
+
+`rimefront-world-soak` runs a world as fast as it goes with 20 players who come and go: a computer commander
+plays each one's side while they are connected; they stay one to six hours and are away for hours, half a
+day to two days, or now and then three to six days, long enough for their base to decay; a player whose
+side fell comes back ten minutes to two hours later. It writes a line of measurements for every hour of
+world time (tick, units, structures, sides, crystal, what each player is sent, saves, memory). Six hours of
+world 29 (Apple M5 Pro, release build), before and after the four fixes it led to:
+
+| | Before | After |
+| --- | --- | --- |
+| Units after 5 hours | 2342 | 227 |
+| Tick, average in hour 5 | 3.79 ms | 0.56 ms |
+| Ticks over 50 ms in hour 5 | 20 | 0 |
+| Save on the world's thread, average / slowest | 42.6 / 129 ms | 3.4 / 4.5 ms |
+| Crystal cells after 3 hours, of about 2800 | 459 | 1030 |
+| Real time for 5 hours of world | 544 s | 201 s |
+
+- **Endless armies**: computer sides are paid an income and built without end; a side now holds at most 120
+  units in a world.
+- **Saves stalled the world**: a save took its records and wrote them on the world's thread; the records
+  now read whole chunks at once and are written on a thread of their own.
+- **Crystal ran out**: one deposit every ten minutes did not keep up with twenty players; a round now
+  grows one for every four players present.
+- **A side that fell started again among the army that beat it**: the first run counted 644 falls in five
+  hours, the same sides falling every few minutes; a newcomer is now given a site nobody stands near.
+
+Still open: one tick an hour or so takes 60 to 100 ms; the world widening for newcomers is one cause (hour 4
+above), the others are not found yet. Six hours of world take about four minutes, so ten days take about
+three hours.
+

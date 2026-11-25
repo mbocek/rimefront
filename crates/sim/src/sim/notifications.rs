@@ -77,6 +77,8 @@ pub enum SideNews {
     Sheltered,
     /// A new crystal deposit appeared somewhere in the world.
     CrystalSurfaced,
+    /// A unit is finished but waits: the side has as many units as a world allows.
+    UnitLimitReached,
     BaseUnderAttack,
     HarvesterUnderAttack,
     LowPower,
@@ -105,6 +107,9 @@ impl SideNews {
             SideNews::CrystalSurfaced => {
                 tr("New crystal has surfaced somewhere in the world").into()
             }
+            SideNews::UnitLimitReached => {
+                tr("Unit limit reached: lose units to deploy more").into()
+            }
             SideNews::BaseUnderAttack => tr("Our base is under attack!").into(),
             SideNews::HarvesterUnderAttack => tr("Our harvester is under attack!").into(),
             SideNews::LowPower => tr("Low power - production slowed").into(),
@@ -129,6 +134,7 @@ impl SideNews {
             | SideNews::NoMine
             | SideNews::Sheltered
             | SideNews::CrystalSurfaced
+            | SideNews::UnitLimitReached
             | SideNews::LowPower => {
                 return None;
             }

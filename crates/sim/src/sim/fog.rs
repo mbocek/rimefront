@@ -45,6 +45,23 @@ impl Clone for FogOfWar {
     }
 }
 
+fn explored_bits(cells: &[CellSight]) -> Option<Vec<u8>> {
+    if cells.iter().all(|&sight| sight == CellSight::Unexplored) {
+        return None;
+    }
+    let bits = cells
+        .chunks(8)
+        .map(|eight| {
+            eight
+                .iter()
+                .enumerate()
+                .filter(|&(_, &sight)| sight != CellSight::Unexplored)
+                .fold(0u8, |byte, (bit, _)| byte | (1 << bit))
+        })
+        .collect();
+    Some(bits)
+}
+
 fn chunk_cells(bounds: MapBounds, chunk: IVec2) -> impl Iterator<Item = IVec2> {
     let (first, last) = bounds.cells_of_chunk(chunk);
     (first.y..=last.y).flat_map(move |y| (first.x..=last.x).map(move |x| IVec2::new(x, y)))
@@ -152,6 +169,9 @@ impl FogOfWar {
     /// Which cells of `chunk` were ever seen, a bit each row by row from its first map cell; `None` when
     /// none were.
     pub fn explored_in_chunk(&self, chunk: IVec2) -> Option<Vec<u8>> {
+        if let Some(cells) = self.cells.whole_chunk_cells(chunk) {
+            return explored_bits(cells);
+        }
         let mut bits = Vec::new();
         let mut any = false;
         for (index, cell) in chunk_cells(self.cells.bounds(), chunk).enumerate() {

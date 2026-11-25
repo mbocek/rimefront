@@ -10,6 +10,10 @@ repository = "https://github.com/mbocek/rimefront"
 name = "rimefront-server"
 path = "src/bin/server.rs"
 
+[[bin]]
+name = "rimefront-world-soak"
+path = "src/bin/world_soak.rs"
+
 [dependencies]
 rimefront_sim = { path = "../sim" }
 bevy = { version = "0.20.1", default-features = false, features = [
@@ -29,3 +33,5 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
 webpki-roots = "1"
 ring = "0.17"
+rand = "0.10.4"
+libc = "0.2"

@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use rand::RngExt;
 
 use crate::levels::ActiveLevel;
-use crate::sim::catalog::BuildingKind;
-use crate::world::map::{CHUNK_CELLS, MapBounds, base_sites, is_water, map_bounds};
+use crate::sim::catalog::{BuildingKind, Team};
+use crate::sim::components::{Building, Unit};
+use crate::world::map::{CHUNK_CELLS, MapBounds, base_sites, is_water, map_bounds, world_to_cell};
 use crate::world::terrain::Landscape;
 use crate::world::wilds::{coordinate_rng, widen_world};
 
@@ -17,6 +18,8 @@ const DRY_REACH: i32 = 7;
 const LEVEL_BASE_CLEARANCE: f32 = 40.0;
 /// Fewer free sites than this and the world widens by another ring of squares.
 const FEWEST_FREE_SITES: usize = 2;
+/// A starting site with a unit or structure of anybody's this close is taken in all but name.
+const OCCUPIED_SITE_REACH: f32 = 30.0;
 const SITES_SALT: u64 = 0x0073_6974_6573;
 const NEUTRAL_SALT: u64 = 0x006e_6575_7472;
 /// A neutral site keeps this far from its square's starting site, so a base does not start beside one.
@@ -109,6 +112,14 @@ pub fn sites_around(map_seed: u64, cell: IVec2) -> impl Iterator<Item = IVec2> {
         .filter_map(move |offset| site_in_square(map_seed, square + offset))
 }
 
+fn occupied_cells(world: &mut World) -> Vec<IVec2> {
+    world
+        .query_filtered::<&Transform, (With<Team>, Or<(With<Unit>, With<Building>)>)>()
+        .iter(world)
+        .map(|transform| world_to_cell(transform.translation))
+        .collect()
+}
+
 /// The starting sites given out so far, beyond the level's own bases.
 #[derive(Resource, Default, Debug)]
 pub struct StartingSites {
@@ -116,13 +127,16 @@ pub struct StartingSites {
 }
 
 /// Gives the free generated site nearest `near` to a newcomer, widening the world by a ring of squares
-/// first if too few sites would be left free. `None` on a map that is not a wilds world.
+/// first if too few sites would be left free; a site with nobody's units or structures near is preferred,
+/// so a side that fell does not start again among the army that beat it. `None` on a map that is not a
+/// wilds world.
 pub fn claim_starting_site(world: &mut World, near: IVec2) -> Option<IVec2> {
     let level = &world.resource::<ActiveLevel>().0;
     if level.landscape != Landscape::Wilds {
         return None;
     }
     let map_seed = level.map_seed;
+    let occupied = occupied_cells(world);
     loop {
         let claimed = &world.get_resource_or_init::<StartingSites>().claimed;
         let free: Vec<IVec2> = sites_within(map_seed, map_bounds())
@@ -130,9 +144,12 @@ pub fn claim_starting_site(world: &mut World, near: IVec2) -> Option<IVec2> {
             .filter(|site| !claimed.contains(site))
             .collect();
         if free.len() > FEWEST_FREE_SITES {
-            let nearest = free
-                .into_iter()
-                .min_by_key(|site| (*site - near).length_squared())?;
+            let nearest = free.into_iter().min_by_key(|&site| {
+                let taken = occupied
+                    .iter()
+                    .any(|&cell| (cell - site).as_vec2().length() < OCCUPIED_SITE_REACH);
+                (taken, (site - near).length_squared())
+            })?;
             world.resource_mut::<StartingSites>().claimed.push(nearest);
             return Some(nearest);
         }
@@ -177,6 +194,21 @@ mod tests {
         world.insert_resource(Intel::new(true));
         world.run_system_once(generate_map).unwrap();
         world
+    }
+
+    #[test]
+    fn a_newcomer_is_not_given_a_site_an_army_stands_on() {
+        let mut world = wilds_world(29);
+        let home = base_sites()[0];
+        let nearest = claim_starting_site(&mut world, home).expect("a wilds world has room");
+        free_starting_site(&mut world, nearest);
+        world.spawn((
+            Unit(crate::sim::catalog::UnitKind::Tank),
+            Team::Crimson,
+            Transform::from_translation(crate::world::map::cell_center(nearest)),
+        ));
+        let given = claim_starting_site(&mut world, home).expect("a wilds world has room");
+        assert_ne!(given, nearest);
     }
 
     #[test]

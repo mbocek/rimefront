@@ -313,8 +313,15 @@ pub fn owned_building_kinds(
         .collect()
 }
 
+/// The most units a side may have; a unit finished past it waits at its producer until one is lost. Only a
+/// persistent world has one, where computer sides would otherwise build without end.
+#[derive(Resource, Clone, Copy, Debug)]
+pub struct UnitLimit(pub usize);
+
 pub fn advance_production(
     mut news: MessageWriter<News>,
+    limit: Option<Res<UnitLimit>>,
+    units: Query<&Team, With<Unit>>,
     mut commands: Commands,
     mut rng: ResMut<SimulationRng>,
     time: Res<Time>,
@@ -324,6 +331,7 @@ pub fn advance_production(
     buildings: Query<(&Building, &Team, Option<&RallyPoint>)>,
     sides: Res<Sides>,
 ) {
+    let limit = limit.map(|limit| limit.0);
     for team in sides.iter() {
         let rate = economies.of(team).production_rate();
         for lane_kind in Lane::ALL {
@@ -358,8 +366,20 @@ pub fn advance_production(
                     producer.map(|(building, _, rally)| (building, rally.copied()))
                 }
             };
+            let was_finished = lane.progress_secs >= item.build_secs();
             lane.progress_secs += time.delta_secs() * rate;
             if lane.progress_secs < item.build_secs() {
+                continue;
+            }
+            let at_limit = matches!(item, BuildItem::Unit(_))
+                && limit.is_some_and(|limit| {
+                    units.iter().filter(|&&owner| owner == team).count() >= limit
+                });
+            if at_limit {
+                lane.progress_secs = item.build_secs();
+                if !was_finished {
+                    news.write(News::to(team, SideNews::UnitLimitReached));
+                }
                 continue;
             }
             lane.queue.pop_front();

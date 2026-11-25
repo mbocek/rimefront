@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::thread::JoinHandle;
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -131,8 +132,16 @@ pub struct SaveReport {
 /// longer named, so a save cut short leaves the last whole one. See docs/persistent-world.md.
 pub struct WorldStore {
     directory: PathBuf,
-    /// The hash and file of every chunk as last written.
-    written: HashMap<IVec2, (u64, String)>,
+    /// The hash and file of every chunk as last written; empty while a save is being written.
+    written: WrittenChunks,
+    writing: Option<JoinHandle<io::Result<WrittenSave>>>,
+}
+
+type WrittenChunks = HashMap<IVec2, (u64, String)>;
+
+struct WrittenSave {
+    written: WrittenChunks,
+    report: SaveReport,
 }
 
 impl WorldStore {
@@ -140,6 +149,7 @@ impl WorldStore {
         Self {
             directory: directory.into(),
             written: HashMap::new(),
+            writing: None,
         }
     }
 
@@ -149,6 +159,7 @@ impl WorldStore {
 
     /// The world saved in this directory; `None` when there is none.
     pub fn load(&mut self) -> io::Result<Option<SavedWorld>> {
+        self.finish_writing()?;
         let bytes = match std::fs::read(self.directory.join(WORLD_FILE)) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -165,60 +176,106 @@ impl WorldStore {
         Ok(Some(SavedWorld { record, chunks }))
     }
 
+    /// Saves the world and waits until it is written.
     pub fn save(
         &mut self,
         world: &mut World,
         tick: u64,
         hosting: HostingRecord,
     ) -> io::Result<SaveReport> {
-        std::fs::create_dir_all(self.chunks_directory())?;
-        let chunks = chunk_records(world);
-        let mut report = SaveReport {
-            chunks: chunks.len(),
-            ..SaveReport::default()
-        };
-        let mut written = HashMap::new();
-        for (chunk, record) in &chunks {
-            let bytes = encode(record)?;
-            let hash = hash_of(&bytes);
-            let file = match self.written.get(chunk) {
-                Some((same, file)) if *same == hash => file.clone(),
-                _ => {
-                    let file = format!("{}_{}_{tick}.bin", chunk.x, chunk.y);
-                    std::fs::write(self.chunks_directory().join(&file), &bytes)?;
-                    report.chunks_written += 1;
-                    report.bytes_written += bytes.len();
-                    file
-                }
-            };
-            written.insert(*chunk, (hash, file));
-        }
-        let record = world_record(world, tick, hosting, &written);
-        let bytes = encode(&record)?;
-        let staged = self.directory.join(format!("{WORLD_FILE}.new"));
-        std::fs::write(&staged, &bytes)?;
-        std::fs::rename(&staged, self.directory.join(WORLD_FILE))?;
-        report.bytes_written += bytes.len();
-        self.written = written;
-        self.remove_unnamed_chunk_files()?;
-        Ok(report)
+        let earlier = self.save_in_background(world, tick, hosting);
+        let report = self.finish_writing()?;
+        earlier.map(|_| report)
     }
 
-    fn remove_unnamed_chunk_files(&self) -> io::Result<()> {
-        let named: Vec<&str> = self
-            .written
-            .values()
-            .map(|(_, file)| file.as_str())
-            .collect();
-        for entry in std::fs::read_dir(self.chunks_directory())? {
-            let entry = entry?;
-            let name = entry.file_name();
-            if !named.iter().any(|file| name == **file) {
-                std::fs::remove_file(entry.path())?;
-            }
-        }
-        Ok(())
+    /// Takes what the world holds now and writes it on a thread of its own, so the world goes on meanwhile.
+    /// What the save before this one wrote, once it is written; its error if it failed, this one going
+    /// ahead all the same.
+    pub fn save_in_background(
+        &mut self,
+        world: &mut World,
+        tick: u64,
+        hosting: HostingRecord,
+    ) -> io::Result<SaveReport> {
+        let earlier = self.finish_writing();
+        let chunks = chunk_records(world);
+        let record = world_record(world, tick, hosting);
+        let directory = self.directory.clone();
+        let before = std::mem::take(&mut self.written);
+        self.writing = Some(std::thread::spawn(move || {
+            write_save(&directory, tick, &chunks, record, &before)
+        }));
+        earlier
     }
+
+    /// Waits for the save being written, if any; what it wrote.
+    pub fn finish_writing(&mut self) -> io::Result<SaveReport> {
+        let Some(writing) = self.writing.take() else {
+            return Ok(SaveReport::default());
+        };
+        let saved = writing
+            .join()
+            .map_err(|_| io::Error::other("the world's writer stopped"))??;
+        self.written = saved.written;
+        Ok(saved.report)
+    }
+}
+
+/// Writes the chunks that differ from those written `before`, each to a new file, then the world file
+/// naming every chunk's file, then removes the files no longer named.
+fn write_save(
+    directory: &Path,
+    tick: u64,
+    chunks: &HashMap<IVec2, ChunkRecord>,
+    mut record: WorldRecord,
+    before: &WrittenChunks,
+) -> io::Result<WrittenSave> {
+    let chunks_directory = directory.join(CHUNKS_DIRECTORY);
+    std::fs::create_dir_all(&chunks_directory)?;
+    let mut report = SaveReport {
+        chunks: chunks.len(),
+        ..SaveReport::default()
+    };
+    let mut written = HashMap::new();
+    for (chunk, chunk_record) in chunks {
+        let bytes = encode(chunk_record)?;
+        let hash = hash_of(&bytes);
+        let file = match before.get(chunk) {
+            Some((same, file)) if *same == hash => file.clone(),
+            _ => {
+                let file = format!("{}_{}_{tick}.bin", chunk.x, chunk.y);
+                std::fs::write(chunks_directory.join(&file), &bytes)?;
+                report.chunks_written += 1;
+                report.bytes_written += bytes.len();
+                file
+            }
+        };
+        written.insert(*chunk, (hash, file));
+    }
+    record.chunks = written
+        .iter()
+        .map(|(&chunk, (_, file))| (chunk, file.clone()))
+        .collect();
+    record.chunks.sort_by_key(|(chunk, _)| (chunk.y, chunk.x));
+    let bytes = encode(&record)?;
+    let staged = directory.join(format!("{WORLD_FILE}.new"));
+    std::fs::write(&staged, &bytes)?;
+    std::fs::rename(&staged, directory.join(WORLD_FILE))?;
+    report.bytes_written += bytes.len();
+    remove_unnamed_chunk_files(&chunks_directory, &written)?;
+    Ok(WrittenSave { written, report })
+}
+
+fn remove_unnamed_chunk_files(chunks_directory: &Path, written: &WrittenChunks) -> io::Result<()> {
+    let named: Vec<&str> = written.values().map(|(_, file)| file.as_str()).collect();
+    for entry in std::fs::read_dir(chunks_directory)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if !named.iter().any(|file| name == **file) {
+            std::fs::remove_file(entry.path())?;
+        }
+    }
+    Ok(())
 }
 
 /// The world record of a world file, of this layout. A layout before it is read here and brought up to
@@ -268,9 +325,7 @@ fn chunk_records(world: &mut World) -> HashMap<IVec2, ChunkRecord> {
         .collect();
     let map = world.resource::<GameMap>();
     for (&chunk, record) in &mut chunks {
-        record.crystal = chunk_cells(chunk)
-            .map(|cell| map.crystal_at(cell))
-            .collect();
+        record.crystal = map.crystal_in_chunk(chunk);
     }
     let intel = world.resource::<Intel>();
     for viewer in intel.viewers() {
@@ -320,12 +375,8 @@ fn chunk_records(world: &mut World) -> HashMap<IVec2, ChunkRecord> {
     chunks
 }
 
-fn world_record(
-    world: &World,
-    tick: u64,
-    hosting: HostingRecord,
-    written: &HashMap<IVec2, (u64, String)>,
-) -> WorldRecord {
+/// The world file's record of `world`, its chunks' files left for the save to name.
+fn world_record(world: &World, tick: u64, hosting: HostingRecord) -> WorldRecord {
     let economies = world.resource::<Economies>();
     let production = world.resource::<Production>();
     let powers = world.resource::<SupportPowers>();
@@ -350,11 +401,6 @@ fn world_record(
                 .to_vec(),
         })
         .collect();
-    let mut chunks: Vec<(IVec2, String)> = written
-        .iter()
-        .map(|(&chunk, (_, file))| (chunk, file.clone()))
-        .collect();
-    chunks.sort_by_key(|(chunk, _)| (chunk.y, chunk.x));
     WorldRecord {
         version: STORE_VERSION,
         map_seed: world.resource::<ActiveLevel>().0.map_seed,
@@ -370,7 +416,7 @@ fn world_record(
             .map_or_else(Vec::new, |sites| sites.claimed.clone()),
         ai: world.resource::<AiCommanders>().clone(),
         hosting,
-        chunks,
+        chunks: Vec::new(),
     }
 }
 

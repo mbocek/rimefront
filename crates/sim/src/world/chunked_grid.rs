@@ -68,6 +68,14 @@ impl<T: Copy> ChunkedGrid<T> {
         self.chunks[index].as_deref()
     }
 
+    /// The cells of an opened chunk lying whole within the bounds, row by row; `None` for a chunk the
+    /// bounds cut, whose cells past them do not count.
+    pub fn whole_chunk_cells(&self, chunk: IVec2) -> Option<&[T]> {
+        let (first, last) = self.bounds.cells_of_chunk(chunk);
+        let whole = last - first + IVec2::ONE == IVec2::splat(CHUNK_CELLS);
+        whole.then(|| self.chunk_cells(chunk)).flatten()
+    }
+
     pub fn chunk_cells_mut(&mut self, chunk: IVec2) -> Option<&mut [T]> {
         let index = self.bounds.chunk_index(chunk)?;
         self.chunks[index].as_deref_mut()

@@ -21,6 +21,7 @@ use rimefront_sim::sim::economy::Economies;
 use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
 use rimefront_sim::sim::notifications::{News, SideNews};
 use rimefront_sim::sim::player_commands::{CommandQueue, SimulationTick};
+use rimefront_sim::sim::production::UnitLimit;
 use rimefront_sim::sim::sides::{Shelter, retire_side, side_stands};
 use rimefront_sim::world::deposits::lay_new_deposit;
 use rimefront_sim::world::map::{GameMap, base_sites, map_bounds};
@@ -134,7 +135,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 5;
+pub const WORLD_PROTOCOL: u32 = 6;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {
@@ -181,10 +182,17 @@ pub const TICKS_PER_VIEW: u64 = 2;
 /// the spacing of sites, so a computer side is one site away at most.
 const COMPUTER_NEIGHBOUR_REACH: f32 = 80.0;
 const TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES: u64 = 20;
+/// Without it computer sides, paid an income, build without end: 278 units became 1646 in four hours of a
+/// soak with twenty players (`rimefront-world-soak`).
+const MOST_UNITS_PER_SIDE: usize = 120;
+
 /// How often a world may grow a new crystal deposit.
 const TICKS_BETWEEN_DEPOSITS: u64 = 10 * 60 * 20;
 /// A deposit counts as fresh while crystal lies this close to its middle.
 const DEPOSIT_REACH: i32 = 6;
+/// Players present for each deposit a world grows at a time: in a soak with twenty players, one deposit a
+/// round let the crystal fall to a sixth in three hours (`rimefront-world-soak`).
+const PLAYERS_PER_DEPOSIT: usize = 4;
 
 /// How often a player present without a computer side near is given one: rarely enough that beating one
 /// leaves the player some peace first.
@@ -332,6 +340,18 @@ impl WorldHost {
         kept.store.save(self.app.world_mut(), tick, hosting)
     }
 
+    /// Saves the world on a thread of its own, so it goes on meanwhile; what the save before wrote.
+    pub fn save_in_background(&mut self) -> io::Result<SaveReport> {
+        let tick = self.tick();
+        let hosting = self.hosting_record();
+        let Some(kept) = &mut self.store else {
+            return Ok(SaveReport::default());
+        };
+        kept.last_saved_tick = tick;
+        kept.store
+            .save_in_background(self.app.world_mut(), tick, hosting)
+    }
+
     fn save_when_due(&mut self) {
         let due = self
             .store
@@ -340,7 +360,7 @@ impl WorldHost {
         if !due {
             return;
         }
-        if let Err(error) = self.save() {
+        if let Err(error) = self.save_in_background() {
             warn!("could not save the world: {error}");
         }
     }
@@ -389,6 +409,7 @@ impl WorldHost {
             .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::ZERO))
             .insert_resource(ActiveLevel(level))
             .insert_resource(HostedWorld)
+            .insert_resource(UnitLimit(MOST_UNITS_PER_SIDE))
             .add_plugins(SimulationPlugin::default());
         if restoring {
             app.insert_resource(RestoringSave);
@@ -486,7 +507,7 @@ impl WorldHost {
         }
         let deposit_rounds = |tick: u64| tick / TICKS_BETWEEN_DEPOSITS;
         if deposit_rounds(self.tick()) != deposit_rounds(before) {
-            self.grow_a_deposit(deposit_rounds(self.tick()));
+            self.grow_deposits(deposit_rounds(self.tick()));
         }
         let neighbour_rounds = |tick: u64| tick / TICKS_BETWEEN_COMPUTER_NEIGHBOURS;
         if neighbour_rounds(self.tick()) != neighbour_rounds(before) {
@@ -739,9 +760,33 @@ impl WorldHost {
         self.paint(team, None);
     }
 
+    /// A deposit for every few players present, and at least one; every player present is told crystal
+    /// surfaced, not where.
+    fn grow_deposits(&mut self, round: u64) {
+        let mut present: Vec<Team> = self
+            .players
+            .iter()
+            .filter_map(|player| player.team)
+            .collect();
+        present.sort_by_key(|team| team.index());
+        present.dedup();
+        let deposits = present.len().div_ceil(PLAYERS_PER_DEPOSIT).max(1) as u64;
+        let laid = (0..deposits)
+            .filter(|index| self.grow_a_deposit(round * 256 + index))
+            .count();
+        if laid == 0 {
+            return;
+        }
+        for team in present {
+            self.app
+                .world_mut()
+                .write_message(News::to(team, SideNews::CrystalSurfaced));
+        }
+    }
+
     /// A new crystal deposit somewhere in the world, while fewer are fresh than one more than the players;
-    /// every player present is told it surfaced, not where.
-    fn grow_a_deposit(&mut self, round: u64) {
+    /// whether one was laid.
+    fn grow_a_deposit(&mut self, turn: u64) -> bool {
         let world = self.app.world();
         let map = world.resource::<GameMap>();
         let fresh = self
@@ -756,26 +801,16 @@ impl WorldHost {
             })
             .count();
         if fresh > self.sides_of_players.len() {
-            return;
+            return false;
         }
-        let Some((middle, laid)) = lay_new_deposit(self.app.world_mut(), round) else {
-            return;
+        let Some((middle, laid)) = lay_new_deposit(self.app.world_mut(), turn) else {
+            return false;
         };
         self.deposits.push(middle);
         for (cell, amount) in laid {
             self.mined.record(cell, amount);
         }
-        let mut present: Vec<Team> = self
-            .players
-            .iter()
-            .filter_map(|player| player.team)
-            .collect();
-        present.dedup();
-        for team in present {
-            self.app
-                .world_mut()
-                .write_message(News::to(team, SideNews::CrystalSurfaced));
-        }
+        true
     }
 
     /// Every player present whose computer neighbour fell, or who never had one, gets one, as hard as the
@@ -1349,6 +1384,38 @@ mod tests {
     }
 
     #[test]
+    fn a_world_saved_in_the_background_goes_on_and_resumes_as_it_was_saved() {
+        let directory = scratch_directory("background_save");
+        let mut host = WorldHost::new(29);
+        let (_player, _) = enter(&mut host);
+        host.keep_in(WorldStore::at(&directory), Duration::from_secs(3600))
+            .unwrap();
+        for _ in 0..5 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        let saved_at = host.tick();
+        let standing_when_saved = standing(&mut host);
+        host.save_in_background().unwrap();
+        for _ in 0..5 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        assert_eq!(host.tick(), saved_at + 5 * 20);
+        let written = host.save_in_background().unwrap();
+        assert!(
+            written.chunks_written > 0,
+            "the save in the background wrote nothing"
+        );
+        let mut store = WorldStore::at(&directory);
+        std::thread::sleep(Duration::from_millis(200));
+        let saved = store.load().unwrap().expect("a saved world");
+        let mut resumed = WorldHost::resume(&saved);
+        match saved.tick() {
+            tick if tick == saved_at => assert_eq!(standing(&mut resumed), standing_when_saved),
+            tick => assert_eq!(tick, host.tick(), "a save of neither tick"),
+        }
+    }
+
+    #[test]
     fn a_saved_world_resumes_with_its_sides_players_and_ground() {
         let directory = scratch_directory("resumed_world");
         let mut host = WorldHost::new(29);
@@ -1618,11 +1685,74 @@ mod tests {
     }
 
     #[test]
+    fn a_side_at_the_unit_limit_deploys_no_more_until_it_loses_one() {
+        let mut host = WorldHost::new(29);
+        let (mut player, mut mirror) = entered_with_mirror(&mut host);
+        let team = Team::Player;
+        let world = host.world();
+        let barracks = free_site_near_base(world, team, BuildingKind::Barracks);
+        let (_, tank_position) = own_unit(world, team, UnitKind::Tank);
+        world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            spawn_building(
+                &mut commands,
+                &mut map,
+                BuildingKind::Barracks,
+                team,
+                barracks,
+            );
+            let mut owned = world
+                .query_filtered::<&Team, With<Unit>>()
+                .iter(world)
+                .filter(|&&owner| owner == team)
+                .count();
+            let mut commands = world.commands();
+            while owned < MOST_UNITS_PER_SIDE {
+                spawn_unit(&mut commands, UnitKind::Rifleman, team, tank_position, 0.0);
+                owned += 1;
+            }
+        });
+        world.flush();
+        let units_of = |host: &mut WorldHost| {
+            let world = host.world();
+            world
+                .query_filtered::<&Team, With<Unit>>()
+                .iter(world)
+                .filter(|&&owner| owner == team)
+                .count()
+        };
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::Enqueue {
+                item: BuildItem::Unit(UnitKind::Rifleman),
+                copies: 1,
+            }],
+        });
+        run(&mut host, 30, &mut mirror, &mut player);
+        assert_eq!(units_of(&mut host), MOST_UNITS_PER_SIDE);
+        assert!(mirror.told.contains(&SideNews::UnitLimitReached));
+
+        let world = host.world();
+        let lost = world
+            .query_filtered::<(Entity, &Team), With<Unit>>()
+            .iter(world)
+            .find(|(_, owner)| **owner == team)
+            .map(|(entity, _)| entity)
+            .expect("the side has units");
+        world.despawn(lost);
+        run(&mut host, 1, &mut mirror, &mut player);
+        assert_eq!(
+            units_of(&mut host),
+            MOST_UNITS_PER_SIDE,
+            "the waiting unit came out"
+        );
+    }
+
+    #[test]
     fn a_world_grows_crystal_deposits_away_from_bases_while_few_are_fresh() {
         let mut host = WorldHost::new(29);
         let (mut player, mut mirror) = entered_with_mirror(&mut host);
         for round in 1..=5 {
-            host.grow_a_deposit(round);
+            host.grow_deposits(round);
         }
         assert_eq!(
             host.deposits.len(),
@@ -1671,7 +1801,7 @@ mod tests {
     fn the_same_world_grows_the_same_deposit_in_the_same_round() {
         let middle = || {
             let mut host = WorldHost::new(41);
-            host.grow_a_deposit(3);
+            host.grow_deposits(3);
             host.deposits.clone()
         };
         let first = middle();

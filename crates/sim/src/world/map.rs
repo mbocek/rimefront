@@ -460,6 +460,18 @@ impl GameMap {
         regions.of(self, from) == regions.of(self, to)
     }
 
+    /// The crystal of every cell of `chunk` within the map, row by row.
+    pub fn crystal_in_chunk(&self, chunk: IVec2) -> Vec<u32> {
+        if let Some(cells) = self.cells.whole_chunk_cells(chunk) {
+            return cells.iter().map(|at| at.crystal).collect();
+        }
+        let (first, last) = self.cells.bounds().cells_of_chunk(chunk);
+        (first.y..=last.y)
+            .flat_map(|y| (first.x..=last.x).map(move |x| IVec2::new(x, y)))
+            .map(|cell| self.crystal_at(cell))
+            .collect()
+    }
+
     pub fn crystal_at(&self, cell: IVec2) -> u32 {
         self.cells.get(cell).map_or(0, |at| at.crystal)
     }

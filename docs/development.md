@@ -62,6 +62,7 @@ cargo test --release --test sound      # the simulation asks for the right sound
 cargo test --release --test orders     # attack-move, patrol, waypoint queues, rally points
 cargo test --release --test crowd_bench -- --ignored --nocapture   # simulation time of up to 1920 fighting units
 cargo test --release --test world_bench -- --ignored --nocapture   # a world's tick and views with up to 64 players
+cargo run --release -p rimefront_net --bin rimefront-world-soak -- --days 0.25   # days of a world with 20 players who come and go
 UPDATE_WORLD_PROTOCOL=1 cargo test -p rimefront_net the_world_protocol   # re-record after raising WORLD_PROTOCOL
 UPDATE_WORLD_LAYOUT=1 cargo test -p rimefront_net the_layout             # re-record after raising STORE_VERSION
 ```

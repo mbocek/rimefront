@@ -31,8 +31,8 @@ use crate::missions::levels::{
 };
 use crate::net::lobby::{MOST_PLAYERS, NetLobby, network_level};
 use crate::net::world_client::{OwnWorld, WorldClient};
-use crate::sim::catalog::Team;
 use crate::sim::catalog::{Alliance, Faction};
+use crate::sim::catalog::{SideColor, Team};
 use crate::ui::sidebar::{
     ACCENT, FRAME, FRAME_BRIGHT, GOOD, PANEL, TEXT_DIM, TEXT_MAIN, UiFonts, set_field,
 };
@@ -42,6 +42,7 @@ use crate::world::terrain::Landscape;
 
 mod battle_setup;
 mod campaign_map;
+mod color_picker;
 mod commands;
 mod network_page;
 mod update_banner;
@@ -49,6 +50,8 @@ mod widgets;
 
 pub use battle_setup::*;
 pub use campaign_map::*;
+use color_picker::spawn_color_picker;
+pub use color_picker::{SidePreview, run_side_preview, set_up_side_preview};
 pub use commands::*;
 pub use network_page::*;
 pub use update_banner::*;
@@ -963,9 +966,9 @@ fn rebuild_details(
     fonts: &UiFonts,
     menu: &MainMenu,
     preview: Option<Handle<Image>>,
-    join_address: &str,
-    lobby: &NetLobby,
+    network: (&str, &NetLobby, Option<SideColor>, Option<&SidePreview>),
 ) {
+    let (join_address, lobby, side_color, side_preview) = network;
     commands.entity(panel).despawn_related::<Children>();
     commands
         .entity(panel)
@@ -1013,7 +1016,8 @@ fn rebuild_details(
                 spawn_command_button(panel, fonts, tr("WATCH REPLAY"), MenuCommand::WatchReplay);
             }
             Selection::Network => {
-                spawn_network_details(panel, fonts, join_address, lobby, &menu.options)
+                spawn_color_picker(panel, fonts, side_color, side_preview);
+                spawn_network_details(panel, fonts, join_address, lobby, &menu.options);
             }
             Selection::Random => spawn_random_battle_details(panel, fonts, menu, preview),
             Selection::Quick => spawn_quick_battle(panel, fonts, menu),
@@ -1112,6 +1116,7 @@ pub fn refresh_main_menu(
     mut lobby: ResMut<NetLobby>,
     menu: Option<ResMut<MainMenu>>,
     mut images: ResMut<Assets<Image>>,
+    side_preview: Option<Res<SidePreview>>,
     lists: Query<Entity, With<LevelList>>,
     mut list_columns: Query<&mut Node, With<ListColumn>>,
     mut sections: Query<(
@@ -1168,8 +1173,12 @@ pub fn refresh_main_menu(
             &fonts,
             &menu,
             preview,
-            &settings.join_address,
-            &lobby,
+            (
+                &settings.join_address,
+                &lobby,
+                settings.side_color,
+                side_preview.as_deref(),
+            ),
         );
     }
     for (hovered, mut background, mut border) in &mut hub_tiles {

@@ -38,7 +38,10 @@ makes Bevy measure text and lay out the whole interface again; that took about 7
 ## Side colour
 
 *Side colour* picks the colour of the player's units and structures, and of their marks on the minimap, from
-twelve far enough apart (`SIDE_PALETTE`), or leaves the side its own. Models carry a key colour the game
+twelve far enough apart (`SIDE_PALETTE`), or leaves the side its own: in the settings, or on the network page,
+where it is a row of swatches beside a tank turning in the colour chosen. The tank stands far above any map
+and a camera of its own draws it into a picture for the page, only while the page is open
+(`ui::main_menu::color_picker`). Models carry a key colour the game
 paints the side's onto ([development.md](development.md)), so any side can take any colour. In a battle on
 this machine the player's side takes it; in a network battle every player tells the others theirs
 (`Message::Paint`), though a spectator who joins once the battle is under way sees the sides' own colours; in

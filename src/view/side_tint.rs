@@ -56,6 +56,8 @@ pub enum Painted {
     Side(Team),
     /// A neutral site nobody holds.
     Unclaimed,
+    /// The model the menu shows the player's chosen colour on.
+    Preview,
 }
 
 const UNCLAIMED_GREY: Color = Color::linear_rgb(0.40, 0.41, 0.40);
@@ -64,6 +66,8 @@ const UNCLAIMED_GREY: Color = Color::linear_rgb(0.40, 0.41, 0.40);
 #[derive(Resource, Default, Debug)]
 pub struct SideColors {
     chosen: HashMap<Team, Color>,
+    /// The colour the menu's preview shows; `None` the player's side's own.
+    pub preview: Option<Color>,
 }
 
 impl SideColors {
@@ -75,6 +79,7 @@ impl SideColors {
                 .copied()
                 .unwrap_or_else(|| team.model_tint()),
             Painted::Unclaimed => UNCLAIMED_GREY,
+            Painted::Preview => self.preview.unwrap_or_else(|| Team::Player.model_tint()),
         }
     }
 

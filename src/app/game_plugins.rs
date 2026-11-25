@@ -301,6 +301,7 @@ impl Plugin for MenusPlugin {
                 lobby::end_network_battle,
                 campaigns::reload_campaigns,
                 main_menu::build_main_menu,
+                main_menu::set_up_side_preview,
             )
                 .chain(),
         )
@@ -314,6 +315,7 @@ impl Plugin for MenusPlugin {
                 main_menu::rebuild_screen,
                 main_menu::refresh_main_menu,
                 main_menu::show_network_status,
+                main_menu::run_side_preview,
                 main_menu::refresh_update_banner,
                 menu::pause_while_menu_open,
                 menu::rebuild_menu_page,

@@ -325,6 +325,13 @@ for ordinary network matches.
     one otherwise. Its thread saves it every half minute and once more when the player leaves; leaving waits
     for that save, so the next game finds it (`tests/world_client.rs` drives a tank, leaves, comes back and
     finds it where it stopped).
+    Computer sides: the level's own opponent holds its base, and a newcomer with no computer side within
+    80 cells of their site (a little more than the spacing of sites, so one site away at most) gets one on
+    the free site nearest them: the usual starting force, a commander of normal difficulty and its income.
+    A computer side with nothing left gives up its commander and its site. The host keeps which sides are
+    the computer's and where, and a saved world keeps that too. Computer commanders leave a sheltered side's
+    structures out of their plans (attack waves, barrages, recon, engineers): `Targets` already keeps their
+    shooters off them, and they would only stand there.
 
 ## Decisions
 

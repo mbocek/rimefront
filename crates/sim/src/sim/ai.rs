@@ -427,6 +427,7 @@ pub fn employ_engineers(
     mut cadences: ResMut<crate::sim::cadence::SimulationCadences>,
     commanders: Res<AiCommanders>,
     intel: Res<Intel>,
+    targets: Res<Targets>,
     mut production: ResMut<Production>,
     mut economies: ResMut<Economies>,
     buildings: Query<(&Building, &Team)>,
@@ -465,7 +466,7 @@ pub fn employ_engineers(
                 .filter(|(_, centre)| intel.vision(ai.team).is_explored(*centre))
                 .collect(),
         );
-        let enemy_structure = nearest(intel.known_enemy_structure_entities(ai.team).collect());
+        let enemy_structure = nearest(assailable_structures(&intel, &targets, ai.team).collect());
         let Some(target) = explored_site.or(enemy_structure) else {
             continue;
         };
@@ -892,7 +893,7 @@ fn direct_army(
                 .total_cmp(&b.position.distance(home))
         })
         .map(|t| t.position);
-    let known_objective = known_assault_objective(team, home, &visible_enemies, knowledge.intel);
+    let known_objective = known_assault_objective(team, home, &visible_enemies, knowledge);
     let search_site = || knowledge.intel.base_site_to_search(team, home);
     let assault_objective = known_objective.or_else(search_site);
 
@@ -1063,21 +1064,35 @@ fn nearest_station(
         .map(|(spot, in_reach, _)| (spot, in_reach))
 }
 
+/// The enemy structures `team` knows of that can be fought: a sheltered side's are only in the way.
+fn assailable_structures<'a>(
+    intel: &'a Intel,
+    targets: &'a Targets,
+    team: Team,
+) -> impl Iterator<Item = (Entity, Vec3)> + 'a {
+    intel
+        .known_enemy_structure_entities(team)
+        .filter(|(entity, _)| {
+            targets
+                .get(*entity)
+                .is_none_or(|target| !targets.is_sheltered(target.team))
+        })
+}
+
 /// The nearest enemy the commander knows of, preferring structures, which do not run away.
 fn known_assault_objective(
     team: Team,
     home: Vec3,
     visible_enemies: &[&TargetInfo],
-    intel: &Intel,
+    knowledge: &Knowledge,
 ) -> Option<Vec3> {
     const UNIT_DETOUR: f32 = 30.0;
     let units = visible_enemies
         .iter()
         .filter(|t| !t.is_building)
         .map(|t| (t.position, UNIT_DETOUR));
-    let structures = intel
-        .known_enemy_structures(team)
-        .map(|position| (position, 0.0));
+    let structures = assailable_structures(knowledge.intel, knowledge.targets, team)
+        .map(|(_, position)| (position, 0.0));
     units
         .chain(structures)
         .min_by(|(a, a_detour), (b, b_detour)| {
@@ -1312,7 +1327,9 @@ pub fn call_support_powers(
         let team = ai.team;
         let owned = crate::sim::support_powers::owned_kinds(&buildings, team);
         let home = footprint_center(ai.base, BuildingKind::CommandCenter.spec().footprint);
-        let nothing_known = intel.known_enemy_structures(team).next().is_none();
+        let nothing_known = assailable_structures(&intel, &targets, team)
+            .next()
+            .is_none();
         if support.is_charged(team, SupportPower::ReconSweep)
             && nothing_known
             && let Some(site) = intel.base_site_to_search(team, home)
@@ -1338,8 +1355,8 @@ pub fn call_support_powers(
             .copied()
             .max_by_key(crowd)
             .filter(|spot| crowd(spot) >= BARRAGE_WORTHY_CROWD);
-        let nearest_structure = intel
-            .known_enemy_structures(team)
+        let nearest_structure = assailable_structures(&intel, &targets, team)
+            .map(|(_, position)| position)
             .min_by(|a, b| a.distance(home).total_cmp(&b.distance(home)));
         if let Some(spot) = thickest.or(nearest_structure) {
             support.call(team, SupportPower::Barrage, world_to_cell(spot), &owned);

@@ -32,7 +32,7 @@ use iron_tide_sim::world::sites::StartingSites;
 use iron_tide_sim::world::wilds::{crystal_look, widen_world};
 
 /// Bumped whenever the layout changes incompatibly; a world saved by another layout is refused.
-const STORE_VERSION: u32 = 2;
+const STORE_VERSION: u32 = 3;
 const WORLD_FILE: &str = "world.bin";
 const CHUNKS_DIRECTORY: &str = "chunks";
 
@@ -62,6 +62,7 @@ pub struct HostingRecord {
     pub sites: Vec<(Team, IVec2)>,
     pub away_since: Vec<(Team, u64)>,
     pub sheltered: Vec<Team>,
+    pub computer_sides: Vec<(Team, IVec2)>,
 }
 
 /// Everything of a world that is not kept by chunk, and the file of every chunk saved with it.

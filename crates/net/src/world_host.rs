@@ -11,11 +11,13 @@ use serde::{Deserialize, Serialize};
 use crate::network::{Arrival, Link, Message};
 use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
-use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
+use iron_tide_sim::levels::{ActiveLevel, Difficulty, LevelDefinition};
 use iron_tide_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
+use iron_tide_sim::sim::ai::{AiCommander, AiCommanders};
 use iron_tide_sim::sim::catalog::Team;
 use iron_tide_sim::sim::components::Health;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
+use iron_tide_sim::sim::economy::Economies;
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
 use iron_tide_sim::sim::sides::{Shelter, side_stands};
 use iron_tide_sim::world::map::{GameMap, base_sites};
@@ -125,6 +127,12 @@ impl Default for AbsenceRules {
     }
 }
 
+/// A newcomer whose site has no computer side this many cells away gets one beside them: a little more than
+/// the spacing of sites, so a computer side is one site away at most.
+const COMPUTER_NEIGHBOUR_REACH: f32 = 80.0;
+const COMPUTER_DIFFICULTY: Difficulty = Difficulty::Normal;
+const TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES: u64 = 20;
+
 fn ticks_in(duration: Duration) -> u64 {
     (duration.as_secs_f64() / SIMULATION_TICK.as_secs_f64()).round() as u64
 }
@@ -152,6 +160,8 @@ pub struct WorldHost {
     away_since: HashMap<Team, u64>,
     /// The generated site each newcomer's side was deployed on.
     sites: HashMap<Team, IVec2>,
+    /// The computer sides that keep the world from standing empty, and the sites they hold.
+    computer_sides: HashMap<Team, IVec2>,
     effects: WorldEffects,
     mined: MinedCrystal,
     /// Effects since the last views went out.
@@ -186,6 +196,7 @@ impl WorldHost {
         host.sides_of_players = hosting.players.iter().cloned().collect();
         host.sites = hosting.sites.iter().copied().collect();
         host.away_since = hosting.away_since.iter().copied().collect();
+        host.computer_sides = hosting.computer_sides.iter().copied().collect();
         for &team in host.sides_of_players.values() {
             host.away_since.entry(team).or_insert(saved.tick());
         }
@@ -242,7 +253,11 @@ impl WorldHost {
         let mut away_since: Vec<(Team, u64)> =
             self.away_since.iter().map(|(&t, &s)| (t, s)).collect();
         away_since.sort_by_key(|(team, _)| *team);
+        let mut computer_sides: Vec<(Team, IVec2)> =
+            self.computer_sides.iter().map(|(&t, &s)| (t, s)).collect();
+        computer_sides.sort_by_key(|(team, _)| *team);
         HostingRecord {
+            computer_sides,
             level_side_taken: self.level_side_taken,
             sheltered: players
                 .iter()
@@ -288,7 +303,13 @@ impl WorldHost {
     }
 
     fn hosting(app: App) -> Self {
+        let level = &app.world().resource::<ActiveLevel>().0;
+        let computer_sides = level
+            .opponents()
+            .map(|(team, enemy)| (team, enemy.force.site.origin()))
+            .collect();
         Self {
+            computer_sides,
             app,
             players: Vec::new(),
             level_side_taken: false,
@@ -340,6 +361,10 @@ impl WorldHost {
         self.app.update();
         let ticks_gone_by = self.tick() - before;
         self.wear_down_long_absent_sides(ticks_gone_by);
+        let looks = |tick: u64| tick / TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES;
+        if looks(self.tick()) != looks(before) {
+            self.retire_fallen_computer_sides();
+        }
         let effects = self.effects.gather(self.app.world_mut());
         self.unshown_effects.extend(effects);
         self.mined.note(self.app.world_mut());
@@ -535,7 +560,49 @@ impl WorldHost {
         let first_base = base_sites()[0];
         let (team, site) = deploy_newcomer(self.app.world_mut(), first_base)?;
         self.sites.insert(team, site);
+        self.give_a_computer_neighbour(site);
         Some(team)
+    }
+
+    /// A newcomer with no computer side near finds one on the free site nearest them.
+    fn give_a_computer_neighbour(&mut self, site: IVec2) {
+        let has_one = self
+            .computer_sides
+            .values()
+            .any(|&computer| (computer - site).as_vec2().length() <= COMPUTER_NEIGHBOUR_REACH);
+        if has_one {
+            return;
+        }
+        let world = self.app.world_mut();
+        let Some((team, computer_site)) = deploy_newcomer(world, site) else {
+            return;
+        };
+        world
+            .resource_mut::<AiCommanders>()
+            .0
+            .push(AiCommander::new(team, computer_site, COMPUTER_DIFFICULTY));
+        world.resource_mut::<Economies>().of_mut(team).income_rate =
+            COMPUTER_DIFFICULTY.income_rate();
+        self.computer_sides.insert(team, computer_site);
+    }
+
+    /// A computer side with nothing left gives up its commander and its site.
+    fn retire_fallen_computer_sides(&mut self) {
+        let fallen: Vec<(Team, IVec2)> = self
+            .computer_sides
+            .iter()
+            .map(|(&team, &site)| (team, site))
+            .filter(|&(team, _)| !side_stands(self.app.world_mut(), team))
+            .collect();
+        for (team, site) in fallen {
+            self.computer_sides.remove(&team);
+            let world = self.app.world_mut();
+            world
+                .resource_mut::<AiCommanders>()
+                .0
+                .retain(|ai| ai.team != team);
+            free_starting_site(world, site);
+        }
     }
 }
 
@@ -1052,6 +1119,7 @@ mod tests {
 
         let saved = WorldStore::at(&directory).load().unwrap().unwrap();
         let mut resumed = WorldHost::resume(&saved);
+        assert_eq!(resumed.computer_sides, host.computer_sides);
         assert_eq!(resumed.tick(), tick);
         assert_eq!(standing(&mut resumed), before);
         let world = resumed.world();
@@ -1084,6 +1152,69 @@ mod tests {
             "the mined crystal was not shown"
         );
         std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn every_newcomer_has_a_computer_side_near() {
+        let mut host = WorldHost::new(29);
+        let level_computers = host.computer_sides.len();
+        let _players: Vec<_> = (0..5).map(|_| enter(&mut host)).collect();
+        assert!(
+            host.computer_sides.len() > level_computers,
+            "no computer side came"
+        );
+        for &site in host.sites.values() {
+            let near = host
+                .computer_sides
+                .values()
+                .any(|&computer| (computer - site).as_vec2().length() <= COMPUTER_NEIGHBOUR_REACH);
+            assert!(near, "the newcomer at {site} has no computer side near");
+        }
+        let commanded: Vec<Team> = host
+            .world()
+            .resource::<AiCommanders>()
+            .0
+            .iter()
+            .map(|ai| ai.team)
+            .collect();
+        for team in host.computer_sides.keys() {
+            assert!(commanded.contains(team), "{team:?} has no commander");
+        }
+    }
+
+    #[test]
+    fn a_fallen_computer_side_gives_up_its_commander_and_site() {
+        let mut host = WorldHost::new(29);
+        let _players: Vec<_> = (0..5).map(|_| enter(&mut host)).collect();
+        let level_sides = Team::ALL.len();
+        let (&team, &site) = host
+            .computer_sides
+            .iter()
+            .find(|(team, _)| team.index() >= level_sides)
+            .expect("a computer side came");
+        let world = host.world();
+        let everything: Vec<Entity> = world
+            .query::<(Entity, &Team)>()
+            .iter(world)
+            .filter(|(_, owner)| **owner == team)
+            .map(|(entity, _)| entity)
+            .collect();
+        for entity in everything {
+            world.despawn(entity);
+        }
+        for _ in 0..TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES + 1 {
+            host.step(SIMULATION_TICK);
+        }
+        assert!(!host.computer_sides.contains_key(&team));
+        let world = host.world();
+        assert!(
+            world
+                .resource::<AiCommanders>()
+                .0
+                .iter()
+                .all(|ai| ai.team != team)
+        );
+        assert!(!world.resource::<StartingSites>().claimed.contains(&site));
     }
 
     #[test]

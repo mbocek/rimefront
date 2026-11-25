@@ -118,6 +118,10 @@ impl SupportPowers {
         self.recharge.of(team)[power.index()].max(0.0)
     }
 
+    pub fn set_secs_until_ready(&mut self, team: Team, power: SupportPower, secs: f32) {
+        self.recharge.of_mut(team)[power.index()] = secs;
+    }
+
     pub fn is_charged(&self, team: Team, power: SupportPower) -> bool {
         self.secs_until_ready(team, power) <= 0.0
     }

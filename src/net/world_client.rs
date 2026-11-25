@@ -9,13 +9,13 @@ use crate::missions::levels::ActiveLevel;
 use crate::net::lobby::DEFAULT_PORT;
 use crate::net::network::{Arrival, Dialling, JoinTarget, Link, Message};
 use crate::net::world_host::{WorldConnection, WorldHost, local_connection, world_level};
-use crate::net::world_view::{Thing, ThingState, ViewChange};
+use crate::net::world_view::{SideState, Thing, ThingState, ViewChange};
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
 use crate::sim::determinism::SimEntities;
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
-use crate::sim::player_commands::{CommandQueue, LocalTeam};
+use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::Sides;
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::world::map::{GameMap, map_bounds};
@@ -32,6 +32,9 @@ pub struct WorldClient {
     team: Option<Team>,
     /// Views that arrived and are not yet shown.
     waiting: Vec<ViewChange>,
+    side: SideState,
+    /// How many ticks the world is ahead of the battle here.
+    world_tick_lead: i64,
     lost: bool,
 }
 
@@ -44,6 +47,8 @@ impl WorldClient {
             connection: Mutex::new(connection),
             team: None,
             waiting: Vec::new(),
+            side: SideState::default(),
+            world_tick_lead: 0,
             lost: false,
         }
     }
@@ -154,11 +159,18 @@ pub fn follow_world(world: &mut World) {
     let side = world.resource::<LocalTeam>().0;
     admit_own_side(world, side);
     debug_assert_eq!(side, team);
+    let local_tick = world.resource::<SimulationTick>().0;
     for change in changes {
+        let mut client = world.resource_mut::<WorldClient>();
+        client.world_tick_lead = change.tick as i64 - local_tick as i64;
         if let Some(bounds) = change.bounds.filter(|&bounds| bounds != map_bounds()) {
             widen_world(world, bounds);
         }
         world.resource_mut::<Economies>().of_mut(side).credits = change.credits;
+        if let Some(state) = change.side {
+            state.apply_to(world, side);
+            world.resource_mut::<WorldClient>().side = state;
+        }
         for id in change.hidden {
             if let Some(entity) = world.resource::<SimEntities>().get(id) {
                 forget(world, entity);
@@ -168,6 +180,14 @@ pub fn follow_world(world: &mut World) {
             show(world, state);
         }
     }
+    show_support_recharge(world, side, local_tick);
+}
+
+fn show_support_recharge(world: &mut World, side: Team, local_tick: u64) {
+    let client = world.resource::<WorldClient>();
+    let world_tick = (local_tick as i64 + client.world_tick_lead).max(0) as u64;
+    let state = client.side.clone();
+    state.show_support_recharge(world, side, world_tick);
 }
 
 fn admit_own_side(world: &mut World, side: Team) {

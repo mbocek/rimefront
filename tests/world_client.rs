@@ -12,6 +12,7 @@ use iron_tide::sim::determinism::{SimEntities, SimId, run_schedules_on_one_threa
 use iron_tide::sim::player_commands::{
     CommandQueue, GroundOrder, LocalTeam, PlayerCommand, SimulationTick,
 };
+use iron_tide::sim::production::{BuildItem, Lane, Production};
 use iron_tide::world::map::world_to_cell;
 
 const STEP: Duration = iron_tide::SIMULATION_TICK;
@@ -91,4 +92,26 @@ fn the_game_plays_a_world_it_runs_itself() {
             .is_some_and(|transform| transform.translation.distance(start) > 3.0)
     });
     assert!(drove, "the order never reached the world");
+
+    let power_plant = BuildItem::Structure(BuildingKind::PowerPlant);
+    let world = app.world_mut();
+    let now = *world.resource::<SimulationTick>();
+    world.resource_mut::<CommandQueue>().issue(
+        now,
+        Team::Player,
+        PlayerCommand::Enqueue {
+            item: power_plant,
+            copies: 1,
+        },
+    );
+    let building = run_until(&mut app, |world| {
+        let lane = world
+            .resource::<Production>()
+            .lane(Team::Player, Lane::Structures);
+        lane.queue.front() == Some(&power_plant) && lane.progress_fraction() > 0.0
+    });
+    assert!(
+        building,
+        "the side here never showed the world's production"
+    );
 }

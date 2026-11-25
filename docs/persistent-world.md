@@ -242,9 +242,14 @@ for ordinary network matches.
     and structures the world showed appear, move and go with the world's ids, so selection, orders, the fog
     and the minimap work as in any battle; the player's orders go to the world instead of the queue. A test
     (`tests/world_client.rs`) enters a world run on its own thread and drives a tank there;
-    `IRON_TIDE_CAPTURE_WORLD=29` (or a server address) captures one. Not mirrored yet: production queues,
-    research, power and support charge (the sidebar shows the game's own, empty), projectiles and blasts,
-    structures under construction, crystal mined away, and enemy structures once out of sight.
+    `IRON_TIDE_CAPTURE_WORLD=29` (or a server address) captures one.
+    The player's own side travels with the view whenever it changes (`SideState`): the production lanes
+    with their queues, progress in percent and the structure ready to place, research done, and the tick
+    each support power is charged at, a tick rather than a countdown so that a recharge sends nothing until
+    a power is called. Power is tallied from the mirrored structures. So the sidebar builds, places,
+    researches and calls support as in a battle (`tests/world_client.rs`, and in `world_host` a power plant
+    queued, finished and placed from what the player is shown). Not mirrored yet: projectiles and blasts,
+    crystal mined away, and enemy structures once out of sight.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.

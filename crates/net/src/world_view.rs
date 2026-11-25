@@ -9,6 +9,9 @@ use iron_tide_sim::sim::components::{Building, Health, Unit};
 use iron_tide_sim::sim::determinism::SimId;
 use iron_tide_sim::sim::economy::Economies;
 use iron_tide_sim::sim::fog::Sight;
+use iron_tide_sim::sim::production::{BuildItem, Lane, Production};
+use iron_tide_sim::sim::research::Upgrade;
+use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
 use iron_tide_sim::sim::transport::Embarked;
 use iron_tide_sim::world::map::{MapBounds, chunk_of, map_bounds, world_to_cell};
 
@@ -44,6 +47,82 @@ impl ThingState {
     }
 }
 
+/// One production lane of the player's side: what is queued, how far along the first item is, and a
+/// finished structure waiting to be placed.
+#[derive(Clone, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub struct LaneState {
+    pub queue: Vec<BuildItem>,
+    pub progress_percent: u8,
+    pub ready: Option<BuildingKind>,
+}
+
+/// What only the player's own side knows of itself: its production, research and support powers.
+#[derive(Clone, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub struct SideState {
+    /// In the order of `Lane::ALL`.
+    pub lanes: [LaneState; Lane::ALL.len()],
+    pub researched: Vec<Upgrade>,
+    /// The world tick each support power, in the order of `SupportPower::ALL`, is charged again at; 0 when
+    /// it is charged. A tick rather than a countdown, so a recharge sends nothing until a power is called.
+    pub support_charged_at: [u64; SupportPower::ALL.len()],
+}
+
+impl SideState {
+    pub fn of(world: &World, team: Team, tick: u64) -> Self {
+        let production = world.resource::<Production>();
+        let powers = world.resource::<SupportPowers>();
+        Self {
+            lanes: Lane::ALL.map(|lane| {
+                let lane = production.lane(team, lane);
+                LaneState {
+                    queue: lane.queue.iter().copied().collect(),
+                    progress_percent: (lane.progress_fraction() * 100.0).floor() as u8,
+                    ready: lane.ready,
+                }
+            }),
+            researched: production.researched(team).to_vec(),
+            support_charged_at: SupportPower::ALL.map(|power| {
+                let ticks_left =
+                    (powers.secs_until_ready(team, power) / tick_secs()).round() as u64;
+                if ticks_left == 0 {
+                    0
+                } else {
+                    tick + ticks_left
+                }
+            }),
+        }
+    }
+
+    /// Makes `team`'s production and research in `world` what this says they are.
+    pub fn apply_to(&self, world: &mut World, team: Team) {
+        let mut production = world.resource_mut::<Production>();
+        for (lane, state) in Lane::ALL.into_iter().zip(&self.lanes) {
+            let lane = production.lane_mut(team, lane);
+            lane.queue = state.queue.iter().copied().collect();
+            lane.progress_secs = lane.queue.front().map_or(0.0, |item| {
+                item.build_secs() * f32::from(state.progress_percent) / 100.0
+            });
+            lane.ready = state.ready;
+        }
+        for &upgrade in &self.researched {
+            production.complete_research(team, upgrade);
+        }
+    }
+
+    /// Counts `team`'s support powers in `world` down to their charge, as of world tick `now`.
+    pub fn show_support_recharge(&self, world: &mut World, team: Team, now: u64) {
+        let mut powers = world.resource_mut::<SupportPowers>();
+        for (power, &charged_at) in SupportPower::ALL.into_iter().zip(&self.support_charged_at) {
+            let secs = charged_at.saturating_sub(now) as f32 * tick_secs();
+            powers.set_secs_until_ready(team, power, secs);
+        }
+    }
+}
+
+fn tick_secs() -> f32 {
+    iron_tide_sim::SIMULATION_TICK.as_secs_f32()
+}
+
 /// What changed in a player's view of a world since the last one they were sent.
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct ViewChange {
@@ -51,6 +130,8 @@ pub struct ViewChange {
     /// The world's cells, when they widened since the last view.
     pub bounds: Option<MapBounds>,
     pub credits: i32,
+    /// The player's own side, when it changed since the last view.
+    pub side: Option<SideState>,
     /// Things that came into view or changed.
     pub shown: Vec<ThingState>,
     /// Things gone from view: out of sight, destroyed or carried off.
@@ -59,7 +140,10 @@ pub struct ViewChange {
 
 impl ViewChange {
     fn is_empty(&self) -> bool {
-        self.bounds.is_none() && self.shown.is_empty() && self.hidden.is_empty()
+        self.bounds.is_none()
+            && self.side.is_none()
+            && self.shown.is_empty()
+            && self.hidden.is_empty()
     }
 }
 
@@ -140,6 +224,7 @@ pub struct SentView {
     things: BTreeMap<SimId, ThingState>,
     bounds: Option<MapBounds>,
     credits: Option<i32>,
+    side: Option<SideState>,
 }
 
 impl SentView {
@@ -161,10 +246,16 @@ impl SentView {
         self.bounds = Some(map_bounds());
         self.things = now;
         let credits = world.resource::<Economies>().of(viewer).credits;
+        let side = Some(SideState::of(world, viewer, tick))
+            .filter(|side| self.side.as_ref() != Some(side));
+        if side.is_some() {
+            self.side.clone_from(&side);
+        }
         let change = ViewChange {
             tick,
             bounds,
             credits,
+            side,
             shown,
             hidden,
         };
@@ -179,6 +270,7 @@ pub struct WorldMirror {
     pub tick: u64,
     pub bounds: Option<MapBounds>,
     pub credits: i32,
+    pub side: SideState,
     pub things: BTreeMap<SimId, ThingState>,
 }
 
@@ -188,6 +280,9 @@ impl WorldMirror {
         self.credits = change.credits;
         if change.bounds.is_some() {
             self.bounds = change.bounds;
+        }
+        if let Some(side) = change.side {
+            self.side = side;
         }
         for id in change.hidden {
             self.things.remove(&id);

@@ -239,12 +239,16 @@ pub fn world_level(map_seed: u64) -> LevelDefinition {
 mod tests {
     use super::*;
     use crate::world_view::{Thing, WorldMirror, things_in_view};
+    use bevy::ecs::system::SystemState;
     use iron_tide_sim::SIMULATION_TICK;
     use iron_tide_sim::sim::catalog::{BuildingKind, UnitKind};
     use iron_tide_sim::sim::components::Building;
     use iron_tide_sim::sim::components::Unit;
     use iron_tide_sim::sim::determinism::SimId;
+    use iron_tide_sim::sim::intel::Intel;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
+    use iron_tide_sim::sim::production::{BuildItem, placement_context};
+    use iron_tide_sim::world::map::GameMap;
     use iron_tide_sim::world::map::map_bounds;
 
     fn follow(mirror: &mut WorldMirror, player: &mut LocalConnection) -> usize {
@@ -325,6 +329,73 @@ mod tests {
             "the mirrored tank never moved"
         );
         println!("ten seconds of a tank driving: {moving_bytes} bytes of JSON");
+    }
+
+    #[test]
+    fn a_player_builds_in_a_world_from_what_their_side_is_shown() {
+        let mut host = WorldHost::new(29);
+        let (mut player, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        player.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+        });
+        let mut mirror = WorldMirror::default();
+        host.step(SIMULATION_TICK);
+        follow(&mut mirror, &mut player);
+        let power_plant = BuildItem::Structure(BuildingKind::PowerPlant);
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::Enqueue {
+                item: power_plant,
+                copies: 1,
+            }],
+        });
+        host.step(SIMULATION_TICK);
+        host.step(SIMULATION_TICK);
+        follow(&mut mirror, &mut player);
+        assert_eq!(mirror.side.lanes[0].queue, [power_plant]);
+
+        let build_ticks = (power_plant.build_secs() * 20.0) as usize + 40;
+        for _ in 0..build_ticks {
+            host.step(SIMULATION_TICK);
+            follow(&mut mirror, &mut player);
+        }
+        assert_eq!(mirror.side.lanes[0].ready, Some(BuildingKind::PowerPlant));
+
+        let origin = free_site_near_base(host.world(), Team::Player, BuildingKind::PowerPlant);
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::PlaceStructure {
+                kind: BuildingKind::PowerPlant,
+                origin,
+            }],
+        });
+        host.step(SIMULATION_TICK);
+        host.step(SIMULATION_TICK);
+        host.step(SIMULATION_TICK);
+        follow(&mut mirror, &mut player);
+        assert_eq!(mirror.side.lanes[0], Default::default());
+        let placed = Thing::Building {
+            kind: BuildingKind::PowerPlant,
+            origin,
+        };
+        assert!(mirror.things.values().any(|thing| thing.thing == placed));
+    }
+
+    type PlacementParams = (
+        Res<'static, GameMap>,
+        Res<'static, Intel>,
+        Query<'static, 'static, (&'static Building, &'static Team)>,
+        Query<'static, 'static, &'static Transform, With<Unit>>,
+    );
+
+    fn free_site_near_base(world: &mut World, team: Team, kind: BuildingKind) -> IVec2 {
+        let mut state: SystemState<PlacementParams> = SystemState::new(world);
+        let (map, intel, buildings, units) = state.get(world).expect("the world has a map");
+        let context = placement_context(&map, team, intel.vision(team), &buildings, &units);
+        let base = context.own_buildings[0].0;
+        (-8..=8)
+            .flat_map(|y| (-8..=8).map(move |x| base + IVec2::new(x, y)))
+            .find(|&origin| context.can_place(kind, origin))
+            .expect("room to build by the base")
     }
 
     fn entered(player: &mut LocalConnection) -> Option<Team> {

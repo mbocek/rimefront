@@ -9,15 +9,17 @@ use crate::missions::levels::ActiveLevel;
 use crate::net::lobby::DEFAULT_PORT;
 use crate::net::network::{Arrival, Dialling, JoinTarget, Link, Message};
 use crate::net::world_host::{WorldConnection, WorldHost, local_connection, world_level};
-use crate::net::world_view::{SideState, Thing, ThingState, ViewChange};
+use crate::net::world_view::{Effect, SideState, Thing, ThingState, ViewChange};
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
+use crate::sim::cues::{BlastCue, SoundCue};
 use crate::sim::determinism::SimEntities;
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::Sides;
 use crate::sim::spawn::{spawn_building, spawn_unit};
+use crate::view::effects::ShotFlight;
 use crate::world::map::{GameMap, map_bounds};
 use crate::world::wilds::widen_world;
 
@@ -179,6 +181,9 @@ pub fn follow_world(world: &mut World) {
         for state in change.shown {
             show(world, state);
         }
+        for effect in change.effects {
+            show_effect(world, side, effect);
+        }
     }
     show_support_recharge(world, side, local_tick);
 }
@@ -213,6 +218,36 @@ fn show(world: &mut World, state: ThingState) {
     }
     if let Some(mut health) = thing.get_mut::<Health>() {
         health.current = health.max * f32::from(state.health_percent) / 100.0;
+    }
+}
+
+fn show_effect(world: &mut World, side: Team, effect: Effect) {
+    match effect {
+        Effect::Shot(shot) => {
+            let (start, end) = (shot.start.position(), shot.end.position());
+            let sight = world.resource::<Intel>().vision(side);
+            if !sight.is_visible(start) && !sight.is_visible(end) {
+                return;
+            }
+            world.spawn((
+                ShotFlight {
+                    style: shot.style,
+                    start,
+                    end,
+                    arc_height: shot.arc_height(),
+                    duration: shot.duration(),
+                    elapsed: 0.0,
+                },
+                Transform::from_translation(start),
+                DespawnOnExit(GameState::Playing),
+            ));
+        }
+        Effect::Blast { size, at } => {
+            world.write_message(BlastCue::at(at.position(), size));
+        }
+        Effect::Sound { sound, at } => {
+            world.write_message(SoundCue::at(sound, at.position()));
+        }
     }
 }
 

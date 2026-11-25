@@ -248,8 +248,14 @@ for ordinary network matches.
     each support power is charged at, a tick rather than a countdown so that a recharge sends nothing until
     a power is called. Power is tallied from the mirrored structures. So the sidebar builds, places,
     researches and calls support as in a battle (`tests/world_client.rs`, and in `world_host` a power plant
-    queued, finished and placed from what the player is shown). Not mirrored yet: projectiles and blasts,
-    crystal mined away, and enemy structures once out of sight.
+    queued, finished and placed from what the player is shown). What happens once travels as effects
+    (`WorldEffects`): every shot fired with its start, end, arc and flight time, every blast and every
+    sound with a place, each to the players who see into a chunk it touches. The game flies the shots as
+    `view::effects::ShotFlight`, the same flight replays show, if an end is in its sight, and hands blasts and
+    sounds to the usual presentation. With effects, the quiet minute of the start grew from 6.6 to 7.3 kB.
+    Sounds the rules make only for the level's own player (credits, repair, sale, capture)
+    reach whoever sees the spot. Not mirrored yet: crystal mined away, and enemy structures once out of
+    sight.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.

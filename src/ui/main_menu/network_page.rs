@@ -114,7 +114,7 @@ pub(super) fn spawn_network_details(
             MenuCommand::PlayWorldAlone,
         );
         panel.spawn(fonts.text(
-            tr("A persistent world grows as players arrive; each newcomer gets a base of their own. Type ws://server/world above to enter a server's world, or play one alone. Early preview: you command your units and build, but combat effects are not shown yet."),
+            tr("A persistent world grows as players arrive; each newcomer gets a base of their own. Type ws://server/world above to enter a server's world, or play one alone. Early preview: crystal fields are not kept up to date yet."),
             14.0,
             TEXT_DIM,
         ));

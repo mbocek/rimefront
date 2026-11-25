@@ -156,6 +156,58 @@ pub fn show_blasts(
     }
 }
 
+/// A shot shown in flight without the simulation behind it, as replays and worlds run elsewhere show
+/// them; it hits nothing.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct ShotFlight {
+    pub style: ProjectileStyle,
+    pub start: Vec3,
+    pub end: Vec3,
+    pub arc_height: f32,
+    pub duration: f32,
+    pub elapsed: f32,
+}
+
+impl ShotFlight {
+    /// Moves the shot `dt` seconds along its arc; true once it has landed.
+    pub fn advance(&mut self, dt: f32, transform: &mut Transform) -> bool {
+        self.elapsed += dt;
+        let t = (self.elapsed / self.duration.max(0.05)).min(1.0);
+        let previous = transform.translation;
+        let arc = 4.0 * self.arc_height * t * (1.0 - t);
+        transform.translation = self.start.lerp(self.end, t) + Vec3::Y * arc;
+        let heading = transform.translation - previous;
+        if heading.length_squared() > 1e-6 {
+            transform.rotation = Quat::from_rotation_arc(Vec3::Y, heading.normalize());
+        }
+        t >= 1.0
+    }
+}
+
+pub fn dress_shown_shots(
+    mut commands: Commands,
+    effects: Res<EffectAssets>,
+    shots: Query<(Entity, &ShotFlight), Added<ShotFlight>>,
+) {
+    for (entity, shot) in &shots {
+        commands
+            .entity(entity)
+            .insert(effects.projectile_visual(shot.style));
+    }
+}
+
+pub fn fly_shown_shots(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut shots: Query<(Entity, &mut ShotFlight, &mut Transform)>,
+) {
+    for (entity, mut shot, mut transform) in &mut shots {
+        if shot.advance(time.delta_secs(), &mut transform) {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
 pub fn dress_projectiles(
     mut commands: Commands,
     effects: Res<EffectAssets>,

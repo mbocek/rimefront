@@ -19,7 +19,7 @@ use crate::sim::outcome::GameOutcome;
 use crate::ui::sidebar::{ACCENT, TEXT_MAIN, UiFonts};
 use crate::view::animation::{ReplayMotion, animated_unit_model};
 use crate::view::assets::ModelLibrary;
-use crate::view::effects::{EffectAssets, spawn_blast};
+use crate::view::effects::{EffectAssets, ShotFlight, spawn_blast};
 use crate::world::map::{footprint_center, world_to_cell};
 
 const REPLAY_VERSION: u32 = 1;
@@ -673,15 +673,9 @@ pub fn control_replay(
     }
 }
 
-/// A replayed shell or missile in flight; it only shows, it hits nothing.
+/// A replayed shell or missile in flight, flown at the replay's speed.
 #[derive(Component)]
-pub struct ReplayShot {
-    start: Vec3,
-    end: Vec3,
-    arc: f32,
-    elapsed: f32,
-    duration: f32,
-}
+pub struct ReplayShot(ShotFlight);
 
 fn show_events(commands: &mut Commands, effects: &EffectAssets, events: &[Event]) {
     for event in events {
@@ -693,13 +687,14 @@ fn show_events(commands: &mut Commands, effects: &EffectAssets, events: &[Event]
                     .unwrap_or(ProjectileStyle::Shell);
                 let start = unpack(from);
                 commands.spawn((
-                    ReplayShot {
+                    ReplayShot(ShotFlight {
+                        style,
                         start,
                         end: unpack(to),
-                        arc: f32::from(arc) / DECIMETRES_PER_METER,
+                        arc_height: f32::from(arc) / DECIMETRES_PER_METER,
+                        duration: f32::from(millis) / 1000.0,
                         elapsed: 0.0,
-                        duration: (f32::from(millis) / 1000.0).max(0.05),
-                    },
+                    }),
                     DespawnOnExit(GameState::Replay),
                     effects.projectile_visual(style),
                     Transform::from_translation(start),
@@ -729,16 +724,7 @@ pub fn fly_replay_shots(
             SPEEDS[playback.speed]
         };
     for (entity, mut shot, mut transform) in &mut shots {
-        shot.elapsed += dt;
-        let t = (shot.elapsed / shot.duration).min(1.0);
-        let previous = transform.translation;
-        let arc = 4.0 * shot.arc * t * (1.0 - t);
-        transform.translation = shot.start.lerp(shot.end, t) + Vec3::Y * arc;
-        let heading = transform.translation - previous;
-        if heading.length_squared() > 1e-6 {
-            transform.rotation = Quat::from_rotation_arc(Vec3::Y, heading.normalize());
-        }
-        if t >= 1.0 {
+        if shot.0.advance(dt, &mut transform) {
             commands.entity(entity).despawn();
         }
     }

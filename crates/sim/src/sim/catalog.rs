@@ -251,7 +251,7 @@ pub enum ArmorClass {
     Aircraft,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum ProjectileStyle {
     Bullet,
     Shell,

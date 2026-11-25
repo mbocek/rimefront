@@ -194,7 +194,11 @@ impl Plugin for BattleViewPlugin {
                         ambience::pulse_crystal_glow,
                         effects::animate_sparkles,
                         transport::deselect_passengers,
-                        effects::dress_projectiles,
+                        (
+                            effects::dress_projectiles,
+                            effects::dress_shown_shots,
+                            effects::fly_shown_shots,
+                        ),
                         effects::show_blasts,
                         effects::animate_blasts,
                         damage_feedback::spawn_damage_numbers,

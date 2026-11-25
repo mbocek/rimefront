@@ -634,5 +634,5 @@
   "A room with this name is already open; join it or pick another name": "Miestnosť s týmto názvom je už otvorená; pripoj sa do nej alebo zvoľ iný názov",
   "ENTER THE SERVER'S WORLD": "VSTÚPIŤ DO SVETA SERVERA",
   "PLAY A WORLD ALONE": "HRAŤ SVET SÁM",
-  "A persistent world grows as players arrive; each newcomer gets a base of their own. Type ws://server/world above to enter a server's world, or play one alone. Early preview: you command your units and build, but combat effects are not shown yet.": "Trvalý svet rastie s príchodom hráčov; každý nováčik dostane vlastnú základňu. Napíš hore ws://server/world a vstúp do sveta servera, alebo hraj svet sám. Skorá ukážka: velíš svojim jednotkám a staviaš, efekty boja sa zatiaľ nezobrazujú."
+  "A persistent world grows as players arrive; each newcomer gets a base of their own. Type ws://server/world above to enter a server's world, or play one alone. Early preview: crystal fields are not kept up to date yet.": "Trvalý svet rastie s príchodom hráčov; každý nováčik dostane vlastnú základňu. Napíš hore ws://server/world a vstúp do sveta servera, alebo hraj svet sám. Skorá ukážka: kryštálové polia sa zatiaľ neaktualizujú."
 }

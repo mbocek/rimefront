@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
 use crate::network::{Arrival, Link, Message};
-use crate::world_view::SentView;
+use crate::world_view::{Effect, SentView, WorldEffects};
 use iron_tide_sim::SimulationPlugin;
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
 use iron_tide_sim::match_flow::{GameState, deploy_newcomer};
@@ -85,6 +85,9 @@ pub struct WorldHost {
     app: App,
     players: Vec<WorldPlayer>,
     level_side_taken: bool,
+    effects: WorldEffects,
+    /// Effects since the last views went out.
+    unshown_effects: Vec<Effect>,
 }
 
 impl WorldHost {
@@ -115,6 +118,8 @@ impl WorldHost {
             app,
             players: Vec::new(),
             level_side_taken: false,
+            effects: WorldEffects::default(),
+            unshown_effects: Vec::new(),
         }
     }
 
@@ -146,6 +151,8 @@ impl WorldHost {
         self.app
             .insert_resource(TimeUpdateStrategy::ManualDuration(elapsed));
         self.app.update();
+        let effects = self.effects.gather(self.app.world_mut());
+        self.unshown_effects.extend(effects);
         if self.tick() != before {
             self.show_views();
         }
@@ -153,10 +160,11 @@ impl WorldHost {
 
     fn show_views(&mut self) {
         let tick = self.tick();
+        let effects = std::mem::take(&mut self.unshown_effects);
         let world = self.app.world_mut();
         for player in &mut self.players {
             let Some(team) = player.team else { continue };
-            if let Some(change) = player.sent.next(world, team, tick) {
+            if let Some(change) = player.sent.next(world, team, tick, &effects) {
                 player
                     .connection
                     .send(&Message::WorldView(Box::new(change)));
@@ -241,6 +249,7 @@ mod tests {
     use crate::world_view::{Thing, WorldMirror, things_in_view};
     use bevy::ecs::system::SystemState;
     use iron_tide_sim::SIMULATION_TICK;
+    use iron_tide_sim::sim::catalog::ProjectileStyle;
     use iron_tide_sim::sim::catalog::{BuildingKind, UnitKind};
     use iron_tide_sim::sim::components::Building;
     use iron_tide_sim::sim::components::Unit;
@@ -248,6 +257,7 @@ mod tests {
     use iron_tide_sim::sim::intel::Intel;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
     use iron_tide_sim::sim::production::{BuildItem, placement_context};
+    use iron_tide_sim::sim::spawn::spawn_unit;
     use iron_tide_sim::world::map::GameMap;
     use iron_tide_sim::world::map::map_bounds;
 
@@ -329,6 +339,50 @@ mod tests {
             "the mirrored tank never moved"
         );
         println!("ten seconds of a tank driving: {moving_bytes} bytes of JSON");
+    }
+
+    #[test]
+    fn a_player_is_shown_the_shots_and_blasts_of_a_fight_in_sight() {
+        let mut host = WorldHost::new(29);
+        let (mut player, _) = enter(&mut host);
+        let world = host.world();
+        let tank_position = world
+            .query::<(&Unit, &Team, &Transform)>()
+            .iter(world)
+            .find(|(unit, team, _)| **team == Team::Player && unit.0 == UnitKind::Tank)
+            .map(|(.., transform)| transform.translation)
+            .expect("the player has a tank");
+        let mut commands = world.commands();
+        spawn_unit(
+            &mut commands,
+            UnitKind::Tank,
+            Team::Crimson,
+            tank_position + Vec3::new(4.0, 0.0, 0.0),
+            0.0,
+        );
+        world.flush();
+
+        let mut effects = Vec::new();
+        for _ in 0..3 * 20 {
+            host.step(SIMULATION_TICK);
+            for arrival in player.drain() {
+                if let Arrival::Message(Message::WorldView(change)) = arrival {
+                    effects.extend(change.effects);
+                }
+            }
+        }
+        assert!(
+            effects
+                .iter()
+                .any(|effect| matches!(effect, Effect::Shot(shot) if shot.style == ProjectileStyle::Shell)),
+            "no shell shown"
+        );
+        assert!(
+            effects
+                .iter()
+                .any(|effect| matches!(effect, Effect::Blast { .. })),
+            "no blast shown"
+        );
     }
 
     #[test]

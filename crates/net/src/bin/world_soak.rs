@@ -1,8 +1,9 @@
 //! A persistent world run as fast as it goes, with computer-driven players who enter and leave it, to find
 //! what grows or slows over days of world time:
-//! `rimefront-world-soak [--players 20] [--days 10] [--seed 29] [--difficulty normal] [--dir DIR]
-//! [--out soak.csv]`. Writes a line of measurements for every hour of world time; see
-//! docs/persistent-world.md.
+//! `rimefront-world-soak [--players 20] [--days 10] [--chance N] [--seed MAP_SEED] [--difficulty normal]
+//! [--dir DIR] [--out soak.csv]`. `--chance` picks the map, when the players come and go, and how hard and
+//! in what manner each one plays; without it a run picks its own and prints it, so a run can be repeated.
+//! Writes a line of measurements for every hour of world time; see docs/persistent-world.md.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -20,7 +21,7 @@ use rimefront_net::world_host::{
 };
 use rimefront_net::world_store::WorldStore;
 use rimefront_sim::SIMULATION_TICK;
-use rimefront_sim::levels::Difficulty;
+use rimefront_sim::levels::{Difficulty, Personality};
 use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
 use rimefront_sim::sim::catalog::{BuildingKind, Team};
 use rimefront_sim::sim::components::{Building, Unit};
@@ -47,17 +48,25 @@ fn argument_after<T: std::str::FromStr>(flag: &str) -> Option<T> {
         .and_then(|value| value.parse().ok())
 }
 
-fn difficulty_named(name: &str) -> Difficulty {
+fn difficulty_named(name: &str) -> Option<Difficulty> {
     Difficulty::ALL
         .into_iter()
         .find(|difficulty| format!("{difficulty:?}").eq_ignore_ascii_case(name))
-        .unwrap_or(Difficulty::Normal)
+}
+
+/// A chance of its own for a run not given one.
+fn fresh_chance() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos() as u64)
 }
 
 /// A player whose side a computer commander plays while they are connected, and who comes and goes: mostly
 /// for hours, now and then for days, and once in a while long enough for their base to decay.
 struct SoakPlayer {
     key: PlayerKey,
+    difficulty: Difficulty,
+    personality: Personality,
     connection: Option<LocalConnection>,
     team: Option<Team>,
     next_change: u64,
@@ -66,9 +75,12 @@ struct SoakPlayer {
 }
 
 impl SoakPlayer {
-    fn new(rng: &mut StdRng) -> Self {
+    fn new(rng: &mut StdRng, difficulty: Option<Difficulty>) -> Self {
+        let any_difficulty = Difficulty::ALL[rng.random_range(0..Difficulty::ALL.len())];
         Self {
             key: PlayerKey::new_random(),
+            difficulty: difficulty.unwrap_or(any_difficulty),
+            personality: Personality::ALL[rng.random_range(0..Personality::ALL.len())],
             connection: None,
             team: None,
             next_change: rng.random_range(0..TICKS_PER_HOUR),
@@ -124,7 +136,7 @@ impl SoakPlayer {
     }
 
     /// Reads what the world sent; once it lets the player in, a commander takes over their side.
-    fn read_views(&mut self, host: &mut WorldHost, difficulty: Difficulty) {
+    fn read_views(&mut self, host: &mut WorldHost) {
         let Some(connection) = &mut self.connection else {
             return;
         };
@@ -135,7 +147,9 @@ impl SoakPlayer {
             self.bytes += encode(&message).map_or(0, |bytes| bytes.len());
             if let Message::Entered { team, .. } = message {
                 self.team = Some(team);
-                take_over_side(host, team, difficulty);
+                let commander = AiCommander::new(team, IVec2::ZERO, self.difficulty)
+                    .with_personality(self.personality);
+                take_over_side(host, commander);
             }
         }
     }
@@ -153,7 +167,9 @@ impl SoakPlayer {
     }
 }
 
-fn take_over_side(host: &mut WorldHost, team: Team, difficulty: Difficulty) {
+/// Hands the side to `commander`, based where the side has its Command Center or else its first unit.
+fn take_over_side(host: &mut WorldHost, mut commander: AiCommander) {
+    let team = commander.team;
     let world = host.world();
     let base = world
         .query::<(&Building, &Team)>()
@@ -171,7 +187,8 @@ fn take_over_side(host: &mut WorldHost, team: Team, difficulty: Difficulty) {
     let Some(base) = base else { return };
     let mut commanders = world.resource_mut::<AiCommanders>();
     if commanders.0.iter().all(|commander| commander.team != team) {
-        commanders.0.push(AiCommander::new(team, base, difficulty));
+        commander.base = base;
+        commanders.0.push(commander);
     }
 }
 
@@ -286,9 +303,11 @@ fn millis(duration: Duration) -> f64 {
 fn main() -> std::io::Result<()> {
     let players = argument_after::<usize>("--players").unwrap_or(20);
     let days = argument_after::<f64>("--days").unwrap_or(10.0);
-    let seed = argument_after::<u64>("--seed").unwrap_or(29);
+    let chance = argument_after::<u64>("--chance").unwrap_or_else(fresh_chance);
+    let mut rng = StdRng::seed_from_u64(chance);
+    let seed = argument_after::<u64>("--seed").unwrap_or_else(|| rng.random_range(0..1_000_000));
     let difficulty =
-        difficulty_named(&argument_after::<String>("--difficulty").unwrap_or_default());
+        argument_after::<String>("--difficulty").and_then(|name| difficulty_named(&name));
     let directory = argument_after::<PathBuf>("--dir")
         .unwrap_or_else(|| std::env::temp_dir().join(format!("rimefront-soak-{seed}")));
     let out = argument_after::<PathBuf>("--out").unwrap_or_else(|| PathBuf::from("soak.csv"));
@@ -299,17 +318,23 @@ fn main() -> std::io::Result<()> {
     }
     let mut host = WorldHost::new(seed);
     host.keep_in(WorldStore::at(&directory), NEVER)?;
-    let mut rng = StdRng::seed_from_u64(seed);
-    let mut soak_players: Vec<SoakPlayer> =
-        (0..players).map(|_| SoakPlayer::new(&mut rng)).collect();
+    let mut soak_players: Vec<SoakPlayer> = (0..players)
+        .map(|_| SoakPlayer::new(&mut rng, difficulty))
+        .collect();
     let mut csv = BufWriter::new(File::create(&out)?);
     writeln!(csv, "{CSV_HEADER}")?;
     eprintln!(
-        "Soaking world {seed} with {players} players ({difficulty:?}) for {days} days; \
+        "Soaking world {seed} with {players} players for {days} days (--chance {chance}); \
          saving in {}, measuring into {}",
         directory.display(),
         out.display()
     );
+    for (index, player) in soak_players.iter().enumerate() {
+        eprintln!(
+            "player {index}: {:?}, {:?}",
+            player.difficulty, player.personality
+        );
+    }
 
     let started = Instant::now();
     let mut hour = HourOfWorld::default();
@@ -323,7 +348,7 @@ fn main() -> std::io::Result<()> {
         host.step(SIMULATION_TICK);
         hour.note_tick(step.elapsed());
         for player in &mut soak_players {
-            player.read_views(&mut host, difficulty);
+            player.read_views(&mut host);
         }
         let tick = host.tick();
         let crossed = |every: u64| tick / every != before / every;

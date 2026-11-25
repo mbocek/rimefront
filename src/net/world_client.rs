@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::net::TcpStream;
+use std::path::PathBuf;
 use std::sync::Mutex;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
@@ -13,6 +15,7 @@ use crate::net::network::{Arrival, Dialling, JoinTarget, Link, Message};
 use crate::net::world_host::{
     PlayerKey, WorldConnection, WorldHost, local_connection, world_level,
 };
+use crate::net::world_store::WorldStore;
 use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewChange};
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
@@ -32,6 +35,8 @@ use crate::world::wilds::widen_world;
 const LOCAL_WORLD_POLL: Duration = Duration::from_millis(2);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const PLAYER_KEY_FILE: &str = "world_player_key";
+const OWN_WORLD_DIRECTORY: &str = "worlds/own";
+const OWN_WORLD_SAVE_EVERY: Duration = Duration::from_secs(30);
 
 /// The world this game plays in, run elsewhere: on a server, or on a thread of the game's own.
 #[derive(Resource)]
@@ -46,6 +51,8 @@ pub struct WorldClient {
     /// How many ticks the world is ahead of the battle here.
     world_tick_lead: i64,
     lost: bool,
+    /// The thread of a world the game runs itself.
+    world_thread: Option<JoinHandle<()>>,
 }
 
 impl WorldClient {
@@ -62,23 +69,61 @@ impl WorldClient {
             shown: HashMap::new(),
             world_tick_lead: 0,
             lost: false,
+            world_thread: None,
         }
     }
 
-    /// A world grown from `map_seed` on a thread of the game's own; it stops when this client goes.
+    /// A world grown from `map_seed` on a thread of the game's own, kept nowhere; it stops when this client
+    /// goes.
     pub fn alone(map_seed: u64) -> Self {
         let (player, world_end) = local_connection();
-        std::thread::spawn(move || {
+        let thread = std::thread::spawn(move || {
             let mut host = WorldHost::new(map_seed);
             host.connect(Box::new(world_end));
-            let mut last_step = Instant::now();
-            while host.player_count() > 0 {
-                host.step(last_step.elapsed());
-                last_step = Instant::now();
-                std::thread::sleep(LOCAL_WORLD_POLL);
+            run_until_left(&mut host);
+        });
+        Self::entering(Box::new(player), PlayerKey::new_random()).running(thread)
+    }
+
+    /// The world kept in `own`, or a new one grown from `map_seed` when it holds none, on a thread of the
+    /// game's own. It is saved every half minute and when this client goes, as it stops then.
+    pub fn alone_in(own: OwnWorld, map_seed: u64) -> Self {
+        let (player, world_end) = local_connection();
+        let directory = own.directory.clone();
+        let thread = std::thread::spawn(move || {
+            let mut store = WorldStore::at(&directory);
+            let mut host = match store.load() {
+                Ok(Some(saved)) => WorldHost::resume(&saved),
+                Ok(None) => WorldHost::new(map_seed),
+                Err(error) => {
+                    warn!(
+                        "could not read the world in {}: {error}",
+                        directory.display()
+                    );
+                    return;
+                }
+            };
+            if let Err(error) = host.keep_in(store, OWN_WORLD_SAVE_EVERY) {
+                warn!(
+                    "could not save the world in {}: {error}",
+                    directory.display()
+                );
+            }
+            host.connect(Box::new(world_end));
+            run_until_left(&mut host);
+            if let Err(error) = host.save() {
+                warn!(
+                    "could not save the world in {}: {error}",
+                    directory.display()
+                );
             }
         });
-        Self::entering(Box::new(player), PlayerKey::new_random())
+        Self::entering(Box::new(player), own.player).running(thread)
+    }
+
+    fn running(mut self, thread: JoinHandle<()>) -> Self {
+        self.world_thread = Some(thread);
+        self
     }
 
     /// The world of the server at `address`, e.g. `ws://server:47300/world`.
@@ -135,6 +180,56 @@ impl WorldClient {
             }
         }
         entered
+    }
+}
+
+fn run_until_left(host: &mut WorldHost) {
+    let mut last_step = Instant::now();
+    while host.player_count() > 0 {
+        host.step(last_step.elapsed());
+        last_step = Instant::now();
+        std::thread::sleep(LOCAL_WORLD_POLL);
+    }
+}
+
+/// A world the game keeps for playing alone, and the player who plays it.
+pub struct OwnWorld {
+    pub directory: PathBuf,
+    pub player: PlayerKey,
+}
+
+impl OwnWorld {
+    /// The one kept with the game's data.
+    pub fn kept_with_the_game() -> Self {
+        Self {
+            directory: game_data_directory().join(OWN_WORLD_DIRECTORY),
+            player: saved_player_key(),
+        }
+    }
+}
+
+/// Leaving lets the world on the game's own thread see the player go, save and stop, before the game goes on.
+impl Drop for WorldClient {
+    fn drop(&mut self) {
+        if let Ok(connection) = self.connection.get_mut() {
+            *connection = Box::new(Closed);
+        }
+        if let Some(thread) = self.world_thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+/// The end of a connection that was let go.
+struct Closed;
+
+impl WorldConnection for Closed {
+    fn send(&self, _: &Message) -> bool {
+        false
+    }
+
+    fn drain(&mut self) -> Vec<Arrival> {
+        vec![Arrival::ConnectionLost]
     }
 }
 

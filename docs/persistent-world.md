@@ -320,6 +320,11 @@ for ordinary network matches.
     view (tick, empty lists). The game keeps the last state of every thing shown to apply the moves to.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing
     empty between players.
+    A world played alone is kept with the game's data, in `worlds/own` (`net::world_client::OwnWorld`), and
+    entered with the game's own player key: *Play a world alone* resumes it when it is there and grows a new
+    one otherwise. Its thread saves it every half minute and once more when the player leaves; leaving waits
+    for that save, so the next game finds it (`tests/world_client.rs` drives a tank, leaves, comes back and
+    finds it where it stopped).
 
 ## Decisions
 

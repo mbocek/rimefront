@@ -172,7 +172,10 @@ pub(super) fn run_command(
             );
         }
         MenuCommand::PlayWorldAlone => {
-            commands.insert_resource(WorldClient::alone(rand::rng().random()));
+            commands.insert_resource(WorldClient::alone_in(
+                OwnWorld::kept_with_the_game(),
+                rand::rng().random(),
+            ));
         }
         MenuCommand::EnterServerWorld => match WorldClient::on_server(&settings.join_address) {
             Ok(client) => commands.insert_resource(client),

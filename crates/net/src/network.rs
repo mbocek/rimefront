@@ -8,6 +8,7 @@ use iron_tide_sim::match_flow::GameState;
 use serde::{Deserialize, Serialize};
 
 use crate::relay::Relay;
+use crate::world_host::PlayerKey;
 use crate::world_view::ViewChange;
 use iron_tide_sim::i18n::{tr, tr_fmt};
 use iron_tide_sim::levels::LevelDefinition;
@@ -97,6 +98,7 @@ pub enum Message {
     /// To a world: this player wants to enter it.
     EnterWorld {
         version: String,
+        player: PlayerKey,
     },
     /// From a world: the side the player commands there, and the world's tick when they entered.
     Entered {

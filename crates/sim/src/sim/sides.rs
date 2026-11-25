@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::sim::catalog::Team;
+use crate::sim::components::{Building, Unit};
 use crate::sim::intel::Intel;
 
 /// The sides in the battle: the four a level names, then every side that joined since, numbered on.
@@ -42,6 +43,18 @@ pub fn admit_side(world: &mut World) -> Team {
     let team = world.resource_mut::<Sides>().join();
     world.resource_mut::<Intel>().admit(team);
     team
+}
+
+/// Whether anything of `team` still stands: a unit, or a structure that keeps a side in the battle.
+pub fn side_stands(world: &mut World, team: Team) -> bool {
+    let mut units = world.query_filtered::<&Team, With<Unit>>();
+    if units.iter(world).any(|&owner| owner == team) {
+        return true;
+    }
+    let mut buildings = world.query::<(&Team, &Building)>();
+    buildings
+        .iter(world)
+        .any(|(&owner, building)| owner == team && building.kind.keeps_a_side_alive())
 }
 
 /// A value for every side, kept only for the sides that ever needed one of their own; any other side has

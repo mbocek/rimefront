@@ -267,6 +267,13 @@ for ordinary network matches.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.
+    A player enters with a key (`world_host::PlayerKey`, 128 random bits): the game makes one the first
+    time it enters a server's world and keeps it in its data directory as `world_player_key`; a world played
+    alone gets a fresh one, since it stops with the game. The host remembers which side each key commands.
+    A key it knows gets its side back as long as anything of it stands (a unit, or a structure that keeps a
+    side in the battle), otherwise a new side on a new site, as an unknown key does. Entering again while
+    still connected elsewhere lets go of the older connection, which is told why. The keys live as long as
+    the server runs, until persistence (step 15) keeps them.
 15. **Persistence.** The world is saved by chunk, incrementally and often, so the server can stop and resume;
     the JSON save format gives way to a compact binary one.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing

@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
+use ring::rand::{SecureRandom, SystemRandom};
+use serde::{Deserialize, Serialize};
 
 use crate::network::{Arrival, Link, Message};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
@@ -12,6 +15,7 @@ use iron_tide_sim::match_flow::{GameState, HostedWorld, deploy_newcomer};
 use iron_tide_sim::sim::catalog::Team;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
+use iron_tide_sim::sim::sides::side_stands;
 use iron_tide_sim::world::map::{GameMap, base_sites};
 use iron_tide_sim::world::terrain::Landscape;
 
@@ -71,10 +75,36 @@ impl WorldConnection for LocalConnection {
     }
 }
 
+/// The secret a player comes back to a world with, to command their side again; their game keeps it.
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct PlayerKey(String);
+
+impl PlayerKey {
+    pub fn new_random() -> Self {
+        let mut bytes = [0u8; 16];
+        SystemRandom::new()
+            .fill(&mut bytes)
+            .expect("the system has randomness");
+        Self(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+    }
+
+    pub fn from_saved(text: &str) -> Option<Self> {
+        let text = text.trim();
+        let well_formed = text.len() == 32 && text.chars().all(|c| c.is_ascii_hexdigit());
+        well_formed.then(|| Self(text.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 struct WorldPlayer {
     connection: Box<dyn WorldConnection>,
-    /// None until the player has asked to enter.
+    /// None until the player has entered.
     team: Option<Team>,
+    /// When the player entered, counted in entries to the world, so the latest of two on one side stays.
+    entry: u64,
     sent: SentView,
 }
 
@@ -85,6 +115,8 @@ pub struct WorldHost {
     app: App,
     players: Vec<WorldPlayer>,
     level_side_taken: bool,
+    sides_of_players: HashMap<PlayerKey, Team>,
+    entries: u64,
     effects: WorldEffects,
     mined: MinedCrystal,
     /// Effects since the last views went out.
@@ -120,6 +152,8 @@ impl WorldHost {
             app,
             players: Vec::new(),
             level_side_taken: false,
+            sides_of_players: HashMap::new(),
+            entries: 0,
             effects: WorldEffects::default(),
             mined: MinedCrystal::default(),
             unshown_effects: Vec::new(),
@@ -142,6 +176,7 @@ impl WorldHost {
         self.players.push(WorldPlayer {
             connection,
             team: None,
+            entry: 0,
             sent: SentView::default(),
         });
     }
@@ -193,23 +228,54 @@ impl WorldHost {
             connected
         });
         self.players = players;
+        self.let_go_of_displaced_players();
+    }
+
+    /// A player who entered again elsewhere commands their side from there; the older connection goes.
+    fn let_go_of_displaced_players(&mut self) {
+        let mut latest: HashMap<Team, u64> = HashMap::new();
+        for player in &self.players {
+            if let Some(team) = player.team {
+                let entry = latest.entry(team).or_default();
+                *entry = (*entry).max(player.entry);
+            }
+        }
+        self.players.retain(|player| {
+            let displaced = player
+                .team
+                .is_some_and(|team| latest[&team] != player.entry);
+            if displaced {
+                player.connection.send(&Message::Refused {
+                    reason: "You entered this world elsewhere".into(),
+                });
+            }
+            !displaced
+        });
     }
 
     fn answer(&mut self, player: &mut WorldPlayer, message: Message) {
         match (message, player.team) {
-            (Message::EnterWorld { version }, None) => {
+            (
+                Message::EnterWorld {
+                    version,
+                    player: key,
+                },
+                None,
+            ) => {
                 if version != env!("CARGO_PKG_VERSION") {
                     player.connection.send(&Message::Refused {
                         reason: format!("The world runs version {}", env!("CARGO_PKG_VERSION")),
                     });
                     return;
                 }
-                let Some(team) = self.side_for_newcomer() else {
+                let Some(team) = self.side_for(&key) else {
                     player.connection.send(&Message::Refused {
                         reason: "The world has no room for you".into(),
                     });
                     return;
                 };
+                self.entries += 1;
+                player.entry = self.entries;
                 player.team = Some(team);
                 let map_seed = self.app.world().resource::<ActiveLevel>().0.map_seed;
                 player.connection.send(&Message::Entered {
@@ -228,6 +294,18 @@ impl WorldHost {
             }
             _ => {}
         }
+    }
+
+    /// A returning player's side if anything of it still stands, otherwise a new one.
+    fn side_for(&mut self, key: &PlayerKey) -> Option<Team> {
+        if let Some(&team) = self.sides_of_players.get(key)
+            && side_stands(self.app.world_mut(), team)
+        {
+            return Some(team);
+        }
+        let team = self.side_for_newcomer()?;
+        self.sides_of_players.insert(key.clone(), team);
+        Some(team)
     }
 
     /// The first player takes the level's own side; everyone after a generated site of their own.
@@ -292,6 +370,7 @@ mod tests {
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            player: PlayerKey::new_random(),
         });
         let team = Team::Player;
         let mut mirror = WorldMirror::default();
@@ -498,6 +577,7 @@ mod tests {
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            player: PlayerKey::new_random(),
         });
         let mut mirror = WorldMirror::default();
         host.step(SIMULATION_TICK);
@@ -570,14 +650,73 @@ mod tests {
     }
 
     fn enter(host: &mut WorldHost) -> (LocalConnection, Team) {
+        enter_as(host, &PlayerKey::new_random())
+    }
+
+    fn enter_as(host: &mut WorldHost, key: &PlayerKey) -> (LocalConnection, Team) {
         let (mut player, world_end) = local_connection();
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            player: key.clone(),
         });
         host.step(SIMULATION_TICK);
         let team = entered(&mut player).expect("the world let the player in");
         (player, team)
+    }
+
+    fn was_refused(player: &mut LocalConnection) -> bool {
+        player
+            .drain()
+            .into_iter()
+            .any(|arrival| matches!(arrival, Arrival::Message(Message::Refused { .. })))
+    }
+
+    #[test]
+    fn a_returning_player_commands_their_side_again() {
+        let mut host = WorldHost::new(29);
+        let key = PlayerKey::new_random();
+        let (_other, _) = enter(&mut host);
+        let (first_visit, team) = enter_as(&mut host, &key);
+        drop(first_visit);
+        host.step(SIMULATION_TICK);
+        assert_eq!(host.player_count(), 1);
+
+        let (_second_visit, team_again) = enter_as(&mut host, &key);
+        assert_eq!(team_again, team);
+    }
+
+    #[test]
+    fn entering_again_elsewhere_lets_go_of_the_older_connection() {
+        let mut host = WorldHost::new(29);
+        let key = PlayerKey::new_random();
+        let (mut older, team) = enter_as(&mut host, &key);
+        let (mut newer, team_again) = enter_as(&mut host, &key);
+        assert_eq!(team_again, team);
+        assert!(was_refused(&mut older));
+        assert!(!was_refused(&mut newer));
+        assert_eq!(host.player_count(), 1);
+    }
+
+    #[test]
+    fn a_player_whose_side_fell_starts_anew() {
+        let mut host = WorldHost::new(29);
+        let key = PlayerKey::new_random();
+        let (_, team) = enter_as(&mut host, &key);
+        let world = host.world();
+        let everything: Vec<Entity> = world
+            .query::<(Entity, &Team)>()
+            .iter(world)
+            .filter(|(_, owner)| **owner == team)
+            .map(|(entity, _)| entity)
+            .collect();
+        for entity in everything {
+            world.despawn(entity);
+        }
+        host.step(SIMULATION_TICK);
+
+        let (_, new_team) = enter_as(&mut host, &key);
+        assert_ne!(new_team, team);
     }
 
     #[test]
@@ -640,6 +779,7 @@ mod tests {
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: "0.0.1".into(),
+            player: PlayerKey::new_random(),
         });
         host.step(SIMULATION_TICK);
         let refused = player

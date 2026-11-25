@@ -6,10 +6,13 @@ use std::time::{Duration, Instant};
 use bevy::prelude::*;
 
 use crate::app::match_flow::{GameState, MirroredBattle};
+use crate::app::settings::game_data_directory;
 use crate::missions::levels::ActiveLevel;
 use crate::net::lobby::DEFAULT_PORT;
 use crate::net::network::{Arrival, Dialling, JoinTarget, Link, Message};
-use crate::net::world_host::{WorldConnection, WorldHost, local_connection, world_level};
+use crate::net::world_host::{
+    PlayerKey, WorldConnection, WorldHost, local_connection, world_level,
+};
 use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewChange};
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
@@ -28,6 +31,7 @@ use crate::world::wilds::widen_world;
 /// How long a world the game runs itself sleeps between steps; short enough to answer at once.
 const LOCAL_WORLD_POLL: Duration = Duration::from_millis(2);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const PLAYER_KEY_FILE: &str = "world_player_key";
 
 /// The world this game plays in, run elsewhere: on a server, or on a thread of the game's own.
 #[derive(Resource)]
@@ -43,9 +47,10 @@ pub struct WorldClient {
 }
 
 impl WorldClient {
-    fn entering(connection: Box<dyn WorldConnection>) -> Self {
+    fn entering(connection: Box<dyn WorldConnection>, player: PlayerKey) -> Self {
         connection.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            player,
         });
         Self {
             connection: Mutex::new(connection),
@@ -70,7 +75,7 @@ impl WorldClient {
                 std::thread::sleep(LOCAL_WORLD_POLL);
             }
         });
-        Self::entering(Box::new(player))
+        Self::entering(Box::new(player), PlayerKey::new_random())
     }
 
     /// The world of the server at `address`, e.g. `ws://server:47300/world`.
@@ -87,7 +92,7 @@ impl WorldClient {
             trusted: None,
         };
         let link = Link::guest_side_to(stream, dialling).map_err(|error| error.to_string())?;
-        Ok(Self::entering(Box::new(link)))
+        Ok(Self::entering(Box::new(link), saved_player_key()))
     }
 
     pub fn team(&self) -> Option<Team> {
@@ -128,6 +133,25 @@ impl WorldClient {
         }
         entered
     }
+}
+
+/// The key this game comes back to the worlds of servers with, made the first time and kept with the game's
+/// data; a world played alone stops with the game, so it needs none.
+fn saved_player_key() -> PlayerKey {
+    let path = game_data_directory().join(PLAYER_KEY_FILE);
+    if let Some(key) = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| PlayerKey::from_saved(&text))
+    {
+        return key;
+    }
+    let key = PlayerKey::new_random();
+    let saved = std::fs::create_dir_all(game_data_directory())
+        .and_then(|()| std::fs::write(&path, key.as_str()));
+    if let Err(error) = saved {
+        warn!("could not keep the world player key: {error}");
+    }
+    key
 }
 
 /// Once the world lets the player in, the battle starts as a copy of it, on the player's side.

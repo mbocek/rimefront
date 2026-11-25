@@ -5,7 +5,11 @@ use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
 
+use crate::app::match_flow::MirroredBattle;
+use crate::app::settings::GameSettings;
+use crate::net::network::NetSession;
 use crate::sim::catalog::Team;
+use crate::sim::player_commands::LocalTeam;
 
 /// A model's own material with its side's colour put where the model has the key colour; see
 /// assets/shaders/side_tint.wesl.
@@ -77,6 +81,51 @@ impl SideColors {
     pub fn choose(&mut self, team: Team, color: Color) {
         self.chosen.insert(team, color);
     }
+
+    /// The side's colour on the minimap and in the sidebar.
+    pub fn ui_of(&self, team: Team) -> Color {
+        self.chosen
+            .get(&team)
+            .copied()
+            .unwrap_or_else(|| team.ui_color())
+    }
+}
+
+/// A new battle starts with every side in its own colour and the player's in the one they chose; a network
+/// battle tells the other players, and a world sends every side's colour itself.
+pub fn paint_sides_for_a_new_battle(
+    mut colors: ResMut<SideColors>,
+    settings: Res<GameSettings>,
+    local: Res<LocalTeam>,
+    session: Option<ResMut<NetSession>>,
+    world: Option<Res<MirroredBattle>>,
+) {
+    colors.chosen.clear();
+    let Some(color) = settings.side_color.filter(|_| world.is_none()) else {
+        return;
+    };
+    colors.choose(local.0, color.color());
+    if let Some(mut session) = session
+        && !session.command_timing().spectating
+    {
+        session.paint(local.0, color);
+    }
+}
+
+/// The colours the other players of a network battle chose.
+pub fn paint_other_players_sides(
+    session: Option<ResMut<NetSession>>,
+    mut colors: ResMut<SideColors>,
+) {
+    let Some(mut session) = session else { return };
+    for (team, color) in session.take_paints() {
+        colors.choose(team, color.color());
+    }
+}
+
+/// A replay shows every side in its own colour.
+pub fn forget_chosen_colors(mut colors: ResMut<SideColors>) {
+    colors.chosen.clear();
 }
 
 /// A part painted in its side's colour: the model's own material, to paint it again when the colour changes.

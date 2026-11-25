@@ -4,7 +4,9 @@ use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use iron_tide_sim::sim::catalog::{BuildingKind, Diplomacy, ProjectileStyle, Team, UnitKind};
+use iron_tide_sim::sim::catalog::{
+    BuildingKind, Diplomacy, ProjectileStyle, SideColor, Team, UnitKind,
+};
 use iron_tide_sim::sim::combat::{Projectile, Targets};
 use iron_tide_sim::sim::components::{Building, HarvestState, Harvester, Health, Unit};
 use iron_tide_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
@@ -334,6 +336,7 @@ pub struct WorldNews<'a> {
     pub tick: u64,
     pub effects: &'a [Effect],
     pub mined: &'a MinedCrystal,
+    pub colors: &'a HashMap<Team, SideColor>,
 }
 
 /// What changed in a player's view of a world since the last one they were sent.
@@ -355,6 +358,8 @@ pub struct ViewChange {
     pub effects: Vec<Effect>,
     /// Cells whose crystal changed, with what is left.
     pub crystal: Vec<(IVec2, u32)>,
+    /// Sides whose colour changed, or that the player was not told the colour of yet.
+    pub colors: Vec<(Team, SideColor)>,
 }
 
 impl ViewChange {
@@ -367,6 +372,7 @@ impl ViewChange {
             && self.hidden.is_empty()
             && self.effects.is_empty()
             && self.crystal.is_empty()
+            && self.colors.is_empty()
     }
 }
 
@@ -504,6 +510,7 @@ pub struct SentView {
     credits: Option<i32>,
     side: Option<SideState>,
     crystal: HashMap<IVec2, u32>,
+    colors: HashMap<Team, SideColor>,
 }
 
 impl SentView {
@@ -562,6 +569,7 @@ impl SentView {
                 .copied()
                 .collect(),
             crystal: self.crystal_changes(&chunks, news.mined),
+            colors: self.color_changes(news.colors),
         };
         (!change.is_empty()).then_some(change)
     }
@@ -590,6 +598,17 @@ impl SentView {
                 now.insert(*id, *state);
             }
         }
+    }
+
+    fn color_changes(&mut self, colors: &HashMap<Team, SideColor>) -> Vec<(Team, SideColor)> {
+        let mut changes: Vec<(Team, SideColor)> = colors
+            .iter()
+            .filter(|&(team, color)| self.colors.get(team) != Some(color))
+            .map(|(&team, &color)| (team, color))
+            .collect();
+        changes.sort_by_key(|(team, _)| *team);
+        self.colors.extend(changes.iter().copied());
+        changes
     }
 
     fn crystal_changes(
@@ -621,6 +640,7 @@ pub struct WorldMirror {
     pub crystal: BTreeMap<(i32, i32), u32>,
     /// Every piece of news the player was told, oldest first.
     pub told: Vec<SideNews>,
+    pub colors: HashMap<Team, SideColor>,
 }
 
 impl WorldMirror {
@@ -649,6 +669,7 @@ impl WorldMirror {
         for (cell, amount) in change.crystal {
             self.crystal.insert((cell.x, cell.y), amount);
         }
+        self.colors.extend(change.colors.iter().copied());
         self.told
             .extend(change.effects.iter().filter_map(|effect| match effect {
                 Effect::Told { news, .. } => Some(*news),
@@ -735,12 +756,14 @@ mod tests {
                 },
             ],
             crystal: vec![(IVec2::new(3, -4), 1_500)],
+            colors: vec![(Team::from_index(9), SideColor([1, 128, 255]))],
         };
         vec![
             Message::EnterWorld {
                 version: "1.6.0".into(),
                 protocol: WORLD_PROTOCOL,
                 player: PlayerKey::from_saved("00112233445566778899aabbccddeeff").unwrap(),
+                color: Some(SideColor([200, 100, 0])),
             },
             Message::Entered {
                 team: Team::from_index(4),

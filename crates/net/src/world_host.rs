@@ -14,7 +14,7 @@ use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews,
 use iron_tide_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
 use iron_tide_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use iron_tide_sim::sim::ai::{AiCommander, AiCommanders};
-use iron_tide_sim::sim::catalog::Team;
+use iron_tide_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
 use iron_tide_sim::sim::components::Health;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::economy::Economies;
@@ -132,7 +132,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 1;
+pub const WORLD_PROTOCOL: u32 = 2;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {
@@ -145,6 +145,30 @@ fn protocol_refusal(protocol: u32) -> Option<&'static str> {
             Some("The world is older than this game: its server needs updating")
         }
     }
+}
+
+/// Two sides' colours closer than this, as `SideColor::distance` measures, are too alike to tell apart.
+const ALIKE_COLORS: u32 = 3 * 45 * 45;
+
+/// `wanted` when it is apart enough from every colour `taken`; otherwise the colour of the palette furthest
+/// from all of them.
+fn distinct_color(wanted: Option<SideColor>, taken: impl Iterator<Item = SideColor>) -> SideColor {
+    let taken: Vec<SideColor> = taken.collect();
+    let nearest = |color: SideColor| {
+        taken
+            .iter()
+            .map(|&other| color.distance(other))
+            .min()
+            .unwrap_or(u32::MAX)
+    };
+    if let Some(wanted) = wanted.filter(|&wanted| nearest(wanted) >= ALIKE_COLORS) {
+        return wanted;
+    }
+    SIDE_PALETTE
+        .iter()
+        .map(|&(_, color)| color)
+        .max_by_key(|&color| nearest(color))
+        .unwrap_or(SIDE_PALETTE[0].1)
 }
 
 /// Players are sent a view every this many ticks: ten a second, half the headers and steps of one a tick,
@@ -186,6 +210,8 @@ pub struct WorldHost {
     sites: HashMap<Team, IVec2>,
     /// The computer sides that keep the world from standing empty, and the sites they hold.
     computer_sides: HashMap<Team, IVec2>,
+    /// Every side's colour, apart enough from the others' to tell them by.
+    colors: HashMap<Team, SideColor>,
     effects: WorldEffects,
     mined: MinedCrystal,
     /// Effects since the last views went out.
@@ -259,6 +285,7 @@ impl WorldHost {
         host.sites = hosting.sites.iter().copied().collect();
         host.away_since = hosting.away_since.iter().copied().collect();
         host.computer_sides = hosting.computer_sides.iter().copied().collect();
+        host.colors = hosting.colors.iter().copied().collect();
         for &team in host.sides_of_players.values() {
             host.away_since.entry(team).or_insert(saved.tick());
         }
@@ -318,7 +345,11 @@ impl WorldHost {
         let mut computer_sides: Vec<(Team, IVec2)> =
             self.computer_sides.iter().map(|(&t, &s)| (t, s)).collect();
         computer_sides.sort_by_key(|(team, _)| *team);
+        let mut colors: Vec<(Team, SideColor)> =
+            self.colors.iter().map(|(&t, &c)| (t, c)).collect();
+        colors.sort_by_key(|(team, _)| *team);
         HostingRecord {
+            colors,
             computer_sides,
             level_side_taken: self.level_side_taken,
             sheltered: players
@@ -366,12 +397,20 @@ impl WorldHost {
 
     fn hosting(app: App) -> Self {
         let level = &app.world().resource::<ActiveLevel>().0;
-        let computer_sides = level
+        let computer_sides: HashMap<Team, IVec2> = level
             .opponents()
             .map(|(team, enemy)| (team, enemy.force.site.origin()))
             .collect();
+        let mut colors = HashMap::new();
+        let mut computers: Vec<Team> = computer_sides.keys().copied().collect();
+        computers.sort();
+        for team in computers {
+            let color = distinct_color(None, colors.values().copied());
+            colors.insert(team, color);
+        }
         Self {
             computer_sides,
+            colors,
             app,
             players: Vec::new(),
             level_side_taken: false,
@@ -442,6 +481,7 @@ impl WorldHost {
             tick: self.tick(),
             effects: &effects,
             mined: &self.mined,
+            colors: &self.colors,
         };
         let snapshot = WorldSnapshot::of(self.app.world_mut());
         let world = self.app.world();
@@ -536,6 +576,7 @@ impl WorldHost {
     fn retire(&mut self, team: Team) {
         self.sides_of_players.retain(|_, &mut side| side != team);
         self.away_since.remove(&team);
+        self.colors.remove(&team);
         if let Some(site) = self.sites.remove(&team) {
             free_starting_site(self.app.world_mut(), site);
         }
@@ -570,6 +611,7 @@ impl WorldHost {
                 Message::EnterWorld {
                     protocol,
                     player: key,
+                    color,
                     ..
                 },
                 None,
@@ -589,6 +631,7 @@ impl WorldHost {
                 self.entries += 1;
                 player.entry = self.entries;
                 player.team = Some(team);
+                self.paint(team, color);
                 let map_seed = self.app.world().resource::<ActiveLevel>().0.map_seed;
                 player.connection.send(&Message::Entered {
                     team,
@@ -606,6 +649,20 @@ impl WorldHost {
             }
             _ => {}
         }
+    }
+
+    /// Gives `team` the colour wanted for it, or the one furthest from the other sides' when that is too
+    /// close to one of theirs or none was wanted.
+    fn paint(&mut self, team: Team, wanted: Option<SideColor>) {
+        let others: Vec<SideColor> = self
+            .colors
+            .iter()
+            .filter(|&(&other, _)| other != team)
+            .map(|(_, &color)| color)
+            .collect();
+        let kept = self.colors.get(&team).copied().filter(|_| wanted.is_none());
+        let color = kept.unwrap_or_else(|| distinct_color(wanted, others.into_iter()));
+        self.colors.insert(team, color);
     }
 
     /// A returning player's side if anything of it still stands, otherwise a new one.
@@ -654,6 +711,7 @@ impl WorldHost {
         world.resource_mut::<Economies>().of_mut(team).income_rate =
             COMPUTER_DIFFICULTY.income_rate();
         self.computer_sides.insert(team, computer_site);
+        self.paint(team, None);
     }
 
     /// A computer side with nothing left gives up its commander and its site.
@@ -666,6 +724,7 @@ impl WorldHost {
             .collect();
         for (team, site) in fallen {
             self.computer_sides.remove(&team);
+            self.colors.remove(&team);
             let world = self.app.world_mut();
             free_starting_site(world, site);
             retire_side(world, team);
@@ -731,6 +790,7 @@ mod tests {
             version: env!("CARGO_PKG_VERSION").into(),
             protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
+            color: None,
         });
         let team = Team::Player;
         let mut mirror = WorldMirror::default();
@@ -939,6 +999,7 @@ mod tests {
             version: env!("CARGO_PKG_VERSION").into(),
             protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
+            color: None,
         });
         let mut mirror = WorldMirror::default();
         host.step(SIMULATION_TICK);
@@ -1022,6 +1083,7 @@ mod tests {
             version: env!("CARGO_PKG_VERSION").into(),
             protocol: WORLD_PROTOCOL,
             player: key.clone(),
+            color: None,
         });
         host.step(SIMULATION_TICK);
         let team = entered(&mut player).expect("the world let the player in");
@@ -1244,6 +1306,7 @@ mod tests {
             version: env!("CARGO_PKG_VERSION").into(),
             protocol: WORLD_PROTOCOL,
             player: key.clone(),
+            color: None,
         });
         for _ in 0..TICKS_PER_VIEW {
             resumed.step(SIMULATION_TICK);
@@ -1387,6 +1450,45 @@ mod tests {
         assert_eq!(shown.thing, site);
     }
 
+    fn enter_in(host: &mut WorldHost, color: Option<SideColor>) -> (LocalConnection, Team) {
+        let (mut player, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        player.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
+            player: PlayerKey::new_random(),
+            color,
+        });
+        host.step(SIMULATION_TICK);
+        let team = entered(&mut player).expect("the world let the player in");
+        (player, team)
+    }
+
+    #[test]
+    fn players_get_the_colour_they_chose_unless_another_side_has_one_like_it() {
+        let mut host = WorldHost::new(29);
+        let teal = SideColor([20, 170, 180]);
+        let nearly_teal = SideColor([25, 165, 185]);
+        let (mut first, first_team) = enter_in(&mut host, Some(teal));
+        let (_second, second_team) = enter_in(&mut host, Some(nearly_teal));
+        assert_eq!(host.colors[&first_team], teal);
+        let given = host.colors[&second_team];
+        assert!(
+            given.distance(teal) >= ALIKE_COLORS,
+            "{given:?} is too like teal"
+        );
+        for (&team, &color) in &host.colors {
+            for (&other, &other_color) in &host.colors {
+                assert!(team == other || color.distance(other_color) >= ALIKE_COLORS);
+            }
+        }
+
+        let mut mirror = WorldMirror::default();
+        run(&mut host, 1, &mut mirror, &mut first);
+        assert_eq!(mirror.colors.get(&first_team), Some(&teal));
+        assert_eq!(mirror.colors.get(&second_team), Some(&given));
+    }
+
     #[test]
     fn entering_again_elsewhere_lets_go_of_the_older_connection() {
         let mut host = WorldHost::new(29);
@@ -1480,6 +1582,7 @@ mod tests {
             version: version.into(),
             protocol,
             player: PlayerKey::new_random(),
+            color: None,
         });
         host.step(SIMULATION_TICK);
         player

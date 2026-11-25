@@ -173,13 +173,17 @@ pub(super) fn run_command(
             );
         }
         MenuCommand::PlayWorldAlone => {
-            commands.insert_resource(WorldClient::alone_in(
-                OwnWorld::kept_with_the_game(),
-                rand::rng().random(),
-            ));
+            let own = OwnWorld {
+                color: settings.side_color,
+                ..OwnWorld::kept_with_the_game()
+            };
+            commands.insert_resource(WorldClient::alone_in(own, rand::rng().random()));
         }
         MenuCommand::NewWorldAlone => {
-            let own = OwnWorld::kept_with_the_game();
+            let own = OwnWorld {
+                color: settings.side_color,
+                ..OwnWorld::kept_with_the_game()
+            };
             match own.put_aside() {
                 Ok(()) => {
                     commands.insert_resource(WorldClient::alone_in(own, rand::rng().random()));
@@ -187,10 +191,12 @@ pub(super) fn run_command(
                 Err(error) => lobby.fail(error.to_string()),
             }
         }
-        MenuCommand::EnterServerWorld => match WorldClient::on_server(&settings.join_address) {
-            Ok(client) => commands.insert_resource(client),
-            Err(reason) => lobby.fail(reason),
-        },
+        MenuCommand::EnterServerWorld => {
+            match WorldClient::on_server(&settings.join_address, settings.side_color) {
+                Ok(client) => commands.insert_resource(client),
+                Err(reason) => lobby.fail(reason),
+            }
+        }
         MenuCommand::AcceptNetworkOffer => lobby.accept_offer(),
         MenuCommand::StartNetworkBattle => lobby.start_battle(),
         MenuCommand::CancelNetworkBattle => lobby.cancel(),

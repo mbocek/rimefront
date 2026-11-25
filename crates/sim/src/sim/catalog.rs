@@ -144,6 +144,42 @@ impl<'de> Deserialize<'de> for Team {
     }
 }
 
+/// A colour a player chose for their side's models, in sRGB, as it is saved and travels.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct SideColor(pub [u8; 3]);
+
+impl SideColor {
+    pub fn color(self) -> Color {
+        let [red, green, blue] = self.0;
+        Color::srgb_u8(red, green, blue)
+    }
+
+    /// How far apart two colours look, roughly: the squared distance of their sRGB values.
+    pub fn distance(self, other: SideColor) -> u32 {
+        self.0
+            .iter()
+            .zip(other.0)
+            .map(|(&a, b)| (i32::from(a) - i32::from(b)).unsigned_abs().pow(2))
+            .sum()
+    }
+}
+
+/// The colours a player may choose for their side, far enough apart to tell sides by.
+pub const SIDE_PALETTE: [(&str, SideColor); 12] = [
+    ("Azure", SideColor([64, 140, 255])),
+    ("Crimson", SideColor([220, 45, 40])),
+    ("Amber", SideColor([245, 140, 20])),
+    ("Violet", SideColor([150, 60, 210])),
+    ("Jade", SideColor([20, 170, 90])),
+    ("Rust", SideColor([150, 70, 30])),
+    ("Gold", SideColor([230, 200, 40])),
+    ("Rose", SideColor([240, 110, 170])),
+    ("Teal", SideColor([20, 170, 180])),
+    ("Lime", SideColor([140, 210, 40])),
+    ("Slate", SideColor([110, 120, 140])),
+    ("Ivory", SideColor([235, 235, 225])),
+];
+
 /// Whose armoury a team builds from; each side has units and structures the other cannot order.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub enum Faction {

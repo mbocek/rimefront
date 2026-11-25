@@ -3,7 +3,7 @@
 ## Settings and saves
 
 Settings (graphics: preset, shadows, AO, bloom, SMAA, vegetation, wind, VSync, frame rate limit, fullscreen;
-gameplay: language, game speed, edge scrolling, scroll speed, damage numbers, health bars, overlay; key
+gameplay: language, side colour, game speed, edge scrolling, scroll speed, damage numbers, health bars, overlay; key
 bindings, stored by key name and only where they differ from the defaults; won missions and field tips
 already read) are saved
 automatically to `~/.config/iron_tide/settings.json` (Windows: `%APPDATA%\iron_tide`). Saved games live in
@@ -34,6 +34,17 @@ the draw data of every mesh using it. The shader's material is bindless like the
 meshes with different materials cannot share a batch. Measured on the development Mac (30 s capture runs,
 High preset, same map): the whole process went from 26.9 to 24.1 s of CPU time, about 10 % less. Interface systems now write text, colours and sizes only when they change, because any write
 makes Bevy measure text and lay out the whole interface again; that took about 7 % off the main thread.
+
+## Side colour
+
+*Side colour* picks the colour of the player's units and structures, and of their marks on the minimap, from
+twelve far enough apart (`SIDE_PALETTE`), or leaves the side its own. Models carry a key colour the game
+paints the side's onto ([development.md](development.md)), so any side can take any colour. In a battle on
+this machine the player's side takes it; in a network battle every player tells the others theirs
+(`Message::Paint`), though a spectator who joins once the battle is under way sees the sides' own colours; in
+a world the player asks for it on entering, and the world gives it unless another side's colour is too much
+like it, then the colour of the palette furthest from the others. Computer sides of a world get palette
+colours the same way, and every player is sent each side's colour once, and again when it changes.
 
 ## Updates
 

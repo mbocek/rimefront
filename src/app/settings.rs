@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::i18n::{Language, set_language};
 use crate::missions::levels::Difficulty;
+use crate::sim::catalog::SideColor;
 use crate::ui::key_bindings::KeyBindings;
 
 const GAME_DIRECTORY: &str = "iron_tide";
@@ -106,6 +107,8 @@ pub struct GameSettings {
     pub keys: KeyBindings,
     /// Ask GitHub at start-up whether a newer version has been released.
     pub check_for_updates: bool,
+    /// The colour of the player's side; `None` takes the side's own.
+    pub side_color: Option<SideColor>,
     /// The host the player last joined for a network battle.
     pub join_address: String,
     /// Names of the campaign missions the player has won.
@@ -144,6 +147,7 @@ impl Default for GameSettings {
             language: Language::English,
             keys: KeyBindings::default(),
             check_for_updates: true,
+            side_color: None,
             join_address: "127.0.0.1".to_string(),
             completed_missions: Vec::new(),
             campaign_difficulty: Difficulty::Normal,

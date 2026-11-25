@@ -14,6 +14,7 @@ use crate::ui::sidebar::SIDEBAR_WIDTH;
 use crate::view::camera::{RtsCamera, ray_hit_on_terrain};
 use crate::view::fog_view::Discovered;
 use crate::view::local_view::LocalView;
+use crate::view::side_tint::SideColors;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_cells, map_bounds};
 use crate::world::terrain::GroundLayers;
 use crate::world::wilds::WorldWidened;
@@ -180,8 +181,8 @@ fn to_minimap(world: Vec3) -> Vec2 {
     (world.xz() - map_bounds().world_min()) / CELL_SIZE * pixels_per_cell()
 }
 
-fn team_rgb(team: Team) -> [u8; 3] {
-    let color = team.ui_color().to_srgba();
+fn team_rgb(colors: &SideColors, team: Team) -> [u8; 3] {
+    let color = colors.ui_of(team).to_srgba();
     [
         (color.red * 255.0) as u8,
         (color.green * 255.0) as u8,
@@ -258,6 +259,7 @@ pub fn redraw_minimap(
     buildings: Query<(&Building, &Team, Has<Discovered>)>,
     unclaimed_sites: Query<&Building, With<UnclaimedSite>>,
     units: Query<(&Transform, &Team), With<Unit>>,
+    colors: Res<SideColors>,
 ) {
     minimap.refresh_timer -= time.delta_secs();
     if minimap.refresh_timer > 0.0 {
@@ -295,7 +297,7 @@ pub fn redraw_minimap(
             continue;
         }
         for cell in footprint_cells(building.origin, building.kind.spec().footprint) {
-            canvas.fill(cell_pixel(cell), cell_pixels(), team_rgb(team));
+            canvas.fill(cell_pixel(cell), cell_pixels(), team_rgb(&colors, team));
         }
     }
     for (transform, &team) in &units {
@@ -303,7 +305,11 @@ pub fn redraw_minimap(
             continue;
         }
         let center = to_minimap(transform.translation).floor().as_ivec2();
-        canvas.fill(center - IVec2::ONE, IVec2::splat(2), team_rgb(team));
+        canvas.fill(
+            center - IVec2::ONE,
+            IVec2::splat(2),
+            team_rgb(&colors, team),
+        );
     }
 
     let (Ok(window), Ok((camera, camera_transform))) = (windows.single(), cameras.single()) else {

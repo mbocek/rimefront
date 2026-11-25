@@ -179,7 +179,10 @@ impl Relay {
                 };
                 let shared = matches!(
                     message,
-                    Message::Turn { .. } | Message::Checksum { .. } | Message::Chat { .. }
+                    Message::Turn { .. }
+                        | Message::Checksum { .. }
+                        | Message::Chat { .. }
+                        | Message::Paint { .. }
                 );
                 if self.forwards && shared {
                     self.send_except(&message, Some(index));

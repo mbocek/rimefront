@@ -388,9 +388,19 @@ impl Plugin for DisplayPlugin {
         .add_systems(
             Update,
             (
+                crate::view::side_tint::paint_other_players_sides,
                 crate::view::side_tint::paint_new_parts,
                 crate::view::side_tint::repaint_parts,
-            ),
+            )
+                .chain(),
+        )
+        .add_systems(
+            OnEnter(match_flow::GameState::Playing),
+            crate::view::side_tint::paint_sides_for_a_new_battle,
+        )
+        .add_systems(
+            OnEnter(match_flow::GameState::Replay),
+            crate::view::side_tint::forget_chosen_colors,
         );
     }
 }

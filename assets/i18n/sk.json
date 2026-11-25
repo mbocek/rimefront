@@ -643,5 +643,19 @@
   "The world is older than this game: its server needs updating": "Svet je starší ako táto hra: jeho server treba aktualizovať",
   "The connection to the world was lost": "Spojenie so svetom sa stratilo",
   "The world has no room for you": "Vo svete pre teba nie je miesto",
-  "You entered this world elsewhere": "Do tohto sveta si vstúpil inde"
+  "You entered this world elsewhere": "Do tohto sveta si vstúpil inde",
+  "Azure": "Azúrová",
+  "Crimson": "Karmínová",
+  "Amber": "Jantárová",
+  "Violet": "Fialová",
+  "Jade": "Nefritová",
+  "Rust": "Hrdzavá",
+  "Gold": "Zlatá",
+  "Rose": "Ružová",
+  "Teal": "Tyrkysová",
+  "Lime": "Limetková",
+  "Slate": "Bridlicová",
+  "Ivory": "Slonovinová",
+  "Side colour": "Farba strany",
+  "The side's own": "Vlastná strany"
 }

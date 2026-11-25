@@ -26,6 +26,7 @@ fn enter(host: &mut WorldHost) -> LocalConnection {
         version: env!("CARGO_PKG_VERSION").into(),
         protocol: WORLD_PROTOCOL,
         player: PlayerKey::new_random(),
+        color: None,
     });
     host.step(SIMULATION_TICK);
     player

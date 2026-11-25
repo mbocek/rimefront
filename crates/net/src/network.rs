@@ -13,7 +13,7 @@ use crate::world_view::ViewChange;
 use iron_tide_sim::i18n::{tr, tr_fmt};
 use iron_tide_sim::levels::LevelDefinition;
 use iron_tide_sim::sim::ai::AiCommanders;
-use iron_tide_sim::sim::catalog::Team;
+use iron_tide_sim::sim::catalog::{SideColor, Team};
 use iron_tide_sim::sim::determinism::simulation_checksum;
 use iron_tide_sim::sim::notifications::Notifications;
 use iron_tide_sim::sim::player_commands::{
@@ -77,6 +77,11 @@ pub enum Message {
     Pong {
         nonce: u64,
     },
+    /// The colour a player chose for their side's models; it changes nothing in the battle.
+    Paint {
+        team: Team,
+        color: SideColor,
+    },
     /// A line a player typed, in the lobby or during the battle.
     Chat {
         team: Team,
@@ -103,6 +108,9 @@ pub enum Message {
         #[serde(default)]
         protocol: u32,
         player: PlayerKey,
+        /// The colour the player chose for their side; `None` leaves it to the world.
+        #[serde(default)]
+        color: Option<SideColor>,
     },
     /// From a world: the side the player commands there, and the world's tick when they entered.
     Entered {
@@ -232,6 +240,7 @@ pub struct NetSession {
     reported: Option<SessionState>,
     pings_in_flight: BTreeMap<u64, Instant>,
     incoming_chat: Vec<(Team, String)>,
+    incoming_paints: Vec<(Team, SideColor)>,
     next_ping: u64,
     last_ping_sent: Option<Instant>,
     round_trip: Option<Duration>,
@@ -255,6 +264,7 @@ impl NetSession {
             state: SessionState::InStep,
             reported: None,
             pings_in_flight: BTreeMap::new(),
+            incoming_paints: Vec::new(),
             incoming_chat: Vec::new(),
             next_ping: 0,
             last_ping_sent: None,
@@ -356,6 +366,16 @@ impl NetSession {
             text: text.clone(),
         });
         Some(text)
+    }
+
+    /// Shows every other player `team`'s models in `color`.
+    pub fn paint(&mut self, team: Team, color: SideColor) {
+        self.broadcast(&Message::Paint { team, color });
+    }
+
+    /// The colours other players chose for their sides since the last call.
+    pub fn take_paints(&mut self) -> Vec<(Team, SideColor)> {
+        std::mem::take(&mut self.incoming_paints)
     }
 
     /// Chat lines other players sent since the last call, with the team that sent each.
@@ -468,6 +488,7 @@ impl NetSession {
                     self.incoming_chat
                         .extend(chat_line(&text).map(|text| (team, text)));
                 }
+                Message::Paint { team, color } => self.incoming_paints.push((team, color)),
                 Message::Pong { nonce } => self.answered(nonce),
                 Message::Ping { .. }
                 | Message::EnterWorld { .. }

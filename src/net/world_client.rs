@@ -19,7 +19,7 @@ use crate::net::world_host::{
 };
 use crate::net::world_store::WorldStore;
 use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewChange};
-use crate::sim::catalog::Team;
+use crate::sim::catalog::{SideColor, Team};
 use crate::sim::components::{Building, Health};
 use crate::sim::cues::{BlastCue, SoundCue};
 use crate::sim::determinism::{SimEntities, SimId};
@@ -32,6 +32,7 @@ use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::{Sides, side_stands};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
+use crate::view::side_tint::SideColors;
 use crate::world::map::{CrystalVisual, GameMap, crystal_scale, map_bounds};
 use crate::world::wilds::widen_world;
 
@@ -70,10 +71,15 @@ pub struct WorldClient {
 }
 
 impl WorldClient {
-    fn entering(connection: Box<dyn WorldConnection>, player: PlayerKey) -> Self {
+    fn entering(
+        connection: Box<dyn WorldConnection>,
+        player: PlayerKey,
+        color: Option<SideColor>,
+    ) -> Self {
         connection.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
             protocol: WORLD_PROTOCOL,
+            color,
             player,
         });
         Self {
@@ -100,7 +106,7 @@ impl WorldClient {
             host.connect(Box::new(world_end));
             run_until_left(&mut host);
         });
-        Self::entering(Box::new(player), PlayerKey::new_random()).running(thread)
+        Self::entering(Box::new(player), PlayerKey::new_random(), None).running(thread)
     }
 
     /// The world kept in `own`, or a new one grown from `map_seed` when it holds none, on a thread of the
@@ -136,7 +142,7 @@ impl WorldClient {
                 );
             }
         });
-        Self::entering(Box::new(player), own.player).running(thread)
+        Self::entering(Box::new(player), own.player, own.color).running(thread)
     }
 
     fn running(mut self, thread: JoinHandle<()>) -> Self {
@@ -144,8 +150,9 @@ impl WorldClient {
         self
     }
 
-    /// The world of the server at `address`, e.g. `ws://server:47300/world`.
-    pub fn on_server(address: &str) -> Result<Self, String> {
+    /// The world of the server at `address`, e.g. `ws://server:47300/world`, asking for `color` for the
+    /// player's side.
+    pub fn on_server(address: &str, color: Option<SideColor>) -> Result<Self, String> {
         let target = JoinTarget::parse(address, DEFAULT_PORT)?;
         let socket_address = std::net::ToSocketAddrs::to_socket_addrs(&target.address)
             .map_err(|error| error.to_string())?
@@ -158,7 +165,7 @@ impl WorldClient {
             trusted: None,
         };
         let link = Link::guest_side_to(stream, dialling).map_err(|error| error.to_string())?;
-        Ok(Self::entering(Box::new(link), saved_player_key()))
+        Ok(Self::entering(Box::new(link), saved_player_key(), color))
     }
 
     pub fn team(&self) -> Option<Team> {
@@ -214,6 +221,8 @@ fn run_until_left(host: &mut WorldHost) {
 pub struct OwnWorld {
     pub directory: PathBuf,
     pub player: PlayerKey,
+    /// The colour the player chose for their side; `None` leaves it to the world.
+    pub color: Option<SideColor>,
 }
 
 impl OwnWorld {
@@ -236,6 +245,7 @@ impl OwnWorld {
         Self {
             directory: game_data_directory().join(OWN_WORLD_DIRECTORY),
             player: saved_player_key(),
+            color: None,
         }
     }
 }
@@ -358,6 +368,10 @@ pub fn follow_world(world: &mut World) {
             show_effect(world, side, effect);
         }
         show_crystal(world, &change.crystal);
+        let mut colors = world.resource_mut::<SideColors>();
+        for (team, color) in change.colors {
+            colors.choose(team, color.color());
+        }
     }
     glide(world);
     let world_tick = world_tick_now(world, local_tick);
@@ -607,7 +621,8 @@ pub struct WorldClientPlugin;
 
 impl Plugin for WorldClientPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, (enter_world, give_up_a_lost_world).chain())
+        app.init_resource::<SideColors>()
+            .add_systems(PreUpdate, (enter_world, give_up_a_lost_world).chain())
             .add_systems(
                 FixedUpdate,
                 (follow_world, send_orders_to_world)

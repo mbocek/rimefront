@@ -446,7 +446,9 @@ fn start_requested_mission(
     if let Ok(world) = std::env::var(CAPTURE_WORLD_VAR) {
         let client = match world.parse() {
             Ok(map_seed) => WorldClient::alone(map_seed),
-            Err(_) => WorldClient::on_server(&world).expect("the server's world can be reached"),
+            Err(_) => {
+                WorldClient::on_server(&world, None).expect("the server's world can be reached")
+            }
         };
         commands.insert_resource(client);
         return;

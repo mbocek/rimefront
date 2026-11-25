@@ -279,6 +279,7 @@ fn a_player_enters_the_world_a_server_runs() {
         version: env!("CARGO_PKG_VERSION").into(),
         protocol: WORLD_PROTOCOL,
         player: PlayerKey::new_random(),
+        color: None,
     });
     let mut entered = None;
     for _ in 0..5_000 {

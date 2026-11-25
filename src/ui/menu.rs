@@ -1,4 +1,5 @@
 use crate::net::network::NetSession;
+use crate::sim::catalog::{SIDE_PALETTE, SideColor};
 use crate::sim::notifications::Notifications;
 use crate::ui::structure_tools::StructureTool;
 use bevy::picking::hover::Hovered;
@@ -99,6 +100,7 @@ enum Setting {
     EffectsVolume,
     VoiceVolume,
     Language,
+    SideColor,
 }
 
 const GRAPHICS_SETTINGS: [Setting; 10] = [
@@ -122,8 +124,9 @@ const AUDIO_SETTINGS: [Setting; 4] = [
 ];
 const VOLUME_STEP: f32 = 0.1;
 
-const GAMEPLAY_SETTINGS: [Setting; 8] = [
+const GAMEPLAY_SETTINGS: [Setting; 9] = [
     Setting::Language,
+    Setting::SideColor,
     Setting::GameSpeed,
     Setting::EdgeScroll,
     Setting::ScrollSpeed,
@@ -196,6 +199,7 @@ impl Setting {
             Setting::EffectsVolume => tr("Effects volume"),
             Setting::VoiceVolume => tr("Voice volume"),
             Setting::Language => tr("Language"),
+            Setting::SideColor => tr("Side colour"),
         }
     }
 
@@ -230,6 +234,10 @@ impl Setting {
             Setting::EffectsVolume => percent(settings.effects_volume),
             Setting::VoiceVolume => percent(settings.voice_volume),
             Setting::Language => settings.language.native_name().into(),
+            Setting::SideColor => SIDE_PALETTE
+                .iter()
+                .find(|(_, color)| Some(*color) == settings.side_color)
+                .map_or_else(|| tr("The side's own").into(), |(name, _)| tr(name).into()),
         }
     }
 
@@ -329,6 +337,12 @@ impl Setting {
             }
             Setting::Language => {
                 settings.language = step(&Language::ALL, settings.language, forward);
+            }
+            Setting::SideColor => {
+                let choices: Vec<Option<SideColor>> = std::iter::once(None)
+                    .chain(SIDE_PALETTE.iter().map(|&(_, color)| Some(color)))
+                    .collect();
+                settings.side_color = step(&choices, settings.side_color, forward);
             }
         }
         if self.is_detail_option() {

@@ -160,6 +160,26 @@ fn handshake(
     }
 }
 
+/// The first byte of a message in postcard; a message in JSON never starts with it.
+const COMPACT: u8 = 0;
+
+/// A message as it travels: in postcard, a compact binary form, once both ends have shown they run the same
+/// version. The messages that show it stay JSON, so a game of another version still reads why it is turned
+/// away; they also carry the level, whose layout postcard cannot write.
+pub fn encode(message: &Message) -> Option<Vec<u8>> {
+    if message.shows_the_version() {
+        return serde_json::to_vec(message).ok();
+    }
+    postcard::to_extend(message, vec![COMPACT]).ok()
+}
+
+pub fn decode(bytes: &[u8]) -> Option<Message> {
+    match bytes.split_first() {
+        Some((&COMPACT, compact)) => postcard::from_bytes(compact).ok(),
+        _ => serde_json::from_slice(bytes).ok(),
+    }
+}
+
 fn is_waiting(error: &tungstenite::Error) -> bool {
     matches!(error, tungstenite::Error::Io(io)
         if matches!(io.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut))
@@ -168,7 +188,7 @@ fn is_waiting(error: &tungstenite::Error) -> bool {
 fn read_arrival(socket: &mut Socket) -> Option<Arrival> {
     match socket.read() {
         Ok(WsMessage::Binary(bytes)) => {
-            Some(serde_json::from_slice(&bytes).map_or(Arrival::ConnectionLost, Arrival::Message))
+            Some(decode(&bytes).map_or(Arrival::ConnectionLost, Arrival::Message))
         }
         Ok(WsMessage::Close(_)) => Some(Arrival::ConnectionLost),
         Ok(_) => None,
@@ -235,7 +255,7 @@ fn serve_polling(mut socket: Socket, outbox: &Receiver<Vec<u8>>, inbox: &Sender<
         }
         let arrival = match socket.read() {
             Ok(WsMessage::Binary(bytes)) => {
-                serde_json::from_slice(&bytes).map_or(Arrival::ConnectionLost, Arrival::Message)
+                decode(&bytes).map_or(Arrival::ConnectionLost, Arrival::Message)
             }
             Ok(WsMessage::Close(_)) => return,
             Ok(_) => continue,
@@ -322,7 +342,7 @@ impl Link {
 
     /// Queues the message for the connection's thread; false once the connection has gone.
     pub fn send(&self, message: &Message) -> bool {
-        let Ok(bytes) = serde_json::to_vec(message) else {
+        let Some(bytes) = encode(message) else {
             return true;
         };
         !self.has_failed() && self.outbox.send(bytes).is_ok()
@@ -470,6 +490,51 @@ impl Drop for Link {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::world_view::ViewChange;
+    use iron_tide_sim::sim::player_commands::PlayerCommand;
+
+    #[test]
+    fn messages_travel_compact_once_the_version_is_shown() {
+        let later = Team::from_index(200);
+        let compact = [
+            Message::Turn {
+                team: later,
+                tick: 70_000,
+                commands: vec![PlayerCommand::Stop { units: Vec::new() }],
+            },
+            Message::Checksum {
+                team: Team::Player,
+                tick: 3,
+                sum: u64::MAX,
+            },
+            Message::Ready,
+            Message::Entered {
+                team: later,
+                tick: 9,
+                map_seed: 29,
+            },
+            Message::WorldView(Box::new(ViewChange {
+                tick: 5,
+                credits: -40,
+                ..ViewChange::default()
+            })),
+        ];
+        for message in compact {
+            let bytes = encode(&message).unwrap();
+            assert_eq!(bytes[0], COMPACT, "{message:?}");
+            assert_eq!(decode(&bytes), Some(message));
+        }
+        let showing = Message::Offer {
+            version: "9.9.9".into(),
+            level: Box::default(),
+            your_team: Some(later),
+            players: vec![Team::Player, later],
+            under_way: false,
+        };
+        let bytes = encode(&showing).unwrap();
+        assert_eq!(bytes[0], b'{');
+        assert_eq!(decode(&bytes), Some(showing));
+    }
 
     #[test]
     fn a_join_address_may_be_a_host_a_port_or_a_websocket_url_with_a_room() {

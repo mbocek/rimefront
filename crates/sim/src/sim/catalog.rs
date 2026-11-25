@@ -119,14 +119,22 @@ const SIDE_LOOKS: [SideLook; 8] = [
     },
 ];
 
+/// By name where people may read it (levels, saved games), by number in compact binary forms.
 impl Serialize for Team {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.key())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&self.key())
+        } else {
+            serializer.serialize_u8(self.0)
+        }
     }
 }
 
 impl<'de> Deserialize<'de> for Team {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        if !deserializer.is_human_readable() {
+            return u8::deserialize(deserializer).map(Team);
+        }
         let key = String::deserialize(deserializer)?;
         Team::from_key(&key)
             .ok_or_else(|| serde::de::Error::custom(format!("no side is called {key}")))

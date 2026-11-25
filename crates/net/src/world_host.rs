@@ -576,7 +576,7 @@ mod tests {
         let mut bytes = 0;
         for arrival in player.drain() {
             if let Arrival::Message(message @ Message::WorldView(_)) = arrival {
-                bytes += serde_json::to_vec(&message).unwrap().len();
+                bytes += crate::link::encode(&message).unwrap().len();
                 let Message::WorldView(change) = message else {
                     unreachable!()
                 };
@@ -622,7 +622,7 @@ mod tests {
             !mirror.things.contains_key(&enemy_base),
             "seen through the fog"
         );
-        println!("a minute of a world's view: {bytes} bytes of JSON");
+        println!("a minute of a world's view: {bytes} bytes");
 
         let tank = mirror
             .things
@@ -650,7 +650,7 @@ mod tests {
             mirror.things[&tank.id], tank,
             "the mirrored tank never moved"
         );
-        println!("ten seconds of a tank driving: {moving_bytes} bytes of JSON");
+        println!("ten seconds of a tank driving: {moving_bytes} bytes");
     }
 
     #[test]

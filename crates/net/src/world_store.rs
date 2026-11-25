@@ -32,7 +32,7 @@ use iron_tide_sim::world::sites::StartingSites;
 use iron_tide_sim::world::wilds::{crystal_look, widen_world};
 
 /// Bumped whenever the layout changes incompatibly; a world saved by another layout is refused.
-const STORE_VERSION: u32 = 1;
+const STORE_VERSION: u32 = 2;
 const WORLD_FILE: &str = "world.bin";
 const CHUNKS_DIRECTORY: &str = "chunks";
 

@@ -232,9 +232,9 @@ for ordinary network matches.
     fog does not hide from them, each with its kind, side, position (hundredths of a cell), facing, health
     and a structure's origin; those gone from view; their credits; and the world's bounds when they widened.
     A player's `WorldMirror` applies them, and a test checks that after a minute it holds exactly what the
-    world shows that side, the computer side's Command Center not among it. Measured in that test, as JSON:
-    a minute of a quiet start costs 6 kB, and a tank driving costs 41 kB in 10 s, about 4 kB/s for every
-    moving unit, so a compact binary format (step 15) is due before crowds.
+    world shows that side, the computer side's Command Center not among it. Measured in that test, as JSON
+    at first: a minute of a quiet start cost 6 kB, and a tank driving 41 kB in 10 s, about 4 kB/s for every
+    moving unit; the compact form below cut that.
     The game plays a world too (`net::world_client`): *Play a world alone* on the network page runs a
     `WorldHost` on a thread of the game's own, *Enter the server's world* connects to `ws://server/world`.
     Once the world lets the player in, the game starts a battle on the world's map and seed as a
@@ -308,8 +308,13 @@ for ordinary network matches.
     away from the tick of the save on. Cells whose crystal differs from what the seed grows are told to
     players as mined, as their games grow the seed's fields. Shots in flight, the targets units had, and
     harvesters' errands are not kept: the shots are gone, the rest is taken up again.
-    The dedicated server saves its world with `--world-dir DIR` (see [server.md](server.md)). The world's
-    views still travel as JSON.
+    The dedicated server saves its world with `--world-dir DIR` (see [server.md](server.md)), and on Ctrl-C
+    or a termination signal before it stops.
+    Every message after the version check travels in postcard too (`link::encode`, see
+    [determinism.md](determinism.md)), lockstep turns included. Measured in `world_host`'s test on the wire:
+    the quiet first minute, with effects and side news, went from 16.8 kB as JSON to 2.1 kB, and a tank
+    driving 10 s from 56 kB to 6.7 kB, about 0.7 kB/s for every moving unit in sight. Sending only the
+    change of a moving unit's position would about halve that again.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing
     empty between players.
 

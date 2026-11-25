@@ -118,6 +118,19 @@ pub enum Message {
     },
 }
 
+impl Message {
+    /// Whether this message is one that tells the other end which version sent it, or why it is refused.
+    pub fn shows_the_version(&self) -> bool {
+        matches!(
+            self,
+            Message::Offer { .. }
+                | Message::OpenRoom { .. }
+                | Message::EnterWorld { .. }
+                | Message::Refused { .. }
+        )
+    }
+}
+
 /// The battle a guest was offered.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Offer {

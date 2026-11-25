@@ -686,7 +686,7 @@ mod tests {
     use crate::world_host::{PlayerKey, WORLD_PROTOCOL};
     use rimefront_sim::sim::components::Stance;
     use rimefront_sim::sim::notifications::SideNews;
-    use rimefront_sim::sim::player_commands::PlayerCommand;
+    use rimefront_sim::sim::player_commands::{GroundOrder, PlayerCommand};
     use rimefront_sim::sim::research::Upgrade;
 
     const PROTOCOL_FIXTURE: &str =
@@ -773,6 +773,14 @@ mod tests {
             Message::Orders {
                 commands: vec![
                     PlayerCommand::Stop { units: vec![id] },
+                    PlayerCommand::Ground {
+                        units: vec![id],
+                        goal: IVec2::new(-7, 300),
+                        order: GroundOrder::AttackMove,
+                        queued: true,
+                        refinery: Some(SimId(3)),
+                        together: true,
+                    },
                     PlayerCommand::SetStance {
                         units: vec![id],
                         stance: Stance::ALL[Stance::ALL.len() - 1],

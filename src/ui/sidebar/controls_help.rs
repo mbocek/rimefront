@@ -46,6 +46,13 @@ pub(super) fn controls_overview(keys: &KeyBindings) -> Vec<(&'static str, String
         ),
         (tr("Orders"), tr_owned("right click: move, attack, harvest")),
         (tr("Attack-move"), tr_owned("Ctrl + right click")),
+        (
+            tr("In formation"),
+            tr_fmt(
+                "{} + right click: the group keeps to its slowest unit",
+                &[&key(Action::KeepFormation)],
+            ),
+        ),
         (tr("Patrol"), tr_owned("Alt + right click")),
         (tr("Queue orders"), tr_owned("Shift + right click")),
         (

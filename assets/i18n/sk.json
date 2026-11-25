@@ -657,5 +657,8 @@
   "Slate": "Bridlicová",
   "Ivory": "Slonovinová",
   "Side colour": "Farba strany",
-  "The side's own": "Vlastná strany"
+  "The side's own": "Vlastná strany",
+  "Keep formation (hold with right click)": "Drž formáciu (podrž s pravým tlačidlom)",
+  "In formation": "Vo formácii",
+  "{} + right click: the group keeps to its slowest unit": "{} + pravé tlačidlo: skupina drží tempo najpomalšej jednotky"
 }

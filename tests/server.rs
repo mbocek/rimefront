@@ -110,6 +110,7 @@ fn attack_with_tanks(battle: &mut Battle, team: Team, goal: IVec2) {
             order: GroundOrder::AttackMove,
             queued: false,
             refinery: None,
+            together: false,
         },
     );
 }

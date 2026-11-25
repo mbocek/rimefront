@@ -31,6 +31,15 @@ pub enum GroundOrder {
     Patrol,
 }
 
+/// A ground order as the battle carries it out, apart from the units it is for.
+struct GroundOrderFor {
+    goal: IVec2,
+    order: GroundOrder,
+    queued: bool,
+    refinery: Option<SimId>,
+    together: bool,
+}
+
 /// Everything a player can tell the battle to do. Commands travel between machines, so they name units and
 /// structures by simulation id and the simulation checks ownership when it carries them out.
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -44,6 +53,8 @@ pub enum PlayerCommand {
         order: GroundOrder,
         queued: bool,
         refinery: Option<SimId>,
+        /// The group keeps to its slowest unit's pace and arrives together; otherwise each goes at its own.
+        together: bool,
     },
     Attack {
         units: Vec<SimId>,
@@ -312,7 +323,17 @@ impl Battlefield<'_, '_> {
                 order,
                 queued,
                 refinery,
-            } => self.ground_order(team, &units, goal, order, queued, refinery),
+                together,
+            } => {
+                let order = GroundOrderFor {
+                    goal,
+                    order,
+                    queued,
+                    refinery,
+                    together,
+                };
+                self.ground_order(team, &units, order)
+            }
             PlayerCommand::Attack { units, target } => self.attack(team, &units, target),
             PlayerCommand::SendEngineers { units, structure } => {
                 self.send_engineers(team, &units, structure)
@@ -517,15 +538,14 @@ impl Battlefield<'_, '_> {
         }
     }
 
-    fn ground_order(
-        &mut self,
-        team: Team,
-        ids: &[SimId],
-        goal: IVec2,
-        order: GroundOrder,
-        queued: bool,
-        refinery: Option<SimId>,
-    ) {
+    fn ground_order(&mut self, team: Team, ids: &[SimId], ground: GroundOrderFor) {
+        let GroundOrderFor {
+            goal,
+            order,
+            queued,
+            refinery,
+            together,
+        } = ground;
         let refinery = refinery
             .and_then(|id| self.own_structure(team, id))
             .filter(|&entity| {
@@ -534,8 +554,8 @@ impl Battlefield<'_, '_> {
                     .is_ok_and(|(building, ..)| building.kind == BuildingKind::Refinery)
             });
         let paces = match order {
-            GroundOrder::Move | GroundOrder::AttackMove => self.group_paces(team, ids),
-            GroundOrder::Patrol => GroupPaces::default(),
+            GroundOrder::Move | GroundOrder::AttackMove if together => self.group_paces(team, ids),
+            _ => GroupPaces::default(),
         };
         let map = &*self.map;
         let mut formation =

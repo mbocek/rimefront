@@ -12,7 +12,7 @@ use crate::sim::neutral_sites::UnclaimedSite;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::player_commands::{CommandIssuer, GroundOrder, PlayerCommand};
 use crate::sim::transport::{Embarked, Passengers};
-use crate::ui::key_bindings::Action;
+use crate::ui::key_bindings::{Action, KeyBindings};
 use crate::ui::minimap::MinimapOrder;
 use crate::ui::placement::Placement;
 use crate::ui::sidebar::UiFonts;
@@ -314,10 +314,12 @@ pub fn select_units(
 struct Shortcut {
     order: GroundOrder,
     queued: bool,
+    together: bool,
 }
 
-/// Right click on the ground. Ctrl attack-moves, Alt patrols, Shift queues behind current orders.
-fn ground_order_from_keys(keys: &ButtonInput<KeyCode>) -> Shortcut {
+/// Right click on the ground. Ctrl attack-moves, Alt patrols, Shift queues behind current orders, and the
+/// formation key keeps the group together at its slowest unit's pace.
+fn ground_order_from_keys(keys: &ButtonInput<KeyCode>, bindings: &KeyBindings) -> Shortcut {
     let order = if keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]) {
         GroundOrder::AttackMove
     } else if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
@@ -328,6 +330,7 @@ fn ground_order_from_keys(keys: &ButtonInput<KeyCode>) -> Shortcut {
     Shortcut {
         order,
         queued: keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
+        together: bindings.pressed(keys, Action::KeepFormation),
     }
 }
 
@@ -510,13 +513,14 @@ pub fn issue_orders(
         .and_then(|t| structures.get(t.entity).ok())
         .filter(|(_, building, _)| building.kind == BuildingKind::Refinery)
         .map(|(&id, ..)| id);
-    let shortcut = ground_order_from_keys(&keys);
+    let shortcut = ground_order_from_keys(&keys, &settings.keys);
     issuer.issue(PlayerCommand::Ground {
         units,
         goal,
         order: shortcut.order,
         queued: shortcut.queued,
         refinery,
+        together: shortcut.together,
     });
     acknowledge(&mut marker, ground, marker_for(shortcut.order));
 }

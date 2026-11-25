@@ -17,6 +17,7 @@ fn move_order(battle: &mut Battle, unit: Entity, goal: IVec2) -> PlayerCommand {
         order: GroundOrder::Move,
         queued: false,
         refinery: None,
+        together: false,
     }
 }
 
@@ -84,6 +85,7 @@ fn the_same_commands_on_the_same_ticks_replay_the_same_battle() {
                     order: GroundOrder::AttackMove,
                     queued: false,
                     refinery: None,
+                    together: false,
                 },
             );
         }
@@ -100,6 +102,7 @@ fn group_order(
     units: &[Entity],
     goal: IVec2,
     order: GroundOrder,
+    together: bool,
 ) -> PlayerCommand {
     PlayerCommand::Ground {
         units: units.iter().map(|&unit| battle.sim_id(unit)).collect(),
@@ -107,11 +110,36 @@ fn group_order(
         order,
         queued: false,
         refinery: None,
+        together,
     }
 }
 
 #[test]
-fn a_group_move_keeps_to_the_pace_of_its_slowest_unit() {
+fn a_group_moves_each_unit_at_its_own_speed_unless_told_to_keep_together() {
+    const SECS: f32 = 4.0;
+    let tank_speed = UnitKind::Tank.spec().speed;
+    let mut battle = Battle::sandbox();
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, FIELD + IVec2::new(0, 2));
+    let start = battle.position(scout);
+    let order = group_order(
+        &mut battle,
+        &[tank, scout],
+        FIELD + IVec2::new(20, 0),
+        GroundOrder::Move,
+        false,
+    );
+    battle.issue(Team::Player, order);
+    battle.run_for(SECS);
+    let travelled = battle.position(scout).distance(start);
+    assert!(
+        travelled > tank_speed * SECS * 1.2,
+        "the scout kept to the tank's pace though not told to: {travelled} m in {SECS} s"
+    );
+}
+
+#[test]
+fn a_group_told_to_keep_together_moves_at_the_pace_of_its_slowest_unit() {
     const SECS: f32 = 4.0;
     let tank_speed = UnitKind::Tank.spec().speed;
     let scout_speed = UnitKind::Scout.spec().speed;
@@ -121,7 +149,7 @@ fn a_group_move_keeps_to_the_pace_of_its_slowest_unit() {
     let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, FIELD + IVec2::new(0, 2));
     let goal = FIELD + IVec2::new(20, 0);
     let start = battle.position(scout);
-    let order = group_order(&mut battle, &[tank, scout], goal, GroundOrder::Move);
+    let order = group_order(&mut battle, &[tank, scout], goal, GroundOrder::Move, true);
     battle.issue(Team::Player, order);
     battle.run_for(SECS);
     let in_the_group = battle.position(scout).distance(start);
@@ -136,6 +164,7 @@ fn a_group_move_keeps_to_the_pace_of_its_slowest_unit() {
         &[scout],
         goal + IVec2::new(0, 12),
         GroundOrder::Move,
+        true,
     );
     battle.issue(Team::Player, alone);
     battle.run_for(SECS);
@@ -147,7 +176,7 @@ fn a_group_move_keeps_to_the_pace_of_its_slowest_unit() {
 }
 
 #[test]
-fn an_attack_move_group_keeps_its_pace_until_it_meets_the_enemy() {
+fn an_attack_move_group_told_to_keep_together_keeps_its_pace_until_it_meets_the_enemy() {
     const SECS: f32 = 4.0;
     let tank_speed = UnitKind::Tank.spec().speed;
     let mut battle = Battle::sandbox();
@@ -159,6 +188,7 @@ fn an_attack_move_group_keeps_its_pace_until_it_meets_the_enemy() {
         &[tank, scout],
         FIELD + IVec2::new(20, 0),
         GroundOrder::AttackMove,
+        true,
     );
     battle.issue(Team::Player, order);
     battle.run_for(SECS);

@@ -89,6 +89,7 @@ fn the_game_plays_a_world_it_runs_itself() {
             order: GroundOrder::Move,
             queued: false,
             refinery: None,
+            together: false,
         },
     );
     let drove = run_until(&mut app, |world| {
@@ -158,6 +159,7 @@ fn a_world_played_alone_is_there_the_next_time() {
             order: GroundOrder::Move,
             queued: false,
             refinery: None,
+            together: false,
         },
     );
     let drove = run_until(&mut app, |world| {

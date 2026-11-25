@@ -1,9 +1,13 @@
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use flate2::Compression;
+use flate2::read::DeflateDecoder;
+use flate2::write::DeflateEncoder;
 use tungstenite::protocol::{Role, WebSocketConfig};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Connector, Message as WsMessage, WebSocket};
@@ -160,8 +164,12 @@ fn handshake(
     }
 }
 
-/// The first byte of a message in postcard; a message in JSON never starts with it.
+/// The first byte of a message in postcard; a message in JSON never starts with either.
 const COMPACT: u8 = 0;
+/// The first byte of a message in postcard, then deflated.
+const PACKED: u8 = 1;
+/// Messages shorter than this go unpacked: deflating a few bytes saves nothing.
+const WORTH_PACKING_BYTES: usize = 256;
 
 /// A message as it travels: in postcard, a compact binary form, once both ends have shown they run the same
 /// version. The messages that show it stay JSON, so a game of another version still reads why it is turned
@@ -170,14 +178,41 @@ pub fn encode(message: &Message) -> Option<Vec<u8>> {
     if message.shows_the_version() {
         return serde_json::to_vec(message).ok();
     }
-    postcard::to_extend(message, vec![COMPACT]).ok()
+    let compact = postcard::to_extend(message, vec![COMPACT]).ok()?;
+    if compact.len() < WORTH_PACKING_BYTES {
+        return Some(compact);
+    }
+    let packed = pack(&compact[1..])?;
+    Some(if packed.len() < compact.len() {
+        packed
+    } else {
+        compact
+    })
 }
 
 pub fn decode(bytes: &[u8]) -> Option<Message> {
     match bytes.split_first() {
         Some((&COMPACT, compact)) => postcard::from_bytes(compact).ok(),
+        Some((&PACKED, packed)) => postcard::from_bytes(&unpack(packed)?).ok(),
         _ => serde_json::from_slice(bytes).ok(),
     }
+}
+
+fn pack(compact: &[u8]) -> Option<Vec<u8>> {
+    let mut packer = DeflateEncoder::new(vec![PACKED], Compression::fast());
+    packer.write_all(compact).ok()?;
+    packer.finish().ok()
+}
+
+/// What a packed message unpacks to, refused past the largest message a peer may send, so a small
+/// message cannot unpack into a flood.
+fn unpack(packed: &[u8]) -> Option<Vec<u8>> {
+    let mut unpacked = Vec::new();
+    DeflateDecoder::new(packed)
+        .take(LARGEST_MESSAGE_BYTES as u64 + 1)
+        .read_to_end(&mut unpacked)
+        .ok()?;
+    (unpacked.len() <= LARGEST_MESSAGE_BYTES).then_some(unpacked)
 }
 
 fn is_waiting(error: &tungstenite::Error) -> bool {
@@ -492,6 +527,36 @@ mod tests {
     use super::*;
     use crate::world_view::ViewChange;
     use iron_tide_sim::sim::player_commands::PlayerCommand;
+
+    #[test]
+    fn a_long_message_travels_packed_and_a_flood_is_refused() {
+        let turns = (0..400)
+            .map(|tick| {
+                (
+                    Team::Crimson,
+                    tick,
+                    vec![PlayerCommand::Stop { units: Vec::new() }],
+                )
+            })
+            .collect();
+        let long = Message::CatchUp {
+            through: vec![(Team::Player, 400), (Team::Crimson, 400)],
+            turns,
+        };
+        let compact_length = postcard::to_stdvec(&long).unwrap().len() + 1;
+        let bytes = encode(&long).unwrap();
+        assert_eq!(bytes[0], PACKED);
+        assert!(
+            bytes.len() * 2 < compact_length,
+            "{} of {compact_length}",
+            bytes.len()
+        );
+        assert_eq!(decode(&bytes), Some(long));
+
+        let flood = pack(&vec![0; LARGEST_MESSAGE_BYTES + 1]).unwrap();
+        assert!(flood.len() < 100_000);
+        assert_eq!(decode(&flood), None);
+    }
 
     #[test]
     fn messages_travel_compact_once_the_version_is_shown() {

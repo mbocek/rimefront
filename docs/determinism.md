@@ -35,7 +35,9 @@ travel over a WebSocket (`tungstenite`; plain `ws://` on the host's port, `wss:/
 (`link::encode`): JSON for the messages that show the sender's version or a refusal (`Offer`, `OpenRoom`,
 `EnterWorld`, `Refused`), so a game of another version still reads why it is turned away, and postcard, a
 compact binary form marked by a first byte of 0, for everything after; sides travel as their number there
-and by name in JSON. The host answers the handshake and a guest opens it, both on the link's own
+and by name in JSON. A compact message of 256 bytes or more is deflated (first byte 1) when that makes it
+smaller, as a late spectator's catch-up or a full first view; unpacking stops at the largest message a peer
+may send, so a small message cannot unpack into a flood. The host answers the handshake and a guest opens it, both on the link's own
 thread, and messages sent before it finishes wait for it. Every second each machine sends the checksum of its battle; differing
 checksums end the match as out of step, and a lost connection stops it. Tests join two battles in one process
 over a real local WebSocket connection: their orders reach each other, the battles stay identical, a deliberate

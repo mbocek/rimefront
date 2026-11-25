@@ -3412,6 +3412,7 @@ version = "1.6.0"
 dependencies = [
  "bevy",
  "ctrlc",
+ "flate2",
  "iron_tide_sim",
  "postcard",
  "ring",

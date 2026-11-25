@@ -355,8 +355,9 @@ for ordinary network matches.
     it), the clock shows the world's age from its tick, and once nothing of their side stands after it was
     shown standing, the battle is lost; the screen then offers only the main menu, since entering the world
     again gives them a new start. An attack or engineers ordered against a sheltered side are turned down
-    with news to the one who ordered them (`SideNews::Sheltered`), which is how a player learns that a side
-    is sheltered; nothing else marks it yet.
+    with news to the one who ordered them (`SideNews::Sheltered`). Every player is also sent which sides are
+    sheltered whenever that changes, and the game puts a glass dome over each one's structures it knows of,
+    as wide as they spread and a little more (`view::shelter_dome`), gone when the side's player returns.
 
 ## Decisions
 

@@ -17,7 +17,7 @@ use rimefront_sim::sim::intel::Intel;
 use rimefront_sim::sim::notifications::{News, SideNews};
 use rimefront_sim::sim::production::{BuildItem, Lane, Production};
 use rimefront_sim::sim::research::Upgrade;
-use rimefront_sim::sim::sides::SideSet;
+use rimefront_sim::sim::sides::{Shelter, SideSet};
 use rimefront_sim::sim::support_powers::{SupportPower, SupportPowers};
 use rimefront_sim::sim::transport::Embarked;
 use rimefront_sim::world::map::{GameMap, MapBounds, chunk_of, map_bounds, world_to_cell};
@@ -360,6 +360,8 @@ pub struct ViewChange {
     pub crystal: Vec<(IVec2, u32)>,
     /// Sides whose colour changed, or that the player was not told the colour of yet.
     pub colors: Vec<(Team, SideColor)>,
+    /// Every side sheltered while its player is away, when that changed.
+    pub sheltered: Option<Vec<Team>>,
 }
 
 impl ViewChange {
@@ -373,6 +375,7 @@ impl ViewChange {
             && self.effects.is_empty()
             && self.crystal.is_empty()
             && self.colors.is_empty()
+            && self.sheltered.is_none()
     }
 }
 
@@ -511,6 +514,7 @@ pub struct SentView {
     side: Option<SideState>,
     crystal: HashMap<IVec2, u32>,
     colors: HashMap<Team, SideColor>,
+    sheltered: Option<Vec<Team>>,
 }
 
 impl SentView {
@@ -570,6 +574,7 @@ impl SentView {
                 .collect(),
             crystal: self.crystal_changes(&chunks, news.mined),
             colors: self.color_changes(news.colors),
+            sheltered: self.shelter_change(world),
         };
         (!change.is_empty()).then_some(change)
     }
@@ -598,6 +603,14 @@ impl SentView {
                 now.insert(*id, *state);
             }
         }
+    }
+
+    fn shelter_change(&mut self, world: &World) -> Option<Vec<Team>> {
+        let sheltered: Vec<Team> = world.resource::<Shelter>().0.iter().collect();
+        (self.sheltered.as_ref() != Some(&sheltered)).then(|| {
+            self.sheltered = Some(sheltered.clone());
+            sheltered
+        })
     }
 
     fn color_changes(&mut self, colors: &HashMap<Team, SideColor>) -> Vec<(Team, SideColor)> {
@@ -641,6 +654,7 @@ pub struct WorldMirror {
     /// Every piece of news the player was told, oldest first.
     pub told: Vec<SideNews>,
     pub colors: HashMap<Team, SideColor>,
+    pub sheltered: Vec<Team>,
 }
 
 impl WorldMirror {
@@ -670,6 +684,9 @@ impl WorldMirror {
             self.crystal.insert((cell.x, cell.y), amount);
         }
         self.colors.extend(change.colors.iter().copied());
+        if let Some(sheltered) = &change.sheltered {
+            self.sheltered.clone_from(sheltered);
+        }
         self.told
             .extend(change.effects.iter().filter_map(|effect| match effect {
                 Effect::Told { news, .. } => Some(*news),
@@ -757,6 +774,7 @@ mod tests {
             ],
             crystal: vec![(IVec2::new(3, -4), 1_500)],
             colors: vec![(Team::from_index(9), SideColor([1, 128, 255]))],
+            sheltered: Some(vec![Team::from_index(4), Team::from_index(200)]),
         };
         vec![
             Message::EnterWorld {

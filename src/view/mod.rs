@@ -15,6 +15,7 @@ pub mod local_view;
 pub mod motion_material;
 pub mod overlay;
 pub mod scenery_view;
+pub mod shelter_dome;
 pub mod side_tint;
 pub mod sky;
 pub mod terrain_chunks;

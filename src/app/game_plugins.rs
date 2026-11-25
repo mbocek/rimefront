@@ -404,6 +404,12 @@ impl Plugin for DisplayPlugin {
         .add_systems(
             OnEnter(match_flow::GameState::Replay),
             crate::view::side_tint::forget_chosen_colors,
+        )
+        .add_systems(Startup, crate::view::shelter_dome::make_dome_look)
+        .add_systems(
+            Update,
+            crate::view::shelter_dome::cover_sheltered_bases
+                .run_if(in_state(match_flow::GameState::Playing)),
         );
     }
 }

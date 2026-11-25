@@ -132,7 +132,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 3;
+pub const WORLD_PROTOCOL: u32 = 4;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {
@@ -1132,7 +1132,23 @@ mod tests {
         }
         assert!(sheltered(&mut host), "never sheltered");
 
-        let (mut attacker, attacking) = enter(&mut host);
+        let attacker_key = PlayerKey::new_random();
+        let (mut attacker, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        attacker.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
+            player: attacker_key.clone(),
+            color: None,
+        });
+        let mut mirror = WorldMirror::default();
+        run(&mut host, 1, &mut mirror, &mut attacker);
+        assert_eq!(
+            mirror.sheltered,
+            [team],
+            "the newcomer was not shown the shelter"
+        );
+        let attacking = host.sides_of_players[&attacker_key];
         let world = host.world();
         let (_, target_id) = world
             .query::<(&Team, &SimId)>()
@@ -1148,7 +1164,6 @@ mod tests {
                 target: target_id,
             }],
         });
-        let mut mirror = WorldMirror::default();
         run(&mut host, 1, &mut mirror, &mut attacker);
         assert!(
             mirror.told.contains(&SideNews::Sheltered),
@@ -1156,7 +1171,11 @@ mod tests {
         );
 
         let (_back, _) = enter_as(&mut host, &key);
-        host.step(SIMULATION_TICK);
+        run(&mut host, 1, &mut mirror, &mut attacker);
+        assert!(
+            mirror.sheltered.is_empty(),
+            "the shelter was not lifted for others to see"
+        );
         assert!(
             !sheltered(&mut host),
             "still sheltered after the player came back"

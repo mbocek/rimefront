@@ -29,7 +29,7 @@ use crate::sim::neutral_sites::spawn_unclaimed_site;
 use crate::sim::notifications::News;
 use crate::sim::outcome::GameOutcome;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
-use crate::sim::sides::{Sides, side_stands};
+use crate::sim::sides::{Shelter, Sides, side_stands};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
 use crate::view::side_tint::SideColors;
@@ -371,6 +371,9 @@ pub fn follow_world(world: &mut World) {
         let mut colors = world.resource_mut::<SideColors>();
         for (team, color) in change.colors {
             colors.choose(team, color.color());
+        }
+        if let Some(sheltered) = change.sheltered {
+            world.insert_resource(Shelter(sheltered.into_iter().collect()));
         }
     }
     glide(world);

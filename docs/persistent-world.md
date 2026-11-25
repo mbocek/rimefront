@@ -354,5 +354,27 @@ Taken on 2026-11-24:
   and decay only matter for the computer sides there. Missions and skirmishes keep running the simulation
   in the game itself.
 
-Still open: how many players at once, which sets the server's tick budget and whether the world must later
-be split across several simulations, and how long an absence is before a base starts to decay.
+Taken on 2026-11-25, from the measurement below:
+
+- **One simulation carries a world** of a few dozen players; splitting it across several is not needed
+  before the player counts outgrow what was measured.
+- **A base starts to decay after three days away** and is gone two days later (`AbsenceRules`), long enough
+  for a weekend away.
+
+### Measured: a world with many players
+
+`tests/world_bench.rs` lets players enter a world, each bringing a computer neighbour where none is near,
+settles it for 30 s and measures 120 s of world time, all players connected and sent their views (Apple M5
+Pro, release build). The tick budget is 50 ms.
+
+| Players | Units | Structures | World | Tick, average | Tick, slowest | Sent to each player |
+| --- | --- | --- | --- | --- | --- | --- |
+| 4 | 35 | 40 | 320 × 320 | 0.10 ms | 0.67 ms | 522 B/s |
+| 16 | 157 | 133 | 448 × 448 | 0.61 ms | 3.10 ms | 604 B/s |
+| 32 | 294 | 236 | 576 × 576 | 1.63 ms | 7.23 ms | 611 B/s |
+| 16, armies of 60 | 1245 | 128 | 448 × 448 | 2.23 ms | 5.33 ms | 978 B/s |
+| 32, armies of 60 | 2388 | 222 | 576 × 576 | 5.54 ms | 13.63 ms | 1005 B/s |
+
+Thirty-two players with 2400 units take a ninth of the budget on average and a quarter at worst, and each is
+sent about 1 kB/s: one server and one simulation carry that with room to spare. Showing every player their
+view costs in players times things in sight, so that is where a much larger world would need work first.

@@ -85,7 +85,7 @@ fn mirrored_spot(map: &GameMap, kind: BuildingKind, wanted: IVec2) -> Option<IVe
 
 /// Buildable ground away from the bases, with open ground all round, so a site never closes a ford or a
 /// pass between rocks and forests.
-fn footprint_is_free(map: &GameMap, kind: BuildingKind, origin: IVec2) -> bool {
+pub fn footprint_is_free(map: &GameMap, kind: BuildingKind, origin: IVec2) -> bool {
     let clearance = IVec2::splat(SITE_CLEARANCE);
     let surroundings = kind.spec().footprint + clearance * 2;
     footprint_cells(origin, kind.spec().footprint)

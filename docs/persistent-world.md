@@ -332,6 +332,13 @@ for ordinary network matches.
     the computer's and where, and a saved world keeps that too. Computer commanders leave a sheltered side's
     structures out of their plans (attack waves, barrages, recon, engineers): `Targets` already keeps their
     shooters off them, and they would only stand there.
+    Neutral sites: every square of sites holds one (`world::sites::neutral_site_in_square`), a Supply
+    Depot, Field Hospital or Observation Post chosen from the map seed and the square, on the first of a few
+    spots at least 24 cells from the square's starting site and clear of the level's bases whose ground is
+    free. The host puts them down for the squares of the first world (its 64 cells hold none) and for every
+    square the world widens by. A player is shown a neutral site, without a side, once their side has
+    explored its ground, and keeps it shown until somebody takes it; computer engineers go for the ones
+    their side explored, as in a battle. A saved world keeps them as any neutral site.
 
 ## Decisions
 

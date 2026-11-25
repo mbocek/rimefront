@@ -18,10 +18,11 @@ use iron_tide_sim::sim::catalog::Team;
 use iron_tide_sim::sim::components::Health;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::economy::Economies;
+use iron_tide_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
 use iron_tide_sim::sim::sides::{Shelter, side_stands};
-use iron_tide_sim::world::map::{GameMap, base_sites};
-use iron_tide_sim::world::sites::free_starting_site;
+use iron_tide_sim::world::map::{GameMap, base_sites, map_bounds};
+use iron_tide_sim::world::sites::{free_starting_site, neutral_site_in_square, squares_within};
 use iron_tide_sim::world::terrain::Landscape;
 use iron_tide_sim::{SIMULATION_TICK, SimulationPlugin};
 
@@ -178,7 +179,45 @@ struct KeptStore {
 
 impl WorldHost {
     pub fn new(map_seed: u64) -> Self {
-        Self::hosting(Self::started(map_seed, false))
+        let mut host = Self::hosting(Self::started(map_seed, false));
+        host.place_neutral_sites(squares_within(map_bounds()));
+        host
+    }
+
+    /// Puts the neutral site of each square down on the first of its spots with free ground.
+    fn place_neutral_sites(&mut self, squares: Vec<IVec2>) {
+        let world = self.app.world_mut();
+        let map_seed = world.resource::<ActiveLevel>().0.map_seed;
+        world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            for square in squares {
+                let (kind, spots) = neutral_site_in_square(map_seed, square);
+                if let Some(origin) = spots
+                    .into_iter()
+                    .find(|&origin| footprint_is_free(&map, kind, origin))
+                {
+                    spawn_unclaimed_site(&mut commands, &mut map, kind, origin);
+                }
+            }
+        });
+        world.flush();
+    }
+
+    /// A new side on the free site nearest `near`; the neutral sites of any ground the world widened by
+    /// for it go down with it.
+    fn deploy_side_near(&mut self, near: IVec2) -> Option<(Team, IVec2)> {
+        let before = map_bounds();
+        let deployed = deploy_newcomer(self.app.world_mut(), near)?;
+        let after = map_bounds();
+        if after != before {
+            let old = squares_within(before);
+            let new = squares_within(after)
+                .into_iter()
+                .filter(|square| !old.contains(square))
+                .collect();
+            self.place_neutral_sites(new);
+        }
+        Some(deployed)
     }
 
     /// The world as it was saved, with its players' sides kept for them; nobody is connected yet.
@@ -558,7 +597,7 @@ impl WorldHost {
             return Some(Team::Player);
         }
         let first_base = base_sites()[0];
-        let (team, site) = deploy_newcomer(self.app.world_mut(), first_base)?;
+        let (team, site) = self.deploy_side_near(first_base)?;
         self.sites.insert(team, site);
         self.give_a_computer_neighbour(site);
         Some(team)
@@ -573,10 +612,10 @@ impl WorldHost {
         if has_one {
             return;
         }
-        let world = self.app.world_mut();
-        let Some((team, computer_site)) = deploy_newcomer(world, site) else {
+        let Some((team, computer_site)) = self.deploy_side_near(site) else {
             return;
         };
+        let world = self.app.world_mut();
         world
             .resource_mut::<AiCommanders>()
             .0
@@ -629,13 +668,14 @@ mod tests {
     use iron_tide_sim::sim::determinism::SimId;
     use iron_tide_sim::sim::economy::Economies;
     use iron_tide_sim::sim::intel::Intel;
+    use iron_tide_sim::sim::neutral_sites::UnclaimedSite;
     use iron_tide_sim::sim::notifications::SideNews;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
     use iron_tide_sim::sim::production::{BuildItem, EnqueueRefusal, placement_context};
     use iron_tide_sim::sim::production::{Lane, Production};
     use iron_tide_sim::sim::spawn::{spawn_building, spawn_unit};
     use iron_tide_sim::world::map::GameMap;
-    use iron_tide_sim::world::map::map_bounds;
+    use iron_tide_sim::world::map::cell_center;
     use iron_tide_sim::world::map::world_to_cell;
     use iron_tide_sim::world::sites::StartingSites;
 
@@ -675,7 +715,7 @@ mod tests {
         assert!(mirror.tick <= tick);
         assert_eq!(mirror.things, seen);
         assert_eq!(mirror.bounds, Some(map_bounds()));
-        assert!(mirror.things.values().any(|thing| thing.team == team));
+        assert!(mirror.things.values().any(|thing| thing.team == Some(team)));
         let world = host.world();
         let enemy_base = world
             .query::<(&SimId, &Team, &Building)>()
@@ -694,7 +734,7 @@ mod tests {
         let tank = mirror
             .things
             .values()
-            .find(|thing| thing.team == team && thing.thing == Thing::Unit(UnitKind::Tank))
+            .find(|thing| thing.team == Some(team) && thing.thing == Thing::Unit(UnitKind::Tank))
             .copied()
             .expect("the player sees their tank");
         let goal = iron_tide_sim::world::map::world_to_cell(tank.position()) + IVec2::new(0, -12);
@@ -1215,6 +1255,72 @@ mod tests {
                 .all(|ai| ai.team != team)
         );
         assert!(!world.resource::<StartingSites>().claimed.contains(&site));
+    }
+
+    fn neutral_sites(host: &mut WorldHost) -> Vec<(SimId, Thing)> {
+        let world = host.world();
+        world
+            .query_filtered::<(&SimId, &Building), With<UnclaimedSite>>()
+            .iter(world)
+            .map(|(id, building)| {
+                let site = Thing::Building {
+                    kind: building.kind,
+                    origin: building.origin,
+                };
+                (*id, site)
+            })
+            .collect()
+    }
+
+    fn origin_of(thing: Thing) -> IVec2 {
+        match thing {
+            Thing::Building { origin, .. } => origin,
+            Thing::Unit(_) => unreachable!("a site is a structure"),
+        }
+    }
+
+    #[test]
+    fn neutral_sites_stand_in_the_ground_a_world_widens_by() {
+        let mut host = WorldHost::new(29);
+        let _players: Vec<_> = (0..5).map(|_| enter(&mut host)).collect();
+        let sites = neutral_sites(&mut host);
+        assert!(
+            sites.len() >= 3,
+            "the widened ground has {} neutral sites",
+            sites.len()
+        );
+        let bases: Vec<IVec2> = host
+            .sites
+            .values()
+            .chain(host.computer_sides.values())
+            .copied()
+            .collect();
+        for &(_, site) in &sites {
+            for base in &bases {
+                let apart = (origin_of(site) - *base).as_vec2().length();
+                assert!(apart > 12.0, "{site:?} stands {apart} cells from a base");
+            }
+        }
+    }
+
+    #[test]
+    fn a_player_is_shown_a_neutral_site_once_their_side_explored_it() {
+        let mut host = WorldHost::new(29);
+        let (mut player, mut mirror) = entered_with_mirror(&mut host);
+        let _newcomers: Vec<_> = (0..3).map(|_| enter(&mut host)).collect();
+        let (id, site) = neutral_sites(&mut host).remove(0);
+        assert!(
+            !mirror.things.contains_key(&id),
+            "shown before it was explored"
+        );
+        let world = host.world();
+        let (scout, _) = own_unit(world, Team::Player, UnitKind::Scout);
+        let beside = cell_center(origin_of(site) + IVec2::new(0, 4));
+        world.get_mut::<Transform>(scout).unwrap().translation = beside;
+        run(&mut host, 1, &mut mirror, &mut player);
+        let shown = mirror.things.get(&id).expect("never shown");
+        assert_eq!(shown.team, None);
+        assert_eq!(shown.thing, site);
     }
 
     #[test]

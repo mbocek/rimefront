@@ -23,6 +23,7 @@ use crate::sim::cues::{BlastCue, SoundCue};
 use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
+use crate::sim::neutral_sites::spawn_unclaimed_site;
 use crate::sim::notifications::News;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::Sides;
@@ -342,9 +343,9 @@ fn admit_own_side(world: &mut World, side: Team) {
 }
 
 fn show(world: &mut World, state: ThingState) {
-    let entity = match world.resource::<SimEntities>().get(state.id) {
-        Some(entity) => entity,
-        None => appear(world, state),
+    let known = world.resource::<SimEntities>().get(state.id);
+    let Some(entity) = known.or_else(|| appear(world, state)) else {
+        return;
     };
     let Ok(mut thing) = world.get_entity_mut(entity) else {
         return;
@@ -421,26 +422,31 @@ fn show_crystal(world: &mut World, changes: &[(IVec2, u32)]) {
     }
 }
 
-fn appear(world: &mut World, state: ThingState) -> Entity {
+/// `None` for a thing of nobody's that is not a neutral site, which the world never sends.
+fn appear(world: &mut World, state: ThingState) -> Option<Entity> {
     let entity = world.resource_scope(|world, mut map: Mut<GameMap>| {
         let mut commands = world.commands();
-        match state.thing {
-            Thing::Unit(kind) => spawn_unit(
+        match (state.thing, state.team) {
+            (Thing::Unit(kind), Some(team)) => Some(spawn_unit(
                 &mut commands,
                 kind,
-                state.team,
+                team,
                 state.position(),
                 state.facing(),
-            ),
-            Thing::Building { kind, origin } => {
-                spawn_building(&mut commands, &mut map, kind, state.team, origin)
+            )),
+            (Thing::Building { kind, origin }, Some(team)) => {
+                Some(spawn_building(&mut commands, &mut map, kind, team, origin))
             }
+            (Thing::Building { kind, origin }, None) => {
+                Some(spawn_unclaimed_site(&mut commands, &mut map, kind, origin))
+            }
+            (Thing::Unit(_), None) => None,
         }
-    });
+    })?;
     world.flush();
     world.entity_mut(entity).insert(state.id);
     world.resource_mut::<SimEntities>().adopt(state.id, entity);
-    entity
+    Some(entity)
 }
 
 fn forget(world: &mut World, entity: Entity) {

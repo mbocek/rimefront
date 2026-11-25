@@ -8,7 +8,7 @@ use iron_tide_sim::sim::catalog::{BuildingKind, Diplomacy, ProjectileStyle, Team
 use iron_tide_sim::sim::combat::{Projectile, Targets};
 use iron_tide_sim::sim::components::{Building, HarvestState, Harvester, Health, Unit};
 use iron_tide_sim::sim::cues::{BlastCue, BlastSize, Sound, SoundCue};
-use iron_tide_sim::sim::determinism::SimId;
+use iron_tide_sim::sim::determinism::{SimEntities, SimId};
 use iron_tide_sim::sim::economy::Economies;
 use iron_tide_sim::sim::fog::Sight;
 use iron_tide_sim::sim::intel::Intel;
@@ -49,7 +49,8 @@ pub enum Thing {
 pub struct ThingState {
     pub id: SimId,
     pub thing: Thing,
-    pub team: Team,
+    /// `None` for a neutral site nobody holds.
+    pub team: Option<Team>,
     position: Spot,
     facing: i32,
     pub health_percent: u8,
@@ -406,14 +407,15 @@ fn things_in_chunks(
     let mut things = world.query_filtered::<(
         Entity,
         &SimId,
-        &Team,
+        Option<&Team>,
         &Transform,
         &Health,
         Option<&Unit>,
         Option<&Building>,
     ), Without<Embarked>>();
     let targets = world.resource::<Targets>();
-    for (entity, &id, &team, transform, health, unit, building) in things.iter(world) {
+    let vision = world.resource::<Intel>().vision(viewer);
+    for (entity, &id, team, transform, health, unit, building) in things.iter(world) {
         let thing = match (unit, building) {
             (Some(unit), _) => Thing::Unit(unit.0),
             (None, Some(building)) => Thing::Building {
@@ -422,9 +424,12 @@ fn things_in_chunks(
             },
             (None, None) => continue,
         };
-        let seen = targets
-            .get(entity)
-            .is_some_and(|target| target.seen_by(viewer));
+        let seen = match team {
+            Some(_) => targets
+                .get(entity)
+                .is_some_and(|target| target.seen_by(viewer)),
+            None => vision.is_explored(transform.translation),
+        };
         if !seen || !in_sight_chunk(transform.translation) {
             continue;
         }
@@ -434,7 +439,7 @@ fn things_in_chunks(
             ThingState {
                 id,
                 thing,
-                team,
+                team: team.copied(),
                 position: Spot::at(transform.translation),
                 facing: (facing * FACING_STEPS).round() as i32,
                 health_percent: (health.fraction() * 100.0).round() as u8,
@@ -514,7 +519,8 @@ impl SentView {
 }
 
 impl SentView {
-    /// Enemy structures out of sight stay as last seen, as long as the side has not seen them gone.
+    /// Enemy structures out of sight stay as last seen, as long as the side has not seen them gone, and
+    /// neutral sites as long as nobody took them.
     fn keep_known_structures(
         &self,
         world: &World,
@@ -522,9 +528,16 @@ impl SentView {
         now: &mut BTreeMap<SimId, ThingState>,
     ) {
         let intel = world.resource::<Intel>();
+        let standing = world.resource::<SimEntities>();
         for (id, state) in &self.things {
-            let is_building = matches!(state.thing, Thing::Building { .. });
-            if is_building && !now.contains_key(id) && intel.knows_structure(viewer, *id) {
+            if now.contains_key(id) || !matches!(state.thing, Thing::Building { .. }) {
+                continue;
+            }
+            let known = match state.team {
+                Some(_) => intel.knows_structure(viewer, *id),
+                None => standing.get(*id).is_some(),
+            };
+            if known {
                 now.insert(*id, *state);
             }
         }

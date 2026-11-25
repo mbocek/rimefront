@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use rand::RngExt;
 
 use crate::levels::ActiveLevel;
+use crate::sim::catalog::BuildingKind;
 use crate::world::map::{CHUNK_CELLS, MapBounds, base_sites, is_water, map_bounds};
 use crate::world::terrain::Landscape;
 use crate::world::wilds::{coordinate_rng, widen_world};
@@ -17,6 +18,16 @@ const LEVEL_BASE_CLEARANCE: f32 = 40.0;
 /// Fewer free sites than this and the world widens by another ring of squares.
 const FEWEST_FREE_SITES: usize = 2;
 const SITES_SALT: u64 = 0x0073_6974_6573;
+const NEUTRAL_SALT: u64 = 0x006e_6575_7472;
+/// A neutral site keeps this far from its square's starting site, so a base does not start beside one.
+const NEUTRAL_SITE_CLEARANCE: f32 = 24.0;
+const NEUTRAL_KINDS: [BuildingKind; 3] = [
+    BuildingKind::SupplyDepot,
+    BuildingKind::FieldHospital,
+    BuildingKind::ObservationPost,
+];
+/// Spots tried in a square before it is left without a neutral site.
+const NEUTRAL_SITE_TRIES: usize = 6;
 
 /// The Command Center origin of the starting site in a square, if the square has one: from the map seed and
 /// the square's coordinate alone, on dry ground clear of the level's bases.
@@ -33,6 +44,43 @@ pub fn site_in_square(map_seed: u64, square: IVec2) -> Option<IVec2> {
         .flat_map(|dy| (-DRY_REACH..=DRY_REACH).map(move |dx| IVec2::new(dx, dy)))
         .all(|offset| !is_water(Landscape::Wilds, middle + offset));
     (clear_of_level && dry).then_some(origin)
+}
+
+/// The neutral site of a square: its kind and the spots it may stand on, best first, from the map seed and
+/// the square's coordinate alone, clear of the square's starting site and the level's bases. The first spot
+/// whose ground is free is the one.
+pub fn neutral_site_in_square(map_seed: u64, square: IVec2) -> (BuildingKind, Vec<IVec2>) {
+    let mut rng = coordinate_rng(map_seed ^ NEUTRAL_SALT, square);
+    let kind = NEUTRAL_KINDS[rng.random_range(0..NEUTRAL_KINDS.len())];
+    let starting_site = site_in_square(map_seed, square);
+    let inside = SITE_MARGIN..SITE_SPACING - SITE_MARGIN;
+    let spots = (0..NEUTRAL_SITE_TRIES)
+        .map(|_| {
+            square * SITE_SPACING
+                + IVec2::new(
+                    rng.random_range(inside.clone()),
+                    rng.random_range(inside.clone()),
+                )
+        })
+        .filter(|&origin| {
+            let far_from =
+                |other: IVec2, clearance: f32| (other - origin).as_vec2().length() > clearance;
+            starting_site.is_none_or(|site| far_from(site, NEUTRAL_SITE_CLEARANCE))
+                && base_sites()
+                    .iter()
+                    .all(|&base| far_from(base, LEVEL_BASE_CLEARANCE))
+        })
+        .collect();
+    (kind, spots)
+}
+
+/// The squares lying wholly inside `bounds`.
+pub fn squares_within(bounds: MapBounds) -> Vec<IVec2> {
+    let first = square_of(bounds.min + IVec2::splat(SITE_SPACING - 1));
+    let last = square_of(bounds.max() + IVec2::ONE) - IVec2::ONE;
+    (first.y..=last.y)
+        .flat_map(|y| (first.x..=last.x).map(move |x| IVec2::new(x, y)))
+        .collect()
 }
 
 pub fn square_of(cell: IVec2) -> IVec2 {

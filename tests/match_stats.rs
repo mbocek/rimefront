@@ -62,3 +62,34 @@ fn an_attack_on_a_harvester_is_announced_with_its_place() {
             .any(|(line, _)| line == "Our harvester is under attack!")
     );
 }
+
+#[test]
+fn only_the_local_side_is_told_its_news() {
+    use iron_tide::sim::cues::Sound;
+    use iron_tide::sim::notifications::Notifications;
+    use iron_tide::sim::player_commands::PlayerCommand;
+    let mut battle = Battle::sandbox();
+    battle.construct(BuildingKind::CommandCenter, Team::Player, IVec2::new(6, 47));
+    battle.set_credits(Team::Player, 1000);
+    battle.set_credits(Team::Crimson, 0);
+    let power_plant = BuildItem::Structure(BuildingKind::PowerPlant);
+    for team in [Team::Player, Team::Crimson] {
+        battle.issue(
+            team,
+            PlayerCommand::Enqueue {
+                item: power_plant,
+                copies: 1,
+            },
+        );
+    }
+    battle.run_for(power_plant.build_secs() + 0.5);
+
+    let lines: Vec<String> = battle
+        .world()
+        .resource::<Notifications>()
+        .visible()
+        .map(|(line, _)| line.to_string())
+        .collect();
+    assert_eq!(lines, ["Construction complete"]);
+    assert_eq!(battle.heard(Sound::ConstructionComplete), 1);
+}

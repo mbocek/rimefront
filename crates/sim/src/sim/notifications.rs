@@ -1,11 +1,17 @@
 use bevy::prelude::*;
 
-use crate::i18n::tr;
+use serde::{Deserialize, Serialize};
+
+use crate::i18n::{tr, tr_fmt};
+use crate::sim::catalog::{BuildingKind, Team, UnitKind};
 use crate::sim::combat::DamageDealt;
 use crate::sim::components::{Building, Harvester};
 use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::economy::Economies;
 use crate::sim::player_commands::LocalTeam;
+use crate::sim::production::{BuildItem, EnqueueRefusal};
+use crate::sim::sides::{PerSide, Sides};
+use crate::sim::veterancy::Rank;
 
 const MESSAGE_LIFETIME_SECS: f32 = 4.0;
 /// A mission's own messages carry orders and warnings, so they stay long enough to be read in a fight.
@@ -54,50 +60,171 @@ impl Notifications {
     }
 }
 
-#[derive(Default)]
+/// Something a side is told; the game of the player on that side puts it in words and sound.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum SideNews {
+    Finished(BuildItem),
+    Promoted(UnitKind, Rank),
+    Captured(BuildingKind),
+    CapturedByEnemy(BuildingKind),
+    Repaired(BuildingKind),
+    RepairStarted,
+    StructureSold,
+    CargoSold,
+    Refused(EnqueueRefusal),
+    NoMine,
+    BaseUnderAttack,
+    HarvesterUnderAttack,
+    LowPower,
+}
+
+impl SideNews {
+    pub fn message(self) -> Option<String> {
+        let name = |kind: BuildingKind| tr(kind.spec().name);
+        Some(match self {
+            SideNews::Finished(BuildItem::Structure(_)) => tr("Construction complete").into(),
+            SideNews::Finished(BuildItem::Unit(kind)) => {
+                tr_fmt("{} ready", &[&tr(kind.spec().name)])
+            }
+            SideNews::Finished(BuildItem::Research(upgrade)) => {
+                tr_fmt("Research complete: {}", &[&tr(upgrade.spec().name)])
+            }
+            SideNews::Promoted(kind, rank) => {
+                tr_fmt("{} promoted to {}", &[&tr(kind.spec().name), &rank.name()])
+            }
+            SideNews::Captured(kind) => tr_fmt("{} captured", &[&name(kind)]),
+            SideNews::CapturedByEnemy(kind) => tr_fmt("{} captured by the enemy", &[&name(kind)]),
+            SideNews::Repaired(kind) => tr_fmt("{} repaired", &[&name(kind)]),
+            SideNews::Refused(refusal) => refusal.message(),
+            SideNews::NoMine => tr("No mine: the cell has one or the credits ran out").into(),
+            SideNews::BaseUnderAttack => tr("Our base is under attack!").into(),
+            SideNews::HarvesterUnderAttack => tr("Our harvester is under attack!").into(),
+            SideNews::LowPower => tr("Low power - production slowed").into(),
+            SideNews::RepairStarted | SideNews::StructureSold | SideNews::CargoSold => return None,
+        })
+    }
+
+    pub fn sound(self) -> Option<Sound> {
+        Some(match self {
+            SideNews::Finished(BuildItem::Structure(_)) => Sound::ConstructionComplete,
+            SideNews::Finished(BuildItem::Research(_)) => Sound::ResearchComplete,
+            SideNews::Finished(BuildItem::Unit(_)) => Sound::UnitReady,
+            SideNews::Promoted(..) => Sound::UnitPromoted,
+            SideNews::Captured(_) => Sound::StructureCaptured,
+            SideNews::CapturedByEnemy(_) => Sound::StructureLost,
+            SideNews::Repaired(_) | SideNews::RepairStarted => Sound::RepairStarted,
+            SideNews::StructureSold => Sound::StructureSold,
+            SideNews::CargoSold => Sound::Credits,
+            SideNews::BaseUnderAttack => Sound::BaseAlert,
+            SideNews::HarvesterUnderAttack => Sound::HarvesterAlert,
+            SideNews::Refused(_) | SideNews::NoMine | SideNews::LowPower => return None,
+        })
+    }
+
+    fn is_alarm(self) -> bool {
+        matches!(
+            self,
+            SideNews::BaseUnderAttack | SideNews::HarvesterUnderAttack
+        )
+    }
+}
+
+/// News for one side; `at` is where it happened, for the news whose sound comes from a place.
+#[derive(Message, Clone, Copy, Debug)]
+pub struct News {
+    pub team: Team,
+    pub news: SideNews,
+    pub at: Option<Vec3>,
+}
+
+impl News {
+    pub fn to(team: Team, news: SideNews) -> Self {
+        Self {
+            team,
+            news,
+            at: None,
+        }
+    }
+
+    pub fn at(team: Team, news: SideNews, at: Vec3) -> Self {
+        Self {
+            team,
+            news,
+            at: Some(at),
+        }
+    }
+}
+
+/// The local side's news becomes the lines at the top of the battlefield and the sounds with them.
+pub fn tell_local_side(
+    local: Res<LocalTeam>,
+    time: Res<Time>,
+    mut news: MessageReader<News>,
+    mut notifications: ResMut<Notifications>,
+    mut cues: MessageWriter<SoundCue>,
+    mut alert: ResMut<LastAlert>,
+) {
+    notifications.age(time.delta_secs());
+    for told in news.read().filter(|told| told.team == local.0) {
+        if let Some(message) = told.news.message() {
+            notifications.push(message);
+        }
+        if let Some(sound) = told.news.sound() {
+            cues.write(match (told.at, told.news.is_alarm()) {
+                (Some(at), false) => SoundCue::at(sound, at),
+                _ => SoundCue::interface(sound),
+            });
+        }
+        if told.news.is_alarm() {
+            alert.0 = told.at;
+        }
+    }
+}
+
+#[derive(Default, Clone)]
 pub struct BaseWatch {
     low_power: bool,
     warning_cooldown: f32,
     harvester_warning_cooldown: f32,
 }
 
-pub fn watch_base(
-    local: Res<LocalTeam>,
-    mut cues: MessageWriter<SoundCue>,
+/// Warns every side of attacks on its base and harvesters, and of running short of power.
+pub fn watch_bases(
     time: Res<Time>,
+    sides: Res<Sides>,
     economies: Res<Economies>,
-    mut notifications: ResMut<Notifications>,
-    mut alert: ResMut<LastAlert>,
-    mut watch: Local<BaseWatch>,
+    mut news: MessageWriter<News>,
+    mut watches: Local<PerSide<BaseWatch>>,
     mut hits: MessageReader<DamageDealt>,
     victims: Query<(&Transform, Has<Building>, Has<Harvester>)>,
 ) {
     let dt = time.delta_secs();
-    notifications.age(dt);
-    watch.warning_cooldown -= dt;
-    watch.harvester_warning_cooldown -= dt;
-
-    for hit in hits.read().filter(|hit| hit.team == local.0) {
+    for watch in watches.iter_mut() {
+        watch.warning_cooldown -= dt;
+        watch.harvester_warning_cooldown -= dt;
+    }
+    for hit in hits.read() {
         let Ok((transform, is_building, is_harvester)) = victims.get(hit.victim) else {
             continue;
         };
-        let (warning, alarm) = if is_building && watch.warning_cooldown <= 0.0 {
+        let watch = watches.of_mut(hit.team);
+        let warning = if is_building && watch.warning_cooldown <= 0.0 {
             watch.warning_cooldown = ATTACK_WARNING_COOLDOWN_SECS;
-            (tr("Our base is under attack!"), Sound::BaseAlert)
+            SideNews::BaseUnderAttack
         } else if is_harvester && watch.harvester_warning_cooldown <= 0.0 {
             watch.harvester_warning_cooldown = ATTACK_WARNING_COOLDOWN_SECS;
-            (tr("Our harvester is under attack!"), Sound::HarvesterAlert)
+            SideNews::HarvesterUnderAttack
         } else {
             continue;
         };
-        notifications.push(warning);
-        cues.write(SoundCue::interface(alarm));
-        alert.0 = Some(transform.translation);
+        news.write(News::at(hit.team, warning, transform.translation));
     }
-
-    let low_power = economies.of(local.0).has_low_power();
-    if low_power && !watch.low_power {
-        notifications.push(tr("Low power - production slowed"));
+    for team in sides.iter() {
+        let low_power = economies.of(team).has_low_power();
+        let watch = watches.of_mut(team);
+        if low_power && !watch.low_power {
+            news.write(News::to(team, SideNews::LowPower));
+        }
+        watch.low_power = low_power;
     }
-    watch.low_power = low_power;
 }

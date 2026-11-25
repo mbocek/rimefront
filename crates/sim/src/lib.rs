@@ -153,6 +153,7 @@ impl Plugin for SimulationPlugin {
             .add_message::<combat::Impact>()
             .add_message::<cues::BlastCue>()
             .add_message::<cues::SoundCue>()
+            .add_message::<notifications::News>()
             .add_message::<world::wilds::WorldWidened>()
             .add_message::<structures::StructureOrder>()
             .add_message::<level_events::MissionMessage>()
@@ -243,7 +244,9 @@ impl Plugin for SimulationPlugin {
                         veterancy::promote_veterans,
                         veterancy::elite_field_repairs,
                         servicing::service_waiting_units,
-                        notifications::watch_base,
+                        notifications::watch_bases,
+                        notifications::tell_local_side
+                            .run_if(not(resource_exists::<match_flow::HostedWorld>)),
                         outcome::decide_outcome,
                     )
                         .chain(),
@@ -258,6 +261,7 @@ impl Plugin for SimulationPlugin {
                     economy::tally_power,
                     intel::update_intel,
                     combat::snapshot_targets,
+                    notifications::tell_local_side,
                 )
                     .chain()
                     .in_set(TickStep::Rules)

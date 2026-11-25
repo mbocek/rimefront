@@ -8,7 +8,7 @@ use crate::network::{Arrival, Link, Message};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews};
 use iron_tide_sim::SimulationPlugin;
 use iron_tide_sim::levels::{ActiveLevel, LevelDefinition};
-use iron_tide_sim::match_flow::{GameState, deploy_newcomer};
+use iron_tide_sim::match_flow::{GameState, HostedWorld, deploy_newcomer};
 use iron_tide_sim::sim::catalog::Team;
 use iron_tide_sim::sim::determinism::run_schedules_on_one_thread;
 use iron_tide_sim::sim::player_commands::{CommandQueue, SimulationTick};
@@ -98,6 +98,7 @@ impl WorldHost {
         app.add_plugins(MinimalPlugins)
             .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::ZERO))
             .insert_resource(ActiveLevel(level))
+            .insert_resource(HostedWorld)
             .add_plugins(SimulationPlugin::default());
         run_schedules_on_one_thread(&mut app);
         let startup_frame_limit = 10;
@@ -262,8 +263,9 @@ mod tests {
     use iron_tide_sim::sim::components::Unit;
     use iron_tide_sim::sim::determinism::SimId;
     use iron_tide_sim::sim::intel::Intel;
+    use iron_tide_sim::sim::notifications::SideNews;
     use iron_tide_sim::sim::player_commands::{GroundOrder, PlayerCommand};
-    use iron_tide_sim::sim::production::{BuildItem, placement_context};
+    use iron_tide_sim::sim::production::{BuildItem, EnqueueRefusal, placement_context};
     use iron_tide_sim::sim::spawn::{spawn_building, spawn_unit};
     use iron_tide_sim::world::map::GameMap;
     use iron_tide_sim::world::map::map_bounds;
@@ -518,6 +520,7 @@ mod tests {
             follow(&mut mirror, &mut player);
         }
         assert_eq!(mirror.side.lanes[0].ready, Some(BuildingKind::PowerPlant));
+        assert!(mirror.told.contains(&SideNews::Finished(power_plant)));
 
         let origin = free_site_near_base(host.world(), Team::Player, BuildingKind::PowerPlant);
         player.send(&Message::Orders {
@@ -580,10 +583,31 @@ mod tests {
     #[test]
     fn players_enter_a_world_on_sides_of_their_own_and_command_them() {
         let mut host = WorldHost::new(29);
-        let (_first, first_team) = enter(&mut host);
-        let (second, second_team) = enter(&mut host);
+        let (mut first, first_team) = enter(&mut host);
+        let (mut second, second_team) = enter(&mut host);
         assert_eq!(first_team, Team::Player);
         assert_eq!(second_team, Team::from_index(4));
+        let mut second_mirror = WorldMirror::default();
+        second.send(&Message::Orders {
+            commands: vec![PlayerCommand::Enqueue {
+                item: BuildItem::Structure(BuildingKind::TechCenter),
+                copies: 1,
+            }],
+        });
+        host.step(SIMULATION_TICK);
+        host.step(SIMULATION_TICK);
+        follow(&mut second_mirror, &mut second);
+        assert!(
+            matches!(
+                second_mirror.told[..],
+                [SideNews::Refused(EnqueueRefusal::Requires(_))]
+            ),
+            "the newcomer was not told why: {:?}",
+            second_mirror.told
+        );
+        let mut first_mirror = WorldMirror::default();
+        follow(&mut first_mirror, &mut first);
+        assert!(first_mirror.told.is_empty(), "told another side's news");
 
         let world = host.world();
         let (tank, id, start) = world

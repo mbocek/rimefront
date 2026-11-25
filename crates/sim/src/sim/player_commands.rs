@@ -1,4 +1,3 @@
-use crate::i18n::tr;
 use crate::sim::abilities::{Mine, lay_mine};
 use crate::sim::intel::Intel;
 use bevy::prelude::*;
@@ -10,7 +9,7 @@ use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
 use crate::sim::engineers::{EngineerTask, job_for};
 use crate::sim::movement::order_move;
-use crate::sim::notifications::Notifications;
+use crate::sim::notifications::{News, SideNews};
 use crate::sim::production::{
     BuildItem, Lane, Production, affordable_wall_line, construct_building, owned_building_kinds,
     placement_context,
@@ -274,12 +273,11 @@ type CommandedUnit<'a> = (
 pub struct Battlefield<'w, 's> {
     commands: Commands<'w, 's>,
     ids: Res<'w, SimEntities>,
-    local: Res<'w, LocalTeam>,
     diplomacy: Res<'w, Diplomacy>,
     map: ResMut<'w, GameMap>,
     production: ResMut<'w, Production>,
     economies: ResMut<'w, Economies>,
-    notifications: ResMut<'w, Notifications>,
+    news: MessageWriter<'w, News>,
     structure_orders: MessageWriter<'w, StructureOrder>,
     units: Query<'w, 's, CommandedUnit<'static>>,
     structures: Query<'w, 's, (&'static Building, Option<&'static Team>, &'static Health)>,
@@ -488,9 +486,8 @@ impl Battlefield<'_, '_> {
                 mined.contains(&cell)
             }) {
                 mined.push(cell);
-            } else if team == self.local.0 {
-                self.notifications
-                    .push(tr("No mine: the cell has one or the credits ran out").to_string());
+            } else {
+                self.news.write(News::to(team, SideNews::NoMine));
             }
         }
     }
@@ -600,9 +597,7 @@ impl Battlefield<'_, '_> {
                 .production
                 .enqueue(&mut self.economies, team, item, &owned)
             {
-                if team == self.local.0 {
-                    self.notifications.push(refusal.message());
-                }
+                self.news.write(News::to(team, SideNews::Refused(refusal)));
                 return;
             }
         }

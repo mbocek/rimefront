@@ -2,10 +2,9 @@ use bevy::prelude::*;
 
 use crate::sim::catalog::{BuildingKind, Team};
 use crate::sim::components::{AttackTarget, Building, Health, Weapon};
-use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::economy::Economies;
-use crate::sim::player_commands::LocalTeam;
+use crate::sim::notifications::{News, SideNews};
 use crate::world::map::{GameMap, footprint_center};
 
 /// Share of its full health a structure regains per second while being repaired.
@@ -81,10 +80,9 @@ type OrderedStructure<'a> = (
 );
 
 pub fn carry_out_structure_orders(
-    local: Res<LocalTeam>,
     mut commands: Commands,
     mut orders: MessageReader<StructureOrder>,
-    mut cues: MessageWriter<SoundCue>,
+    mut news: MessageWriter<News>,
     mut economies: ResMut<Economies>,
     structures: Query<OrderedStructure>,
 ) {
@@ -106,9 +104,11 @@ pub fn carry_out_structure_orders(
                 let standing = health.current > 0.0;
                 if standing && health.current < health.max {
                     structure.insert(Repairing::default());
-                    if team == local.0 {
-                        cues.write(SoundCue::at(Sound::RepairStarted, transform.translation));
-                    }
+                    news.write(News::at(
+                        team,
+                        SideNews::RepairStarted,
+                        transform.translation,
+                    ));
                 }
             }
             StructureOrderKind::Sell => {
@@ -121,9 +121,11 @@ pub fn carry_out_structure_orders(
                     .insert(BeingSold {
                         remaining_secs: SELL_ANIMATION_SECS,
                     });
-                if team == local.0 {
-                    cues.write(SoundCue::at(Sound::StructureSold, transform.translation));
-                }
+                news.write(News::at(
+                    team,
+                    SideNews::StructureSold,
+                    transform.translation,
+                ));
             }
         }
     }

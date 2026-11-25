@@ -2,14 +2,11 @@ use std::collections::HashSet;
 
 use bevy::prelude::*;
 
-use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team};
 use crate::sim::components::{Building, Health, Mobile, Orders};
-use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
-use crate::sim::notifications::Notifications;
-use crate::sim::player_commands::LocalTeam;
+use crate::sim::notifications::{News, SideNews};
 use crate::sim::spawn::spawn_building;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_center};
 
@@ -66,10 +63,8 @@ fn reach_of(building: &Building) -> f32 {
 }
 
 pub fn carry_out_engineer_tasks(
-    local: Res<LocalTeam>,
     mut commands: Commands,
-    mut cues: MessageWriter<SoundCue>,
-    mut notifications: ResMut<Notifications>,
+    mut news: MessageWriter<News>,
     time: Res<Time>,
     mut map: ResMut<GameMap>,
     mut engineers: Query<(
@@ -135,25 +130,16 @@ pub fn carry_out_engineer_tasks(
                     current: kind.spec().max_health - damage,
                     max: kind.spec().max_health,
                 });
-                if owner == Some(local.0) {
-                    notifications
-                        .push(tr_fmt("{} captured by the enemy", &[&tr(kind.spec().name)]));
-                    cues.write(SoundCue::interface(Sound::StructureLost));
+                if let Some(owner) = owner {
+                    news.write(News::to(owner, SideNews::CapturedByEnemy(kind)));
                 }
             }
         }
-        if team == local.0 {
-            let message = match task.job {
-                EngineerJob::Capture => tr_fmt("{} captured", &[&tr(building.kind.spec().name)]),
-                EngineerJob::Repair => tr_fmt("{} repaired", &[&tr(building.kind.spec().name)]),
-            };
-            notifications.push(message);
-            let sound = match task.job {
-                EngineerJob::Capture => Sound::StructureCaptured,
-                EngineerJob::Repair => Sound::RepairStarted,
-            };
-            cues.write(SoundCue::at(sound, center));
-        }
+        let done = match task.job {
+            EngineerJob::Capture => SideNews::Captured(building.kind),
+            EngineerJob::Repair => SideNews::Repaired(building.kind),
+        };
+        news.write(News::at(team, done, center));
         commands.entity(engineer).despawn();
     }
 }

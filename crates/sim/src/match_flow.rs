@@ -49,6 +49,10 @@ pub struct MatchRules {
 #[derive(Resource)]
 pub struct MirroredBattle;
 
+/// A world run for players whose games are elsewhere: nobody plays here, so nobody here is told anything.
+#[derive(Resource)]
+pub struct HostedWorld;
+
 /// A saved game is about to replace the level's starting forces, so they are not deployed.
 #[derive(Resource)]
 pub struct RestoringSave;

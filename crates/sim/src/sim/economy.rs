@@ -2,10 +2,9 @@ use bevy::prelude::*;
 
 use crate::sim::catalog::{BuildingKind, HARVESTER_CAPACITY, STARTING_CREDITS, Team};
 use crate::sim::components::*;
-use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::{SimId, in_simulation_order};
 use crate::sim::movement::order_move;
-use crate::sim::player_commands::LocalTeam;
+use crate::sim::notifications::{News, SideNews};
 use crate::sim::sides::PerSide;
 use crate::sim::spawn::exit_cell;
 use crate::world::map::{
@@ -101,8 +100,7 @@ type CrystalVisuals<'w, 's> = Query<
 const DOCKING_REACH: f32 = ARRIVAL_DISTANCE * 2.0;
 
 pub fn run_harvesters(
-    local: Res<LocalTeam>,
-    mut cues: MessageWriter<SoundCue>,
+    mut news: MessageWriter<News>,
     time: Res<Time>,
     mut map: ResMut<GameMap>,
     mut economies: ResMut<Economies>,
@@ -151,9 +149,7 @@ pub fn run_harvesters(
                     Some(HarvestState::Unloading { refinery, timer })
                 } else {
                     sell_the_cargo(&mut harvester, economies.of_mut(team));
-                    if team == local.0 {
-                        cues.write(SoundCue::at(Sound::Credits, position));
-                    }
+                    news.write(News::at(team, SideNews::CargoSold, position));
                     Some(HarvestState::SeekingField)
                 }
             }

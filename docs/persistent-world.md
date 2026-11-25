@@ -259,8 +259,11 @@ for ordinary network matches.
     into that differ from what they were last sent. A newcomer's game grows the same fields from the seed,
     so they are sent every cell mined in the chunks they come to see, and nothing else. Enemy structures
     stay as last seen once out of sight, as long as the side's intel still knows them, as in any battle.
-    Sounds the rules make only for the level's own player (credits, repair, sale, capture) reach whoever
-    sees the spot, and the announcements and messages for the player's own side are not sent yet.
+    What a side is told is news for that side (`sim::notifications::SideNews`: finished production, a
+    promotion, a capture, a refusal, an attack on the base, low power, the credits of a delivered load...),
+    written by the rules for every side; `tell_local_side` turns the local side's news into lines and
+    sounds, so in a battle nothing changed. A world host tells nobody itself (`HostedWorld`) and sends each
+    player their own side's news, which their game puts into words in its own language.
 14. **Joining and leaving.** A new player gets a free starting site and a starting force; a returning player
     gets their side back wherever it stands. While its player is away a side cannot be attacked, and after a
     long absence its structures decay and its site is freed.

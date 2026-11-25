@@ -3,13 +3,11 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::i18n::{tr, tr_fmt};
+use crate::i18n::tr;
 use crate::sim::catalog::{Team, UnitKind};
 use crate::sim::combat::{DamageDealt, DamageSource, Destroyed};
 use crate::sim::components::{Health, Unit};
-use crate::sim::cues::{Sound, SoundCue};
-use crate::sim::notifications::Notifications;
-use crate::sim::player_commands::LocalTeam;
+use crate::sim::notifications::{News, SideNews};
 use crate::sim::structures::structure_value;
 
 /// Experience is counted in credits destroyed; a rank is earned at this many times the unit's own price.
@@ -127,9 +125,7 @@ pub fn credit_kills(
 }
 
 pub fn promote_veterans(
-    local: Res<LocalTeam>,
-    mut cues: MessageWriter<SoundCue>,
-    mut notifications: ResMut<Notifications>,
+    mut news: MessageWriter<News>,
     mut veterans: Query<(&Unit, &Team, &mut Veterancy, &mut Health), Changed<Veterancy>>,
 ) {
     for (unit, &team, mut veterancy, mut health) in &mut veterans {
@@ -141,13 +137,7 @@ pub fn promote_veterans(
         health.current += new_max - health.max;
         health.max = new_max;
         veterancy.rank = earned;
-        if team == local.0 {
-            notifications.push(tr_fmt(
-                "{} promoted to {}",
-                &[&tr(unit.0.spec().name), &earned.name()],
-            ));
-            cues.write(SoundCue::interface(Sound::UnitPromoted));
-        }
+        news.write(News::to(team, SideNews::Promoted(unit.0, earned)));
     }
 }
 

@@ -7,13 +7,11 @@ use serde::{Deserialize, Serialize};
 use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{BuildingKind, Faction, Team, UnitKind};
 use crate::sim::components::*;
-use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::determinism::SimulationRng;
 use crate::sim::economy::Economies;
 use crate::sim::fog::{CellSight, FogOfWar};
 use crate::sim::movement::{FLIGHT_ALTITUDE, order_move};
-use crate::sim::notifications::Notifications;
-use crate::sim::player_commands::LocalTeam;
+use crate::sim::notifications::{News, SideNews};
 use crate::sim::research::Upgrade;
 use crate::sim::sides::{PerSide, Sides};
 use crate::sim::spawn::{exit_cell, spawn_building, spawn_unit};
@@ -127,7 +125,7 @@ impl BuildItem {
 }
 
 /// Why an item could not be added to a production queue.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum EnqueueRefusal {
     NotInMission,
     Requires(BuildingKind),
@@ -310,15 +308,13 @@ pub fn owned_building_kinds(
 }
 
 pub fn advance_production(
-    local: Res<LocalTeam>,
-    mut cues: MessageWriter<SoundCue>,
+    mut news: MessageWriter<News>,
     mut commands: Commands,
     mut rng: ResMut<SimulationRng>,
     time: Res<Time>,
     map: Res<GameMap>,
     economies: Res<Economies>,
     mut production: ResMut<Production>,
-    mut notifications: ResMut<Notifications>,
     buildings: Query<(&Building, &Team, Option<&RallyPoint>)>,
     sides: Res<Sides>,
 ) {
@@ -362,21 +358,7 @@ pub fn advance_production(
             }
             lane.queue.pop_front();
             lane.progress_secs = 0.0;
-            if team == local.0 {
-                let fanfare = match item {
-                    BuildItem::Structure(_) => Sound::ConstructionComplete,
-                    BuildItem::Research(_) => Sound::ResearchComplete,
-                    BuildItem::Unit(_) => Sound::UnitReady,
-                };
-                cues.write(SoundCue::interface(fanfare));
-                notifications.push(match item {
-                    BuildItem::Structure(_) => tr("Construction complete").to_string(),
-                    BuildItem::Unit(kind) => tr_fmt("{} ready", &[&tr(kind.spec().name)]),
-                    BuildItem::Research(upgrade) => {
-                        tr_fmt("Research complete: {}", &[&tr(upgrade.spec().name)])
-                    }
-                });
-            }
+            news.write(News::to(team, SideNews::Finished(item)));
             match (item, producer) {
                 (BuildItem::Structure(kind), _) => lane.ready = Some(kind),
                 (BuildItem::Unit(kind), Some(producer)) => {

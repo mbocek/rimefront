@@ -45,7 +45,7 @@ The code is a Cargo workspace of three crates:
 | `sides` | the sides in a battle, letting one more in, and the per-side storage everything keeps |
 | `intel` | what each side knows: the Syndicate's shared view and the enemy structures each side has spotted |
 | `outcome`, `match_stats` | mission objectives, victory and defeat; the tally shown at the end of a match |
-| `notifications` | status messages for the player, written by the simulation and shown by the sidebar |
+| `notifications` | news for every side (`SideNews`), and the local side's turned into status messages and sounds, shown by the sidebar |
 
 ## `world` — the map and its landscape
 

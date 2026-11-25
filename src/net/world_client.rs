@@ -10,13 +10,14 @@ use crate::missions::levels::ActiveLevel;
 use crate::net::lobby::DEFAULT_PORT;
 use crate::net::network::{Arrival, Dialling, JoinTarget, Link, Message};
 use crate::net::world_host::{WorldConnection, WorldHost, local_connection, world_level};
-use crate::net::world_view::{Effect, SideState, Thing, ThingState, ViewChange};
+use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewChange};
 use crate::sim::catalog::Team;
 use crate::sim::components::{Building, Health};
 use crate::sim::cues::{BlastCue, SoundCue};
 use crate::sim::determinism::SimEntities;
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
+use crate::sim::notifications::News;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::Sides;
 use crate::sim::spawn::{spawn_building, spawn_unit};
@@ -249,6 +250,13 @@ fn show_effect(world: &mut World, side: Team, effect: Effect) {
         }
         Effect::Sound { sound, at } => {
             world.write_message(SoundCue::at(sound, at.position()));
+        }
+        Effect::Told { news, at, .. } => {
+            world.write_message(News {
+                team: side,
+                news,
+                at: at.map(Spot::position),
+            });
         }
     }
 }

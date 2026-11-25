@@ -12,6 +12,7 @@ use iron_tide_sim::sim::determinism::SimId;
 use iron_tide_sim::sim::economy::Economies;
 use iron_tide_sim::sim::fog::Sight;
 use iron_tide_sim::sim::intel::Intel;
+use iron_tide_sim::sim::notifications::{News, SideNews};
 use iron_tide_sim::sim::production::{BuildItem, Lane, Production};
 use iron_tide_sim::sim::research::Upgrade;
 use iron_tide_sim::sim::support_powers::{SupportPower, SupportPowers};
@@ -164,16 +165,29 @@ impl Shot {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Effect {
     Shot(Shot),
-    Blast { size: BlastSize, at: Spot },
-    Sound { sound: Sound, at: Spot },
+    Blast {
+        size: BlastSize,
+        at: Spot,
+    },
+    Sound {
+        sound: Sound,
+        at: Spot,
+    },
+    /// News for one side only, wherever its player looks.
+    Told {
+        team: Team,
+        news: SideNews,
+        at: Option<Spot>,
+    },
 }
 
 impl Effect {
-    fn is_in(&self, chunks: &HashSet<IVec2>) -> bool {
+    fn is_for(&self, viewer: Team, chunks: &HashSet<IVec2>) -> bool {
         let in_sight = |spot: Spot| chunks.contains(&chunk_of(world_to_cell(spot.position())));
         match *self {
             Effect::Shot(shot) => in_sight(shot.start) || in_sight(shot.end),
             Effect::Blast { at, .. } | Effect::Sound { at, .. } => in_sight(at),
+            Effect::Told { team, .. } => team == viewer,
         }
     }
 }
@@ -183,6 +197,7 @@ impl Effect {
 pub struct WorldEffects {
     blasts: MessageCursor<BlastCue>,
     sounds: MessageCursor<SoundCue>,
+    news: MessageCursor<News>,
     flying: HashSet<SimId>,
 }
 
@@ -218,6 +233,12 @@ impl WorldEffects {
                 sound: cue.sound,
                 at: Spot::at(cue.position?),
             })
+        }));
+        let news = world.resource::<Messages<News>>();
+        effects.extend(self.news.read(news).map(|told| Effect::Told {
+            team: told.team,
+            news: told.news,
+            at: told.at.map(Spot::at),
         }));
         effects
     }
@@ -424,7 +445,7 @@ impl SentView {
             effects: news
                 .effects
                 .iter()
-                .filter(|effect| effect.is_in(&chunks))
+                .filter(|effect| effect.is_for(viewer, &chunks))
                 .copied()
                 .collect(),
             crystal: self.crystal_changes(&chunks, news.mined),
@@ -478,6 +499,8 @@ pub struct WorldMirror {
     pub side: SideState,
     pub things: BTreeMap<SimId, ThingState>,
     pub crystal: BTreeMap<(i32, i32), u32>,
+    /// Every piece of news the player was told, oldest first.
+    pub told: Vec<SideNews>,
 }
 
 impl WorldMirror {
@@ -499,5 +522,10 @@ impl WorldMirror {
         for (cell, amount) in change.crystal {
             self.crystal.insert((cell.x, cell.y), amount);
         }
+        self.told
+            .extend(change.effects.iter().filter_map(|effect| match effect {
+                Effect::Told { news, .. } => Some(*news),
+                _ => None,
+            }));
     }
 }

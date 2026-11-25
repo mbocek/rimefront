@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::net::TcpListener;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::lobby::MOST_PLAYERS;
 use crate::network::{Arrival, Link, MOST_SPECTATORS, Message};
@@ -13,6 +13,22 @@ use rimefront_sim::sim::catalog::Team;
 const ROOM_PATH: &str = "/room/";
 const WORLD_PATH: &str = "/world";
 
+/// How many rooms a server keeps at once, and how long a room may gather before its battle starts.
+#[derive(Clone, Copy, Debug)]
+pub struct RoomLimits {
+    pub most_rooms: usize,
+    pub gathering_for: Duration,
+}
+
+impl Default for RoomLimits {
+    fn default() -> Self {
+        Self {
+            most_rooms: 64,
+            gathering_for: Duration::from_secs(20 * 60),
+        }
+    }
+}
+
 /// A dedicated server: every player connects to it and it runs one `Relay` per room, so nobody forwards a
 /// port and no player's computer is the hub. A room is named by the path players connect to,
 /// `ws://host/room/NAME`; whoever sends it a battle first owns it. It may also run a persistent world, which
@@ -24,6 +40,7 @@ pub struct Server {
     rooms: HashMap<String, Room>,
     world: Option<WorldHost>,
     last_step: Instant,
+    limits: RoomLimits,
 }
 
 enum Room {
@@ -43,6 +60,7 @@ struct Gathering {
     start_asked: bool,
     /// The owner left, which closes the room.
     closed: bool,
+    opened: Option<Instant>,
 }
 
 struct Seat {
@@ -61,7 +79,13 @@ impl Server {
             rooms: HashMap::new(),
             world: None,
             last_step: Instant::now(),
+            limits: RoomLimits::default(),
         })
+    }
+
+    pub fn with_room_limits(mut self, limits: RoomLimits) -> Self {
+        self.limits = limits;
+        self
     }
 
     /// Runs a world grown from `map_seed` beside the rooms.
@@ -110,7 +134,12 @@ impl Server {
                 None => self.arriving.push(link),
             }
         }
+        let gathering_for = self.limits.gathering_for;
         self.rooms.retain(|_, room| match room {
+            Room::Gathering(gathering) if gathering.gathered_too_long(gathering_for) => {
+                gathering.close("This room closed: its battle did not start in time");
+                false
+            }
             Room::Gathering(gathering) => gathering.step(),
             Room::Playing(relay) => {
                 relay.receive();
@@ -145,11 +174,17 @@ impl Server {
             link.refuse("Join a room: ws://server/room/NAME");
             return;
         };
-        match self
-            .rooms
-            .entry(name.to_string())
-            .or_insert_with(|| Room::Gathering(Gathering::default()))
-        {
+        let new_room = !self.rooms.contains_key(name);
+        if new_room && self.rooms.len() >= self.limits.most_rooms {
+            link.refuse("The server has no room for another battle");
+            return;
+        }
+        match self.rooms.entry(name.to_string()).or_insert_with(|| {
+            Room::Gathering(Gathering {
+                opened: Some(Instant::now()),
+                ..Gathering::default()
+            })
+        }) {
             Room::Gathering(gathering) => gathering.arrive(link),
             Room::Playing(relay) if relay.has_room() => relay.welcome(link),
             Room::Playing(_) => link.refuse("The battle in this room has no room for you"),
@@ -158,6 +193,18 @@ impl Server {
 }
 
 impl Gathering {
+    fn gathered_too_long(&self, limit: Duration) -> bool {
+        self.opened.is_some_and(|opened| opened.elapsed() > limit)
+    }
+
+    /// Tells everyone in the room why it closes.
+    fn close(&mut self, reason: &str) {
+        let seated = self.seats.iter().map(|seat| &seat.link);
+        for link in self.owner.iter().chain(seated).chain(&self.waiting) {
+            link.refuse(reason);
+        }
+    }
+
     fn arrive(&mut self, link: Link) {
         if self.battle.is_some() {
             self.seat(link);

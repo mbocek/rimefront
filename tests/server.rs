@@ -10,7 +10,7 @@ use common::Battle;
 use rimefront::missions::levels::{ActiveLevel, LevelDefinition};
 use rimefront::net::lobby::{BattleStart, NetLobby};
 use rimefront::net::network::{Arrival, Dialling, Link, Message, SessionState};
-use rimefront::net::server::Server;
+use rimefront::net::server::{RoomLimits, Server};
 use rimefront::net::world_host::{PlayerKey, WORLD_PROTOCOL};
 use rimefront::sim::catalog::{Team, UnitKind};
 use rimefront::sim::determinism::simulation_checksum;
@@ -26,12 +26,16 @@ struct RunningServer {
 
 impl RunningServer {
     fn start() -> Self {
+        Self::start_with(RoomLimits::default())
+    }
+
+    fn start_with(limits: RoomLimits) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap().to_string();
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = Arc::clone(&stop);
         std::thread::spawn(move || {
-            let mut server = Server::new(listener).unwrap();
+            let mut server = Server::new(listener).unwrap().with_room_limits(limits);
             while !stopping.load(Ordering::Relaxed) {
                 server.step();
                 std::thread::sleep(Duration::from_millis(1));
@@ -256,6 +260,48 @@ fn an_address_without_a_room_is_refused_with_a_reason() {
         }
     }
     panic!("no refusal: {:?}", lobby.status(clock));
+}
+
+/// Moves `lobby` along until its status holds `words`; false if it never does.
+fn told(lobby: &mut NetLobby, words: &str) -> bool {
+    let mut clock = 0.0;
+    for _ in 0..3000 {
+        clock += 0.002;
+        std::thread::sleep(Duration::from_millis(1));
+        lobby.advance(clock);
+        if lobby
+            .status(clock)
+            .is_some_and(|status| status.contains(words))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+#[test]
+fn a_server_with_every_room_taken_turns_another_away() {
+    let server = RunningServer::start_with(RoomLimits {
+        most_rooms: 1,
+        ..RoomLimits::default()
+    });
+    let mut first = NetLobby::default();
+    first.join(&server.room("FIRST"));
+    assert!(!told(&mut first, "no room"), "the first room was refused");
+    let mut second = NetLobby::default();
+    second.join(&server.room("SECOND"));
+    assert!(told(&mut second, "no room for another battle"));
+}
+
+#[test]
+fn a_room_whose_battle_never_starts_closes() {
+    let server = RunningServer::start_with(RoomLimits {
+        gathering_for: Duration::from_millis(300),
+        ..RoomLimits::default()
+    });
+    let mut waiting = NetLobby::default();
+    waiting.join(&server.room("IDLE"));
+    assert!(told(&mut waiting, "did not start in time"));
 }
 
 #[test]

@@ -660,5 +660,7 @@
   "In formation": "Ve formaci",
   "Patrol (hold with right click)": "Hlídka (podrž s pravým tlačítkem)",
   "{} + right click": "{} + pravý klik",
-  "Alt (Option) + right click: the group keeps to its slowest unit": "Alt (Option) + pravý klik: skupina drží tempo nejpomalejší jednotky"
+  "Alt (Option) + right click: the group keeps to its slowest unit": "Alt (Option) + pravý klik: skupina drží tempo nejpomalejší jednotky",
+  "The server has no room for another battle": "Server nemá místo pro další bitvu",
+  "This room closed: its battle did not start in time": "Místnost se zavřela: její bitva nezačala včas"
 }

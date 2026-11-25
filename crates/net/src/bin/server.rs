@@ -1,5 +1,6 @@
 //! The dedicated network battle server:
-//! `rimefront-server [--port 47300] [--world SEED] [--world-dir DIR] [--save-every SECS]`. Players join
+//! `rimefront-server [--port 47300] [--world SEED] [--world-dir DIR] [--save-every SECS] [--most-rooms N]
+//! [--room-patience MINUTES]`. Players join
 //! `ws://host:port/room/NAME`, and with `--world` or `--world-dir` enter a persistent world at
 //! `ws://host:port/world`; with `--world-dir` the world is saved there and resumed from there. Ctrl-C or
 //! a termination signal saves the world before the server stops.
@@ -11,7 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use rimefront_net::lobby::DEFAULT_PORT;
-use rimefront_net::server::Server;
+use rimefront_net::server::{RoomLimits, Server};
 use rimefront_net::world_host::WorldHost;
 use rimefront_net::world_store::WorldStore;
 
@@ -69,10 +70,19 @@ fn world_to_run() -> std::io::Result<Option<WorldHost>> {
 fn main() -> std::io::Result<()> {
     let port = argument_after("--port").unwrap_or(DEFAULT_PORT);
     let listener = TcpListener::bind(("0.0.0.0", port))?;
+    let defaults = RoomLimits::default();
+    let limits = RoomLimits {
+        most_rooms: argument_after("--most-rooms").unwrap_or(defaults.most_rooms),
+        gathering_for: argument_after::<u64>("--room-patience")
+            .map_or(defaults.gathering_for, |minutes| {
+                Duration::from_secs(minutes * 60)
+            }),
+    };
     let mut server = match world_to_run()? {
         Some(world) => Server::hosting(listener, world)?,
         None => Server::new(listener)?,
-    };
+    }
+    .with_room_limits(limits);
     let stopping = Arc::new(AtomicBool::new(false));
     let asked_to_stop = Arc::clone(&stopping);
     ctrlc::set_handler(move || asked_to_stop.store(true, Ordering::Relaxed))

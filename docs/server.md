@@ -54,7 +54,9 @@ apart, a late spectator and a returning player catching up, an address without a
   could decide alone.
 - **Limits.** A link takes no more messages once more than 256 kB wait for a reader that does not keep up
   (`MOST_UNSENT_BYTES`), and a world lets go of a player whose link refuses their view; they enter again
-  when their connection recovers. Still open: rooms per server and idle rooms. The binary is small (10 MB) when built on its own,
+  when their connection recovers. A server keeps at most 64 rooms at once (`--most-rooms`) and turns a new
+  one away beyond that, and closes a room whose battle has not started 20 minutes after it opened
+  (`--room-patience` in minutes), telling everyone in it why (`RoomLimits`). The binary is small (10 MB) when built on its own,
   `cargo build --release -p rimefront_net --bin rimefront-server`; a workspace build gives it the game's
   Bevy features and the game's size.
 - **A world on its own thread.** A world lives on the thread that made it (map queries are per thread), so

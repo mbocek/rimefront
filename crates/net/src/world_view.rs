@@ -656,3 +656,153 @@ impl WorldMirror {
             }));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::link::encode;
+    use crate::network::Message;
+    use crate::world_host::{PlayerKey, WORLD_PROTOCOL};
+    use iron_tide_sim::sim::components::Stance;
+    use iron_tide_sim::sim::notifications::SideNews;
+    use iron_tide_sim::sim::player_commands::PlayerCommand;
+    use iron_tide_sim::sim::research::Upgrade;
+
+    const PROTOCOL_FIXTURE: &str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/world_protocol.txt");
+
+    /// One of everything a world and its players say to each other, as it travels.
+    fn sample_of_the_protocol() -> Vec<Message> {
+        let id = SimId(70_001);
+        let thing = ThingState {
+            id,
+            thing: Thing::Building {
+                kind: BuildingKind::CommandCenter,
+                origin: IVec2::new(-40, 90),
+            },
+            team: Some(Team::from_index(200)),
+            position: Spot::at(Vec3::new(-79.5, 0.25, 181.0)),
+            facing: -1571,
+            health_percent: 64,
+        };
+        let change = ViewChange {
+            tick: 123_456,
+            bounds: Some(MapBounds {
+                min: IVec2::new(-64, -64),
+                size: IVec2::new(192, 192),
+            }),
+            credits: Some(-5),
+            side: Some(SideState {
+                lanes: Lane::ALL.map(|_| LaneState {
+                    queue: vec![BuildItem::Research(Upgrade::ALL[0])],
+                    progress_percent: 37,
+                    ready: Some(BuildingKind::Wall),
+                }),
+                researched: Upgrade::ALL.to_vec(),
+                support_charged_at: [0, 9_999],
+            }),
+            shown: vec![thing],
+            moved: vec![Moved {
+                id,
+                step: [-3, 0, 12],
+                turn: 7,
+                health_percent: 99,
+            }],
+            hidden: vec![SimId(5)],
+            effects: vec![
+                Effect::Shot(Shot {
+                    style: ProjectileStyle::ArtilleryShell,
+                    start: Spot::at(Vec3::ONE),
+                    end: Spot::at(Vec3::NEG_ONE),
+                    arc_height: 250,
+                    millis: 1_200,
+                }),
+                Effect::Blast {
+                    size: BlastSize::BuildingCollapse,
+                    at: Spot::at(Vec3::X),
+                },
+                Effect::Sound {
+                    sound: Sound::ALL[Sound::ALL.len() - 1],
+                    at: Spot::at(Vec3::Z),
+                },
+                Effect::Told {
+                    team: Team::Player,
+                    news: SideNews::Promoted(
+                        UnitKind::ALL[UnitKind::ALL.len() - 1],
+                        Default::default(),
+                    ),
+                    at: None,
+                },
+            ],
+            crystal: vec![(IVec2::new(3, -4), 1_500)],
+        };
+        vec![
+            Message::EnterWorld {
+                version: "1.6.0".into(),
+                protocol: WORLD_PROTOCOL,
+                player: PlayerKey::from_saved("00112233445566778899aabbccddeeff").unwrap(),
+            },
+            Message::Entered {
+                team: Team::from_index(4),
+                tick: 99,
+                map_seed: u64::MAX,
+            },
+            Message::Orders {
+                commands: vec![
+                    PlayerCommand::Stop { units: vec![id] },
+                    PlayerCommand::SetStance {
+                        units: vec![id],
+                        stance: Stance::ALL[Stance::ALL.len() - 1],
+                    },
+                ],
+            },
+            Message::WorldView(Box::new(change)),
+            Message::Refused {
+                reason: "The world has no room for you".into(),
+            },
+        ]
+    }
+
+    /// The protocol as recorded: its number, how many kinds of each catalog there are, and the bytes of the
+    /// sample, one message a line.
+    fn protocol_record() -> String {
+        let mut record = format!(
+            "protocol {WORLD_PROTOCOL}\nunits {} structures {} sounds {} upgrades {} stances {}\n",
+            UnitKind::ALL.len(),
+            1 + BuildingKind::CONSTRUCTIBLE.len() + BuildingKind::NEUTRAL_SITES.len(),
+            Sound::ALL.len(),
+            Upgrade::ALL.len(),
+            Stance::ALL.len(),
+        );
+        for message in sample_of_the_protocol() {
+            let bytes = encode(&message).unwrap();
+            record.extend(bytes.iter().map(|byte| format!("{byte:02x}")));
+            record.push('\n');
+        }
+        record
+    }
+
+    /// A change to what a world and its players say must come with a new `WORLD_PROTOCOL`, so a game and a
+    /// world that would misread each other are told so; re-record with `UPDATE_WORLD_PROTOCOL=1`.
+    #[test]
+    fn the_world_protocol_changes_only_with_its_number() {
+        let record = protocol_record();
+        if std::env::var_os("UPDATE_WORLD_PROTOCOL").is_some() {
+            std::fs::write(PROTOCOL_FIXTURE, &record).unwrap();
+            return;
+        }
+        let recorded = std::fs::read_to_string(PROTOCOL_FIXTURE).unwrap_or_default();
+        let recorded_protocol = recorded.lines().next().unwrap_or_default();
+        let protocol = record.lines().next().unwrap_or_default();
+        let step = if recorded_protocol == protocol {
+            "raise WORLD_PROTOCOL so a game that would misread it is turned away, then re-record"
+        } else {
+            "WORLD_PROTOCOL was raised: re-record"
+        };
+        assert!(
+            recorded == record,
+            "what a world says changed: {step} with \
+             UPDATE_WORLD_PROTOCOL=1 cargo test -p iron_tide_net the_world_protocol"
+        );
+    }
+}

@@ -638,5 +638,10 @@
   "Its player is away: it cannot be attacked now": "Jej hráč je preč: teraz sa nedá napadnúť",
   "Nothing of your side stands. Enter the world again to start anew.": "Z tvojej strany nič nestojí. Vstúp do sveta znova a začni odznova.",
   "A persistent world grows as players arrive; each newcomer gets a base of their own and a computer neighbour. Type ws://server/world above to enter a server's world, or play one alone: it is kept for your next game, and a new one puts it aside.": "Trvalý svet rastie s príchodom hráčov; každý nováčik dostane vlastnú základňu a počítačového suseda. Napíš hore ws://server/world a vstúp do sveta servera, alebo hraj svet sám: zostane ti uložený na ďalšiu hru. Nový svet ho odloží.",
-  "NEW WORLD ALONE": "NOVÝ SVET SÁM"
+  "NEW WORLD ALONE": "NOVÝ SVET SÁM",
+  "The world is newer than this game: update the game to enter it": "Svet je novší ako táto hra: aktualizuj hru, aby si doň mohol vstúpiť",
+  "The world is older than this game: its server needs updating": "Svet je starší ako táto hra: jeho server treba aktualizovať",
+  "The connection to the world was lost": "Spojenie so svetom sa stratilo",
+  "The world has no room for you": "Vo svete pre teba nie je miesto",
+  "You entered this world elsewhere": "Do tohto sveta si vstúpil inde"
 }

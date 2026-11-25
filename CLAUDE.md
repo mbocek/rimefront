@@ -34,6 +34,9 @@ building, tests and releases: [docs/development.md](docs/development.md).
 - The simulation is deterministic lockstep. Anything that changes simulation results (map generation,
   crystal placement, the shared map RNG, combat or economy rules) changes `tests/fingerprints.txt`: re-record
   with `UPDATE_FINGERPRINTS=1 cargo test --release --test cross_platform` and say so in the commit.
+- What a persistent world says to games and what a saved world holds are versioned (`WORLD_PROTOCOL`,
+  `STORE_VERSION`); a change to either fails a fixture test until the number is raised and the fixture
+  re-recorded, see [docs/compatibility.md](docs/compatibility.md).
 - Generated assets come from code: models from `tools/blender` (`make models`), sounds and music from
   `tools/audio/generate_audio.py`. Change the generator and regenerate; never edit the outputs by hand.
 - Third-party assets must be CC0 or similarly free and are credited in the README.

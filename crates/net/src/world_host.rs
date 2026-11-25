@@ -128,6 +128,25 @@ impl Default for AbsenceRules {
     }
 }
 
+/// The version of what a world and its players say to each other after the game enters it: the messages and
+/// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
+/// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
+/// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
+pub const WORLD_PROTOCOL: u32 = 1;
+
+/// Why a game speaking `protocol` cannot enter this world; `None` when it can.
+fn protocol_refusal(protocol: u32) -> Option<&'static str> {
+    match protocol.cmp(&WORLD_PROTOCOL) {
+        std::cmp::Ordering::Equal => None,
+        std::cmp::Ordering::Less => {
+            Some("The world is newer than this game: update the game to enter it")
+        }
+        std::cmp::Ordering::Greater => {
+            Some("The world is older than this game: its server needs updating")
+        }
+    }
+}
+
 /// Players are sent a view every this many ticks: ten a second, half the headers and steps of one a tick,
 /// and the game glides its units between them.
 pub const TICKS_PER_VIEW: u64 = 2;
@@ -549,14 +568,15 @@ impl WorldHost {
         match (message, player.team) {
             (
                 Message::EnterWorld {
-                    version,
+                    protocol,
                     player: key,
+                    ..
                 },
                 None,
             ) => {
-                if version != env!("CARGO_PKG_VERSION") {
+                if let Some(reason) = protocol_refusal(protocol) {
                     player.connection.send(&Message::Refused {
-                        reason: format!("The world runs version {}", env!("CARGO_PKG_VERSION")),
+                        reason: reason.into(),
                     });
                     return;
                 }
@@ -709,6 +729,7 @@ mod tests {
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
         });
         let team = Team::Player;
@@ -916,6 +937,7 @@ mod tests {
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
         });
         let mut mirror = WorldMirror::default();
@@ -998,6 +1020,7 @@ mod tests {
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
             player: key.clone(),
         });
         host.step(SIMULATION_TICK);
@@ -1219,6 +1242,7 @@ mod tests {
         resumed.connect(Box::new(world_end));
         back.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
             player: key.clone(),
         });
         for _ in 0..TICKS_PER_VIEW {
@@ -1449,21 +1473,39 @@ mod tests {
         assert!(moved.distance(start) > 3.0, "the tank stayed at {start}");
     }
 
-    #[test]
-    fn a_player_of_another_version_is_turned_away() {
-        let mut host = WorldHost::new(29);
+    fn answer_to(host: &mut WorldHost, version: &str, protocol: u32) -> Option<Message> {
         let (mut player, world_end) = local_connection();
         host.connect(Box::new(world_end));
         player.send(&Message::EnterWorld {
-            version: "0.0.1".into(),
+            version: version.into(),
+            protocol,
             player: PlayerKey::new_random(),
         });
         host.step(SIMULATION_TICK);
-        let refused = player
+        player
             .drain()
             .into_iter()
-            .any(|arrival| matches!(arrival, Arrival::Message(Message::Refused { .. })));
-        assert!(refused);
+            .find_map(|arrival| match arrival {
+                Arrival::Message(message @ (Message::Entered { .. } | Message::Refused { .. })) => {
+                    Some(message)
+                }
+                _ => None,
+            })
+    }
+
+    #[test]
+    fn a_game_of_another_protocol_is_turned_away_and_one_of_another_version_is_not() {
+        let mut host = WorldHost::new(29);
+        let refusal = |answer: Option<Message>| match answer {
+            Some(Message::Refused { reason }) => reason,
+            other => panic!("not refused: {other:?}"),
+        };
+        let older_game = refusal(answer_to(&mut host, "0.0.1", 0));
+        assert!(older_game.contains("update the game"), "{older_game}");
+        let newer_game = refusal(answer_to(&mut host, "99.0.0", WORLD_PROTOCOL + 1));
+        assert!(newer_game.contains("server needs updating"), "{newer_game}");
+        let same_protocol = answer_to(&mut host, "99.0.0", WORLD_PROTOCOL);
+        assert!(matches!(same_protocol, Some(Message::Entered { .. })));
     }
 
     #[test]

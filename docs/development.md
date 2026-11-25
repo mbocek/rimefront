@@ -61,8 +61,13 @@ cargo test --release --test fog        # fog of war: hidden enemies, exploration
 cargo test --release --test sound      # the simulation asks for the right sounds at the right moments
 cargo test --release --test orders     # attack-move, patrol, waypoint queues, rally points
 cargo test --release --test crowd_bench -- --ignored --nocapture   # simulation time of up to 1920 fighting units
-cargo test --release --test world_bench -- --ignored --nocapture   # a world's tick and views with up to 32 players
+cargo test --release --test world_bench -- --ignored --nocapture   # a world's tick and views with up to 64 players
+UPDATE_WORLD_PROTOCOL=1 cargo test -p iron_tide_net the_world_protocol   # re-record after raising WORLD_PROTOCOL
+UPDATE_WORLD_LAYOUT=1 cargo test -p iron_tide_net the_layout             # re-record after raising STORE_VERSION
 ```
+
+When to raise the world protocol or a saved world's layout, and how a server is updated, is in
+[compatibility.md](compatibility.md).
 
 The playability tests run the real simulation systems (`SimulationPlugin`) without a window: units cross the
 river through a ford, a refinery's harvester earns credits, barracks train queued infantry, low power slows

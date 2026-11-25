@@ -5,7 +5,7 @@ use iron_tide::SIMULATION_TICK;
 use iron_tide::net::link::encode;
 use iron_tide::net::network::{Arrival, Message};
 use iron_tide::net::world_host::{
-    LocalConnection, PlayerKey, WorldConnection, WorldHost, local_connection,
+    LocalConnection, PlayerKey, WORLD_PROTOCOL, WorldConnection, WorldHost, local_connection,
 };
 use iron_tide::sim::catalog::{BuildingKind, Team, UnitKind};
 use iron_tide::sim::components::{Building, Unit};
@@ -24,6 +24,7 @@ fn enter(host: &mut WorldHost) -> LocalConnection {
     host.connect(Box::new(world_end));
     player.send(&Message::EnterWorld {
         version: env!("CARGO_PKG_VERSION").into(),
+        protocol: WORLD_PROTOCOL,
         player: PlayerKey::new_random(),
     });
     host.step(SIMULATION_TICK);

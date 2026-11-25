@@ -31,7 +31,9 @@ use iron_tide_sim::world::map::{
 use iron_tide_sim::world::sites::StartingSites;
 use iron_tide_sim::world::wilds::{crystal_look, widen_world};
 
-/// Bumped whenever the layout changes incompatibly; a world saved by another layout is refused.
+/// The layout of a saved world: what its files hold and in what order. It is the first thing in the world
+/// file, so a world saved by another layout is recognised before anything else is read; raising it needs a
+/// way to read the layout before (docs/compatibility.md), and `fixtures/world_layout.txt` changes with it.
 const STORE_VERSION: u32 = 4;
 const WORLD_FILE: &str = "world.bin";
 const CHUNKS_DIRECTORY: &str = "chunks";
@@ -150,13 +152,7 @@ impl WorldStore {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
         };
-        let record: WorldRecord = decode(&bytes)?;
-        if record.version != STORE_VERSION {
-            return Err(io::Error::other(format!(
-                "the world was saved by layout {}, this server reads {STORE_VERSION}",
-                record.version
-            )));
-        }
+        let record = read_world_record(&bytes)?;
         let mut chunks = HashMap::new();
         self.written.clear();
         for (chunk, file) in &record.chunks {
@@ -220,6 +216,24 @@ impl WorldStore {
             }
         }
         Ok(())
+    }
+}
+
+/// The world record of a world file, of this layout. A layout before it is read here and brought up to
+/// date once there is one to read.
+fn read_world_record(bytes: &[u8]) -> io::Result<WorldRecord> {
+    let (layout, _) = postcard::take_from_bytes::<u32>(bytes)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    match layout {
+        STORE_VERSION => decode(bytes),
+        older if older < STORE_VERSION => Err(io::Error::other(format!(
+            "the world was saved by layout {older}, which this server no longer reads (it reads \
+             {STORE_VERSION})"
+        ))),
+        newer => Err(io::Error::other(format!(
+            "the world was saved by layout {newer}, newer than this server's {STORE_VERSION}: run the \
+             server that saved it, or a newer one"
+        ))),
     }
 }
 
@@ -485,5 +499,130 @@ fn restore_sides(world: &mut World, teams: &[Team], records: &[SideRecord]) {
         {
             powers.set_secs_until_ready(team, power, secs);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LAYOUT_FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/world_layout.txt");
+
+    fn sample_world() -> WorldRecord {
+        WorldRecord {
+            version: STORE_VERSION,
+            map_seed: 29,
+            tick: 1_000_000,
+            match_secs: 50_000.5,
+            bounds: MapBounds {
+                min: IVec2::new(-64, -64),
+                size: IVec2::new(192, 192),
+            },
+            sides: vec![SideRecord {
+                credits: 4_200,
+                lanes: Lane::ALL
+                    .map(|_| LaneRecord {
+                        queue: vec![BuildItem::Structure(BuildingKind::Refinery)],
+                        progress_secs: 2.5,
+                        ready: None,
+                    })
+                    .to_vec(),
+                researched: Upgrade::ALL.to_vec(),
+                support_recharge_secs: vec![0.0, 33.0],
+            }],
+            retired_sides: vec![Team::from_index(9)],
+            starting_sites: vec![IVec2::new(100, -20)],
+            ai: AiCommanders::default(),
+            hosting: HostingRecord {
+                level_side_taken: true,
+                players: vec![(
+                    PlayerKey::from_saved("00112233445566778899aabbccddeeff").unwrap(),
+                    Team::from_index(4),
+                )],
+                sites: vec![(Team::from_index(4), IVec2::new(100, -20))],
+                away_since: vec![(Team::from_index(4), 77)],
+                sheltered: vec![Team::from_index(4)],
+                computer_sides: vec![(Team::Crimson, IVec2::new(54, 8))],
+            },
+            chunks: vec![(IVec2::new(-1, 2), "-1_2_77.bin".into())],
+        }
+    }
+
+    fn sample_chunk() -> ChunkRecord {
+        let unit: SavedUnit = serde_json::from_str(
+            r#"{"team":"Side4","kind":"Tank","position":[1.5,0.0,-3.0],"facing":0.5,"health":300.0,
+                "cargo":0,"orders":[],"experience":12.0,"stance":"HoldFire"}"#,
+        )
+        .unwrap();
+        let building: SavedBuilding = serde_json::from_str(
+            r#"{"team":"Crimson","kind":"PowerPlant","origin":[3,4],"health":500.0,"rally":[5,6],
+                "repairing":true}"#,
+        )
+        .unwrap();
+        ChunkRecord {
+            crystal: vec![0, 1_500, 30],
+            buildings: vec![building],
+            units: vec![unit],
+            mines: Vec::new(),
+            unclaimed_sites: vec![(BuildingKind::SupplyDepot, IVec2::new(-30, 40))],
+            explored: vec![(Team::Player, vec![0b1010_0101, 0xff])],
+        }
+    }
+
+    fn layout_record() -> String {
+        let hex = |bytes: Vec<u8>| {
+            bytes
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        };
+        format!(
+            "layout {STORE_VERSION}\n{}\n{}\n",
+            hex(encode(&sample_world()).unwrap()),
+            hex(encode(&sample_chunk()).unwrap()),
+        )
+    }
+
+    /// A change to what a saved world holds must come with a new `STORE_VERSION` and a way to read the layout
+    /// before; re-record with `UPDATE_WORLD_LAYOUT=1`.
+    #[test]
+    fn the_layout_of_a_saved_world_changes_only_with_its_number() {
+        let record = layout_record();
+        if std::env::var_os("UPDATE_WORLD_LAYOUT").is_some() {
+            std::fs::write(LAYOUT_FIXTURE, &record).unwrap();
+            return;
+        }
+        let recorded = std::fs::read_to_string(LAYOUT_FIXTURE).unwrap_or_default();
+        assert!(
+            recorded == record,
+            "what a saved world holds changed: raise STORE_VERSION, read the layout before in \
+             read_world_record, then re-record with UPDATE_WORLD_LAYOUT=1 cargo test -p iron_tide_net \
+             the_layout"
+        );
+    }
+
+    #[test]
+    fn a_world_of_another_layout_is_recognised_before_it_is_read() {
+        let mut older = encode(&sample_world()).unwrap();
+        older[0] = (STORE_VERSION - 1) as u8;
+        let error = read_world_record(&older)
+            .err()
+            .expect("an older layout was read");
+        assert!(error.to_string().contains("no longer reads"), "{error}");
+        let mut newer = encode(&sample_world()).unwrap();
+        newer[0] = (STORE_VERSION + 1) as u8;
+        let error = read_world_record(&newer)
+            .err()
+            .expect("a newer layout was read");
+        assert!(
+            error.to_string().contains("newer than this server"),
+            "{error}"
+        );
+        assert_eq!(
+            read_world_record(&encode(&sample_world()).unwrap())
+                .unwrap()
+                .tick,
+            1_000_000
+        );
     }
 }

@@ -97,7 +97,11 @@ pub enum Message {
     Start,
     /// To a world: this player wants to enter it.
     EnterWorld {
+        /// The game's version, for the record; whether it may enter is the protocol's to say.
         version: String,
+        /// `WORLD_PROTOCOL` of the game; 0 from a game that came before it.
+        #[serde(default)]
+        protocol: u32,
         player: PlayerKey,
     },
     /// From a world: the side the player commands there, and the world's tick when they entered.

@@ -8,13 +8,14 @@ use std::time::{Duration, Instant};
 use bevy::prelude::*;
 
 use crate::SIMULATION_TICK;
+use crate::app::i18n::tr_owned;
 use crate::app::match_flow::{GameState, MatchClock, MirroredBattle};
 use crate::app::settings::game_data_directory;
 use crate::missions::levels::ActiveLevel;
-use crate::net::lobby::DEFAULT_PORT;
+use crate::net::lobby::{DEFAULT_PORT, NetLobby};
 use crate::net::network::{Arrival, Dialling, JoinTarget, Link, Message};
 use crate::net::world_host::{
-    PlayerKey, WorldConnection, WorldHost, local_connection, world_level,
+    PlayerKey, WORLD_PROTOCOL, WorldConnection, WorldHost, local_connection, world_level,
 };
 use crate::net::world_store::WorldStore;
 use crate::net::world_view::{Effect, SideState, Spot, Thing, ThingState, ViewChange};
@@ -60,6 +61,8 @@ pub struct WorldClient {
     /// The world's tick of the last view shown.
     last_view_tick: u64,
     lost: bool,
+    /// Why the world turned the player away, in its words.
+    refusal: Option<String>,
     /// The thread of a world the game runs itself.
     world_thread: Option<JoinHandle<()>>,
     /// Whether anything of the player's side was shown standing yet.
@@ -70,6 +73,7 @@ impl WorldClient {
     fn entering(connection: Box<dyn WorldConnection>, player: PlayerKey) -> Self {
         connection.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
             player,
         });
         Self {
@@ -81,6 +85,7 @@ impl WorldClient {
             world_tick_lead: 0,
             last_view_tick: 0,
             lost: false,
+            refusal: None,
             world_thread: None,
             side_was_shown: false,
         }
@@ -185,7 +190,7 @@ impl WorldClient {
                 }
                 Arrival::Message(Message::WorldView(change)) => self.waiting.push(*change),
                 Arrival::Message(Message::Refused { reason }) => {
-                    warn!("the world refused: {reason}");
+                    self.refusal = Some(reason);
                     self.lost = true;
                 }
                 Arrival::Message(_) => {}
@@ -565,6 +570,32 @@ pub fn send_orders_to_world(client: Option<Res<WorldClient>>, mut queue: ResMut<
     }
 }
 
+/// A world that turned the player away or whose connection went is given up: the network page says why,
+/// and a battle in it ends.
+pub fn give_up_a_lost_world(
+    mut commands: Commands,
+    client: Option<Res<WorldClient>>,
+    lobby: Option<ResMut<NetLobby>>,
+    state: Res<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    let Some(client) = client.filter(|client| client.is_lost()) else {
+        return;
+    };
+    let reason = client
+        .refusal
+        .as_deref()
+        .unwrap_or("The connection to the world was lost");
+    warn!("left the world: {reason}");
+    if let Some(mut lobby) = lobby {
+        lobby.fail(tr_owned(reason));
+    }
+    commands.remove_resource::<WorldClient>();
+    if *state.get() == GameState::Playing {
+        next_state.set(GameState::MainMenu);
+    }
+}
+
 /// Leaving the battle leaves the world; a world the game ran itself stops with it.
 pub fn leave_world(mut commands: Commands) {
     commands.remove_resource::<WorldClient>();
@@ -576,7 +607,7 @@ pub struct WorldClientPlugin;
 
 impl Plugin for WorldClientPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, enter_world)
+        app.add_systems(PreUpdate, (enter_world, give_up_a_lost_world).chain())
             .add_systems(
                 FixedUpdate,
                 (follow_world, send_orders_to_world)

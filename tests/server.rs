@@ -11,7 +11,7 @@ use iron_tide::missions::levels::{ActiveLevel, LevelDefinition};
 use iron_tide::net::lobby::{BattleStart, NetLobby};
 use iron_tide::net::network::{Arrival, Dialling, Link, Message, SessionState};
 use iron_tide::net::server::Server;
-use iron_tide::net::world_host::PlayerKey;
+use iron_tide::net::world_host::{PlayerKey, WORLD_PROTOCOL};
 use iron_tide::sim::catalog::{Team, UnitKind};
 use iron_tide::sim::determinism::simulation_checksum;
 use iron_tide::sim::player_commands::{GroundOrder, PlayerCommand};
@@ -277,6 +277,7 @@ fn a_player_enters_the_world_a_server_runs() {
     let mut link = Link::guest_side_to(TcpStream::connect(&address).unwrap(), dialling).unwrap();
     link.send(&Message::EnterWorld {
         version: env!("CARGO_PKG_VERSION").into(),
+        protocol: WORLD_PROTOCOL,
         player: PlayerKey::new_random(),
     });
     let mut entered = None;

@@ -37,6 +37,9 @@ use crate::world::wilds::widen_world;
 /// How long a world the game runs itself sleeps between steps; short enough to answer at once.
 const LOCAL_WORLD_POLL: Duration = Duration::from_millis(2);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// A unit glides to where a view showed it over the ticks since the view before, but never longer than this,
+/// so after a pause in the views it catches up at once instead of trailing behind.
+const LONGEST_GLIDE_TICKS: u64 = 4;
 const PLAYER_KEY_FILE: &str = "world_player_key";
 const OWN_WORLD_DIRECTORY: &str = "worlds/own";
 const PUT_ASIDE_SUFFIX: &str = "-previous";
@@ -54,6 +57,8 @@ pub struct WorldClient {
     shown: HashMap<SimId, ThingState>,
     /// How many ticks the world is ahead of the battle here.
     world_tick_lead: i64,
+    /// The world's tick of the last view shown.
+    last_view_tick: u64,
     lost: bool,
     /// The thread of a world the game runs itself.
     world_thread: Option<JoinHandle<()>>,
@@ -74,6 +79,7 @@ impl WorldClient {
             side: SideState::default(),
             shown: HashMap::new(),
             world_tick_lead: 0,
+            last_view_tick: 0,
             lost: false,
             world_thread: None,
             side_was_shown: false,
@@ -310,6 +316,9 @@ pub fn follow_world(world: &mut World) {
     for change in changes {
         let mut client = world.resource_mut::<WorldClient>();
         client.world_tick_lead = change.tick as i64 - local_tick as i64;
+        let ticks_since_last_view = change.tick.saturating_sub(client.last_view_tick);
+        client.last_view_tick = change.tick;
+        let glide_ticks = ticks_since_last_view.clamp(1, LONGEST_GLIDE_TICKS) as u32;
         if let Some(bounds) = change.bounds.filter(|&bounds| bounds != map_bounds()) {
             widen_world(world, bounds);
         }
@@ -338,13 +347,14 @@ pub fn follow_world(world: &mut World) {
             client.shown.insert(state.id, *state);
         }
         for state in states {
-            show(world, state);
+            show(world, state, glide_ticks);
         }
         for effect in change.effects {
             show_effect(world, side, effect);
         }
         show_crystal(world, &change.crystal);
     }
+    glide(world);
     let world_tick = world_tick_now(world, local_tick);
     show_support_recharge(world, side, world_tick);
     world.resource_mut::<MatchClock>().elapsed_secs =
@@ -382,7 +392,35 @@ fn admit_own_side(world: &mut World, side: Team) {
     world.resource_mut::<Intel>().admit(side);
 }
 
-fn show(world: &mut World, state: ThingState) {
+/// A unit on its way to where the world last showed it, a share of the way each tick until the next view.
+#[derive(Component)]
+struct Glide {
+    from: Transform,
+    to: Transform,
+    ticks: u32,
+    done: u32,
+}
+
+/// Moves every gliding unit a tick further along.
+fn glide(world: &mut World) {
+    let mut gliding = world.query::<(Entity, &mut Transform, &mut Glide)>();
+    let mut arrived = Vec::new();
+    for (entity, mut transform, mut glide) in gliding.iter_mut(world) {
+        glide.done += 1;
+        let share = glide.done as f32 / glide.ticks as f32;
+        transform.translation = glide.from.translation.lerp(glide.to.translation, share);
+        transform.rotation = glide.from.rotation.slerp(glide.to.rotation, share);
+        if glide.done >= glide.ticks {
+            arrived.push(entity);
+        }
+    }
+    for entity in arrived {
+        world.entity_mut(entity).remove::<Glide>();
+    }
+}
+
+/// Shows a thing as the world last sent it; a unit already here glides there over `ticks`.
+fn show(world: &mut World, state: ThingState, ticks: u32) {
     let known = world.resource::<SimEntities>().get(state.id);
     let Some(entity) = known.or_else(|| appear(world, state)) else {
         return;
@@ -393,8 +431,23 @@ fn show(world: &mut World, state: ThingState) {
     if let Some(mut transform) = thing.get_mut::<Transform>()
         && matches!(state.thing, Thing::Unit(_))
     {
-        transform.translation = state.position();
-        transform.rotation = Quat::from_rotation_y(state.facing());
+        let to = Transform {
+            translation: state.position(),
+            rotation: Quat::from_rotation_y(state.facing()),
+            ..*transform
+        };
+        match known {
+            Some(_) => {
+                let from = *transform;
+                thing.insert(Glide {
+                    from,
+                    to,
+                    ticks,
+                    done: 0,
+                });
+            }
+            None => *transform = to,
+        }
     }
     if let Some(mut health) = thing.get_mut::<Health>() {
         health.current = health.max * f32::from(state.health_percent) / 100.0;
@@ -532,5 +585,35 @@ impl Plugin for WorldClientPlugin {
                     .run_if(resource_exists::<MirroredBattle>),
             )
             .add_systems(OnExit(GameState::Playing), leave_world);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_unit_glides_to_where_the_world_showed_it_over_the_ticks_between_views() {
+        let mut world = World::new();
+        let to = Transform::from_xyz(4.0, 0.0, 0.0);
+        let unit = world
+            .spawn((
+                Transform::default(),
+                Glide {
+                    from: Transform::default(),
+                    to,
+                    ticks: 2,
+                    done: 0,
+                },
+            ))
+            .id();
+        glide(&mut world);
+        assert_eq!(world.get::<Transform>(unit).unwrap().translation.x, 2.0);
+        glide(&mut world);
+        assert_eq!(world.get::<Transform>(unit).unwrap().translation.x, 4.0);
+        assert!(
+            world.get::<Glide>(unit).is_none(),
+            "still gliding once there"
+        );
     }
 }

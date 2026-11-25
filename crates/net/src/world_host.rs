@@ -128,6 +128,10 @@ impl Default for AbsenceRules {
     }
 }
 
+/// Players are sent a view every this many ticks: ten a second, half the headers and steps of one a tick,
+/// and the game glides its units between them.
+pub const TICKS_PER_VIEW: u64 = 2;
+
 /// A newcomer whose site has no computer side this many cells away gets one beside them: a little more than
 /// the spacing of sites, so a computer side is one site away at most.
 const COMPUTER_NEIGHBOUR_REACH: f32 = 80.0;
@@ -407,7 +411,7 @@ impl WorldHost {
         let effects = self.effects.gather(self.app.world_mut());
         self.unshown_effects.extend(effects);
         self.mined.note(self.app.world_mut());
-        if self.tick() != before {
+        if self.tick() / TICKS_PER_VIEW != before / TICKS_PER_VIEW {
             self.show_views();
         }
         self.save_when_due();
@@ -916,8 +920,9 @@ mod tests {
                 copies: 1,
             }],
         });
-        host.step(SIMULATION_TICK);
-        host.step(SIMULATION_TICK);
+        for _ in 0..1 + TICKS_PER_VIEW {
+            host.step(SIMULATION_TICK);
+        }
         follow(&mut mirror, &mut player);
         assert_eq!(mirror.side.lanes[0].queue, [power_plant]);
 
@@ -1208,7 +1213,9 @@ mod tests {
             version: env!("CARGO_PKG_VERSION").into(),
             player: key.clone(),
         });
-        resumed.step(SIMULATION_TICK);
+        for _ in 0..TICKS_PER_VIEW {
+            resumed.step(SIMULATION_TICK);
+        }
         assert_eq!(resumed.sides_of_players[&key], team);
         let mut mirror = WorldMirror::default();
         follow(&mut mirror, &mut back);

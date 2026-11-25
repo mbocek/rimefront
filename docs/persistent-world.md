@@ -323,6 +323,11 @@ for ordinary network matches.
     health), and credits only when they change: 1.9 kB and 5.1 kB. Of those 10 s, 191 views: 1.6 kB of
     moves, 1.5 kB of effects (each shot carries its flight, blast and sound), and about 8 bytes of header a
     view (tick, empty lists). The game keeps the last state of every thing shown to apply the moves to.
+    Views then went out every second tick (`TICKS_PER_VIEW`), ten a second: effects, news and moves wait
+    for the next one, and the game glides each unit from where it stands to where the view shows it over
+    the ticks since the view before (at most four, so after a pause it catches up rather than trails), on top
+    of the drawing between ticks every battle has. A quiet first minute costs 1.8 kB, a tank driving 10 s
+    3.3 kB instead of 5.1 kB.
 16. **The world's own inhabitants.** Neutral sites and computer sides that keep the world from standing
     empty between players.
     A world played alone is kept with the game's data, in `worlds/own` (`net::world_client::OwnWorld`), and

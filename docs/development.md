@@ -30,6 +30,12 @@ RIMEFRONT_CAPTURE_POINTER="3 move 1355 760; 3.2 press left; 3.3 release left; 4 
 Each step is seconds since start, then `move x y` (pixels of the 1600 x 900 capture), `press` / `release`
 `left` or `right`, or `shot`, which saves `run-1.png`, `run-2.png` and so on.
 
+The main menu's backdrop (`assets/ui/menu_backdrop.jpg`) is a capture without the interface
+(`RIMEFRONT_CAPTURE_SCENE_ONLY=1`) of a custom level: map seed 77, Plains, Autumn, no fog, the player in the
+south-west with two power plants, a refinery, barracks, factory, gun turret and tech centre and a few tanks,
+taken 8 s in with `RIMEFRONT_CAPTURE_ZOOM=78 RIMEFRONT_CAPTURE_FOCUS_CELL=9,45`, so the base sits below the
+menu's tiles and the forest on the left. Saved as JPEG at quality 85.
+
 ## Packages and releases
 
 ```sh

@@ -63,6 +63,8 @@ const CAPTURE_CLAIM_SITES_VAR: &str = "RIMEFRONT_CAPTURE_CLAIM_SITES";
 const CAPTURE_WORLD_VAR: &str = "RIMEFRONT_CAPTURE_WORLD";
 /// `RIMEFRONT_CAPTURE_DESTROY=1` destroys the player's vehicles two seconds in, to show their wrecks.
 const CAPTURE_DESTROY_VAR: &str = "RIMEFRONT_CAPTURE_DESTROY";
+/// `RIMEFRONT_CAPTURE_SCENE_ONLY=1` hides the interface, for pictures such as the main menu's backdrop.
+const CAPTURE_SCENE_ONLY_VAR: &str = "RIMEFRONT_CAPTURE_SCENE_ONLY";
 const LOAD_AFTER_SECS: f32 = 1.5;
 /// A hosting capture run starts the battle only after this, so spectators can join too.
 const HOST_WAITS_FOR_GUESTS_SECS: f32 = 10.0;
@@ -117,6 +119,10 @@ impl Plugin for CapturePlugin {
         .add_systems(PreUpdate, discard_keyboard.after(InputSystems))
         .add_systems(Update, (follow_main_camera, capture_then_exit).chain())
         .add_systems(Update, accept_network_offer)
+        .add_systems(
+            PostUpdate,
+            hide_interface.run_if(|| std::env::var_os(CAPTURE_SCENE_ONLY_VAR).is_some()),
+        )
         .add_systems(Update, open_requested_main_menu_section)
         .add_systems(
             Update,
@@ -269,6 +275,12 @@ fn select_all_own_units(
         if *team == Team::Player {
             commands.entity(entity).insert(Selected);
         }
+    }
+}
+
+fn hide_interface(mut interface_roots: Query<&mut Visibility, (With<Node>, Without<ChildOf>)>) {
+    for mut visibility in &mut interface_roots {
+        *visibility = Visibility::Hidden;
     }
 }
 

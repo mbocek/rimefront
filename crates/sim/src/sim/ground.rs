@@ -60,7 +60,7 @@ impl RunningGear {
     }
 }
 
-/// How the ground goes underfoot right now: snow all winter, mud while it rains in autumn.
+/// How the ground goes underfoot right now: snow all winter, mud while it rains in autumn or spring.
 #[derive(Resource, Clone, Copy, PartialEq, Debug, Default)]
 pub struct Ground {
     snow: bool,
@@ -75,7 +75,7 @@ impl Ground {
                 snow: true,
                 mud: 0.0,
             },
-            Season::Autumn => Ground {
+            Season::Autumn | Season::Spring => Ground {
                 snow: false,
                 mud: rainfall,
             },

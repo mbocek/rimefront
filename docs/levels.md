@@ -134,7 +134,8 @@ the bases stay in the corners, crystal fields and road bends near a base keep th
 everything else spreads out from the centre (the fords move apart, the lake grows longer), while the river
 keeps its width. Forests, rocks and meadows grow with the area, so a Huge map has about 2.5 times as much
 scenery and costs more to draw. The map size is chosen when a match starts and kept per thread: every schedule runs on the thread that updates the app, so tests can play battles of different sizes side by side.
-Seasons: `Summer`, `Autumn` (birches turn yellow, broadleaf trees orange, shrubs red, grass straw; pines stay
+Seasons: `Summer`, `Spring` (young leaves lighter and yellower, shrubs and broadleaf trees in pink blossom,
+fresh grass), `Autumn` (birches turn yellow, broadleaf trees orange, shrubs red, grass straw; pines stay
 green; a warmer sun) or `Winter` (snow on open flat ground and on top of rocks, trees and logs, broadleaf
 trees and birches stand bare, pines frosted, a colder sun, and rain falls as snow). Each scenery model's
 colours are turned once per season when it is loaded, and the bare trees are models of their own
@@ -149,7 +150,7 @@ still fire as far as they reach), the player is told when it starts and stops, a
 the match time meanwhile.
 The ground slows what crosses it (`sim::ground`): in winter snow keeps infantry to 85 % of its speed, wheeled
 vehicles (Scout Buggy, Raider Bike, Missile Truck, Repair Truck, Troop Carrier) to 70 % and tracked ones to 90 %;
-in autumn rain turns the ground to mud, which, at its worst in a downpour, keeps infantry to 90 %, wheels to
+in autumn and spring rain turns the ground to mud, which, at its worst in a downpour, keeps infantry to 90 %, wheels to
 75 % and tracks to 95 %, and *Rain, mud* shows beside the match time. Aircraft fly over all of it. Winter also freezes rivers, lakes and ponds: the ice, pale blue in the battle and
 on the minimap, carries every unit, so the fords are no longer the only crossings, but nothing can be built on
 it. The water freezes once the map is made, so crystal, trees and rocks stand where they do in summer.

@@ -120,7 +120,7 @@ pub fn refresh_match_time(
     let shown = match (raining, level.0.season) {
         (false, _) => time,
         (true, Season::Summer) => format!("{}  ·  {time}", tr("Rain")),
-        (true, Season::Autumn) => format!("{}  ·  {time}", tr("Rain, mud")),
+        (true, Season::Autumn | Season::Spring) => format!("{}  ·  {time}", tr("Rain, mud")),
         (true, Season::Winter) => format!("{}  ·  {time}", tr("Snow")),
     };
     for mut text in &mut lines {

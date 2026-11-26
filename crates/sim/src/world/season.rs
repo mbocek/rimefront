@@ -9,6 +9,12 @@ const WINTER_DESATURATION: f32 = 0.35;
 const WINTER_FROST_ON_LEAVES: f32 = 0.45;
 /// How far green foliage turns towards its autumn colour.
 const AUTUMN_TURN: f32 = 0.85;
+/// Spring's young leaves: lighter and yellower than summer's, as a multiple of the leaf's brightness.
+const SPRING_LEAF: [f32; 3] = [0.85, 1.6, 0.4];
+const SPRING_FRESHNESS: f32 = 0.55;
+/// Blossom on shrubs and broadleaf trees, in linear colour, and the share of their leaves it covers.
+const BLOSSOM: [f32; 3] = [0.95, 0.62, 0.74];
+const BLOSSOM_SHARE: f32 = 0.22;
 
 /// What kind of plant a scenery model is, which decides its autumn colour.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -22,6 +28,10 @@ pub enum Foliage {
 }
 
 impl Foliage {
+    fn blossoms(self) -> bool {
+        matches!(self, Foliage::Broadleaf | Foliage::Shrub)
+    }
+
     pub fn of_model(model_id: &str) -> Foliage {
         match model_id {
             "tree_pine" | "tree_pine_young" => Foliage::Evergreen,
@@ -50,10 +60,17 @@ pub enum Season {
     Summer,
     Autumn,
     Winter,
+    Spring,
 }
 
 impl Season {
-    pub const ALL: [Season; 3] = [Season::Summer, Season::Autumn, Season::Winter];
+    /// In the order they come round, from the summer a level has unless it names another.
+    pub const ALL: [Season; 4] = [
+        Season::Summer,
+        Season::Autumn,
+        Season::Winter,
+        Season::Spring,
+    ];
 
     pub fn index(self) -> usize {
         self as usize
@@ -65,6 +82,7 @@ impl Season {
             Season::Summer => Vec4::new(0.6, 0.98, 0.5, 1.0),
             Season::Autumn => Vec4::new(0.92, 0.84, 0.52, 1.0),
             Season::Winter => Vec4::new(0.8, 0.85, 0.8, 1.0),
+            Season::Spring => Vec4::new(0.62, 1.08, 0.42, 1.0),
         }
     }
 
@@ -82,6 +100,7 @@ impl Season {
             Season::Summer => Vec3::new(0.30, 0.38, 0.17),
             Season::Autumn => Vec3::new(0.46, 0.38, 0.18),
             Season::Winter => Vec3::new(0.80, 0.83, 0.87),
+            Season::Spring => Vec3::new(0.33, 0.45, 0.17),
         }
     }
 
@@ -90,6 +109,7 @@ impl Season {
             Season::Summer => Color::srgb(1.0, 0.96, 0.9),
             Season::Autumn => Color::srgb(1.0, 0.9, 0.76),
             Season::Winter => Color::srgb(0.88, 0.93, 1.0),
+            Season::Spring => Color::srgb(1.0, 0.98, 0.94),
         }
     }
 
@@ -109,6 +129,17 @@ impl Season {
         let luminance = 0.3 * r + 0.55 * g + 0.15 * b;
         match self {
             Season::Summer => color,
+            Season::Spring => {
+                let fresh = SPRING_LEAF.map(|channel| luminance * channel);
+                let young = mix3([r, g, b], fresh, leafiness * SPRING_FRESHNESS);
+                let in_bloom = plant.blossoms() && speckle(normal) < BLOSSOM_SHARE;
+                let [r, g, b] = if in_bloom {
+                    mix3(young, BLOSSOM, leafiness * 0.85)
+                } else {
+                    young
+                };
+                [r, g, b, a]
+            }
             Season::Autumn => {
                 let Some(tint) = plant.autumn_color() else {
                     return color;
@@ -128,6 +159,12 @@ impl Season {
             }
         }
     }
+}
+
+/// A number from 0 to 1 that looks random over a leafy surface, from the direction it faces.
+fn speckle(normal: [f32; 3]) -> f32 {
+    let wave = (normal[0] * 12.9898 + normal[1] * 78.233 + normal[2] * 37.719).sin() * 43_758.547;
+    wave - wave.floor()
 }
 
 fn mix3(from: [f32; 3], to: [f32; 3], amount: f32) -> [f32; 3] {
@@ -161,6 +198,24 @@ mod tests {
             Season::Autumn.recolor(LEAF, SIDEWAYS, Foliage::Evergreen),
             LEAF
         );
+    }
+
+    #[test]
+    fn spring_freshens_leaves_and_some_shrubs_bloom() {
+        let leaf = Season::Spring.recolor(LEAF, SIDEWAYS, Foliage::Evergreen);
+        assert!(leaf[1] > LEAF[1], "{leaf:?}");
+        assert_eq!(Season::Spring.recolor(ROCK, UP, Foliage::Shrub), ROCK);
+        let blooming = (0..200)
+            .map(|step| {
+                let angle = step as f32 * 0.37;
+                [angle.cos(), 0.3, angle.sin()]
+            })
+            .filter(|&normal| {
+                let shrub = Season::Spring.recolor(LEAF, normal, Foliage::Shrub);
+                shrub[0] > shrub[1]
+            })
+            .count();
+        assert!((20..80).contains(&blooming), "{blooming} of 200 in bloom");
     }
 
     #[test]

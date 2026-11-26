@@ -190,6 +190,12 @@ fn write_save_file(path: &std::path::Path, save: &SaveGame) -> Result<(), String
     std::fs::write(path, json).map_err(|error| error.to_string())
 }
 
+/// The pause menu stops the ticks, so a save made from it is written between frames instead, before the
+/// menu's slot list is read again.
+fn battle_paused(time: Res<Time<Virtual>>) -> bool {
+    time.is_paused()
+}
+
 pub fn write_requested_save(
     directory: Res<SaveDirectory>,
     mut requests: ResMut<SaveRequests>,
@@ -395,6 +401,13 @@ impl Plugin for SavePlugin {
             .add_systems(
                 FixedUpdate,
                 write_requested_save.in_set(crate::TickStep::Save),
+            )
+            .add_systems(
+                Update,
+                write_requested_save
+                    .run_if(in_state(GameState::Playing))
+                    .run_if(battle_paused)
+                    .before(crate::ui::menu::rebuild_menu_page),
             );
     }
 }

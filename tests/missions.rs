@@ -2,7 +2,7 @@ mod common;
 
 use bevy::prelude::*;
 use common::Battle;
-use rimefront::app::savegame::SaveRequests;
+use rimefront::app::savegame::{SaveDirectory, SaveRequests, slot_summary};
 use rimefront::missions::levels::{
     BaseSite, Difficulty, LevelDefinition, Objective, SkirmishOptions, campaign,
 };
@@ -237,6 +237,17 @@ fn a_bulwark_outfights_a_battle_tank() {
     let took = battle.run_until(60.0, |battle| !battle.alive(tank) || !battle.alive(bulwark));
     assert!(took.is_some(), "the duel never ended");
     assert!(battle.alive(bulwark) && !battle.alive(tank));
+}
+
+#[test]
+fn a_save_from_the_pause_menu_is_written_at_once() {
+    let mut battle = Battle::on_level(SkirmishOptions::default().to_level());
+    battle.run_for(1.0);
+    battle.world().resource_mut::<Time<Virtual>>().pause();
+    battle.world().resource_mut::<SaveRequests>().save = Some(3);
+    battle.run_for(0.1);
+    let directory = battle.world().resource::<SaveDirectory>().clone();
+    assert!(slot_summary(&directory, 3).is_some());
 }
 
 #[test]

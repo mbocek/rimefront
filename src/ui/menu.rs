@@ -910,6 +910,10 @@ fn spawn_slot_row(
         });
 }
 
+/// Where the menu's page is rebuilt, in the battle and in the main menu alike, for systems that must run first.
+#[derive(SystemSet, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct MenuPageRebuild;
+
 pub fn rebuild_menu_page(
     mut commands: Commands,
     mut menu: ResMut<MenuState>,

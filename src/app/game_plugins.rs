@@ -157,7 +157,7 @@ impl Plugin for BattleViewPlugin {
                     menu::toggle_menu,
                     menu::pause_while_menu_open,
                     savegame::quick_save_keys,
-                    menu::rebuild_menu_page,
+                    menu::rebuild_menu_page.in_set(menu::MenuPageRebuild),
                     menu::refresh_menu,
                     sidebar::toggle_controls_help,
                     orders::select_units,
@@ -320,7 +320,7 @@ impl Plugin for MenusPlugin {
                 main_menu::run_side_preview,
                 main_menu::refresh_update_banner,
                 menu::pause_while_menu_open,
-                menu::rebuild_menu_page,
+                menu::rebuild_menu_page.in_set(menu::MenuPageRebuild),
                 menu::refresh_menu,
             )
                 .chain()

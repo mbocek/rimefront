@@ -407,7 +407,7 @@ impl Plugin for SavePlugin {
                 write_requested_save
                     .run_if(in_state(GameState::Playing))
                     .run_if(battle_paused)
-                    .before(crate::ui::menu::rebuild_menu_page),
+                    .before(crate::ui::menu::MenuPageRebuild),
             );
     }
 }

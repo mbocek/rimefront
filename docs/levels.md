@@ -147,6 +147,10 @@ on match time, so every player of a network match sees the same sky and a loaded
 cut how far every unit and structure sees by up to a quarter (fog of war and what the computer knows; weapons
 still fire as far as they reach), the player is told when it starts and stops, and *Rain* or *Snow* shows beside
 the match time meanwhile.
+The ground slows what crosses it (`sim::ground`): in winter snow keeps infantry to 85 % of its speed, wheeled
+vehicles (Scout Buggy, Raider Bike, Missile Truck, Repair Truck, Troop Carrier) to 70 % and tracked ones to 90 %;
+in autumn rain turns the ground to mud, which, at its worst in a downpour, keeps infantry to 90 %, wheels to
+75 % and tracks to 95 %, and *Rain, mud* shows beside the match time. Aircraft fly over all of it.
 Sites: `SouthWest`, `NorthEast`, `NorthWest`, `SouthEast`. Objectives: `"DestroyAllEnemies"`,
 `"DestroyCommandCenters"`, `"CaptureCommandCenter"`, `{ "Survive": { "minutes": N } }`, `{ "ReachCredits": { "credits": N } }`.
 `events` (`src/missions/level_events.rs`) script a mission: each happens once, when its trigger is met, and runs in the

@@ -4,6 +4,7 @@ use crate::levels::ActiveLevel;
 use crate::sim::catalog::ArmorClass;
 use crate::sim::components::*;
 use crate::sim::determinism::SimId;
+use crate::sim::ground::{Ground, RunningGear};
 use crate::sim::sim_math;
 use crate::sim::sorties::Sortie;
 use crate::sim::spatial_index::SpatialIndex;
@@ -53,10 +54,11 @@ pub fn order_move(
 
 pub fn follow_paths(
     time: Res<Time>,
-    mut movers: Query<(&mut Mobile, &mut Transform, Option<&Sortie>)>,
+    ground: Res<Ground>,
+    mut movers: Query<(&mut Mobile, &mut Transform, Option<&Sortie>, Option<&Unit>)>,
 ) {
     let dt = time.delta_secs();
-    for (mut mobile, mut transform, sortie) in &mut movers {
+    for (mut mobile, mut transform, sortie, unit) in &mut movers {
         let Some(&waypoint) = mobile.path.front() else {
             mobile.ordered_move = false;
             continue;
@@ -74,7 +76,8 @@ pub fn follow_paths(
         let misalignment = shortest_angle(mobile.facing, desired_yaw).abs();
         let lifting_off = sortie.is_some_and(Sortie::climbing);
         if misalignment < DRIVE_ALIGNMENT_TOLERANCE && !lifting_off {
-            let step = (mobile.travel_speed() * dt).min(distance);
+            let going = unit.map_or(1.0, |unit| ground.speed_factor(RunningGear::of(unit.0)));
+            let step = (mobile.travel_speed() * going * dt).min(distance);
             transform.translation += to_waypoint / distance * step;
         }
     }

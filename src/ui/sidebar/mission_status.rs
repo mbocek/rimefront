@@ -117,10 +117,11 @@ pub fn refresh_match_time(
 ) {
     let raining = weather.is_some_and(|weather| weather.now.rainfall > RAINING);
     let time = match_time(clock.elapsed_secs);
-    let shown = match (raining, level.0.season == Season::Winter) {
+    let shown = match (raining, level.0.season) {
         (false, _) => time,
-        (true, false) => format!("{}  ·  {time}", tr("Rain")),
-        (true, true) => format!("{}  ·  {time}", tr("Snow")),
+        (true, Season::Summer) => format!("{}  ·  {time}", tr("Rain")),
+        (true, Season::Autumn) => format!("{}  ·  {time}", tr("Rain, mud")),
+        (true, Season::Winter) => format!("{}  ·  {time}", tr("Snow")),
     };
     for mut text in &mut lines {
         if text.0 != shown {

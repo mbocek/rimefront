@@ -342,3 +342,35 @@ fn opposite_corners_get_the_same_ground() {
         }
     }
 }
+
+fn distance_driven_in(season: rimefront::world::season::Season, kind: UnitKind) -> f32 {
+    let level = LevelDefinition {
+        season,
+        weather: rimefront::missions::levels::Weather::Clear,
+        ..default()
+    };
+    let mut battle = Battle::on_level(level);
+    let start = OPEN_FIELD;
+    let unit = battle.spawn_unit(kind, Team::Azure, start);
+    battle.order_move(unit, start + IVec2::new(0, -12));
+    battle.run_for(3.0);
+    battle.position(unit).xz().distance(cell_center(start).xz())
+}
+
+#[test]
+fn snow_slows_wheels_more_than_tracks() {
+    use rimefront::world::season::Season;
+    let buggy_in_summer = distance_driven_in(Season::Summer, UnitKind::Scout);
+    let buggy_in_snow = distance_driven_in(Season::Winter, UnitKind::Scout);
+    let tank_in_summer = distance_driven_in(Season::Summer, UnitKind::Tank);
+    let tank_in_snow = distance_driven_in(Season::Winter, UnitKind::Tank);
+    assert!(
+        buggy_in_snow < buggy_in_summer * 0.8,
+        "{buggy_in_snow} vs {buggy_in_summer}"
+    );
+    assert!(
+        tank_in_snow > tank_in_summer * 0.85,
+        "{tank_in_snow} vs {tank_in_summer}"
+    );
+    assert!(tank_in_snow < tank_in_summer);
+}

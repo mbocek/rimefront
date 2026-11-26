@@ -8,7 +8,7 @@ pub mod sim;
 pub mod world;
 
 use sim::{
-    abilities, ai, cadence, catalog, combat, cues, determinism, economy, engineers, intel,
+    abilities, ai, cadence, catalog, combat, cues, determinism, economy, engineers, ground, intel,
     match_stats, medical, movement, neutral_sites, notifications, outcome, player_commands,
     production, servicing, sorties, structures, support_powers, transport, unit_orders, veterancy,
 };
@@ -142,6 +142,7 @@ impl Plugin for SimulationPlugin {
             .init_resource::<notifications::LastAlert>()
             .init_resource::<match_flow::MatchClock>()
             .init_resource::<intel::Intel>()
+            .init_resource::<ground::Ground>()
             .init_resource::<support_powers::SupportPowers>()
             .init_resource::<cadence::SimulationCadences>()
             .init_resource::<catalog::Diplomacy>()
@@ -220,7 +221,7 @@ impl Plugin for SimulationPlugin {
                         combat::chase_targets,
                         unit_orders::carry_out_orders,
                         (sorties::fly_home_to_rearm, sorties::climb_and_descend).chain(),
-                        movement::follow_paths,
+                        (ground::update_ground, movement::follow_paths).chain(),
                         sorties::circle_while_waiting,
                         movement::separate_units,
                         movement::settle_on_terrain,

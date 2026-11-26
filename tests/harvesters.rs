@@ -31,7 +31,7 @@ fn computer_duel(map_seed: u64) -> Battle {
     level.enemies[0].force.site = BaseSite::NorthEast;
     let mut battle = Battle::on_level(level);
     battle.add_ai(
-        Team::Player,
+        Team::Azure,
         BaseSite::SouthWest.origin(),
         Difficulty::Normal,
     );

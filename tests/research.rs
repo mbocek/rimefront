@@ -27,23 +27,23 @@ fn research(battle: &mut Battle, team: Team, upgrade: Upgrade) {
 #[test]
 fn research_needs_a_tech_center_and_happens_once() {
     let mut battle = Battle::sandbox();
-    battle.set_credits(Team::Player, 10_000);
+    battle.set_credits(Team::Azure, 10_000);
     let armour = BuildItem::Research(Upgrade::CompositeArmour);
-    assert!(!battle.enqueue(Team::Player, armour));
+    assert!(!battle.enqueue(Team::Azure, armour));
 
-    battle.construct(BuildingKind::TechCenter, Team::Player, BASE);
-    assert!(battle.enqueue(Team::Player, armour));
-    assert!(!battle.enqueue(Team::Player, armour), "queued twice");
+    battle.construct(BuildingKind::TechCenter, Team::Azure, BASE);
+    assert!(battle.enqueue(Team::Azure, armour));
+    assert!(!battle.enqueue(Team::Azure, armour), "queued twice");
     let research_secs = Upgrade::CompositeArmour.spec().research_secs;
     battle.run_until(research_secs * 3.0, |battle| {
-        researched(battle, Team::Player, Upgrade::CompositeArmour)
+        researched(battle, Team::Azure, Upgrade::CompositeArmour)
     });
     assert!(researched(
         &mut battle,
-        Team::Player,
+        Team::Azure,
         Upgrade::CompositeArmour
     ));
-    assert!(!battle.enqueue(Team::Player, armour), "researched twice");
+    assert!(!battle.enqueue(Team::Azure, armour), "researched twice");
     assert!(!researched(
         &mut battle,
         Team::Crimson,
@@ -54,9 +54,9 @@ fn research_needs_a_tech_center_and_happens_once() {
 fn tank_health_after_a_rocketeer_volley(armoured: bool) -> f32 {
     let mut battle = Battle::sandbox();
     if armoured {
-        research(&mut battle, Team::Player, Upgrade::CompositeArmour);
+        research(&mut battle, Team::Azure, Upgrade::CompositeArmour);
     }
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     battle
         .world()
         .entity_mut(tank)
@@ -86,7 +86,7 @@ fn rifleman_loss_to(shooter_upgrade: Option<Upgrade>) -> f32 {
     if let Some(upgrade) = shooter_upgrade {
         research(&mut battle, Team::Crimson, upgrade);
     }
-    let target = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let target = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     battle
         .world()
         .entity_mut(target)

@@ -356,10 +356,10 @@ pub fn show_outcome(
     if !outcome.is_changed() {
         return;
     }
-    let enemy_side = if local.0 == Team::Player {
+    let enemy_side = if local.0 == Team::Azure {
         Team::Crimson
     } else {
-        Team::Player
+        Team::Azure
     };
     let banner = match *outcome {
         GameOutcome::Ongoing => None,

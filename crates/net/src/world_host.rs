@@ -776,7 +776,7 @@ impl WorldHost {
     fn side_for_newcomer(&mut self) -> Option<Team> {
         if !self.level_side_taken {
             self.level_side_taken = true;
-            return Some(Team::Player);
+            return Some(Team::Azure);
         }
         let first_base = base_sites()[0];
         let (team, site) = self.deploy_side_near(first_base)?;
@@ -900,7 +900,7 @@ impl WorldHost {
     fn site_of(&self, team: Team) -> Option<IVec2> {
         match self.sites.get(&team) {
             Some(&site) => Some(site),
-            None => (team == Team::Player).then(|| base_sites()[0]),
+            None => (team == Team::Azure).then(|| base_sites()[0]),
         }
     }
 
@@ -1000,7 +1000,7 @@ mod tests {
             player: PlayerKey::new_random(),
             color: None,
         });
-        let team = Team::Player;
+        let team = Team::Azure;
         let mut mirror = WorldMirror::default();
         let mut bytes = 0;
         let minute_of_ticks = 60 * 20;
@@ -1064,7 +1064,7 @@ mod tests {
         let mut host = WorldHost::new(29);
         let (mut player, _) = enter(&mut host);
         let world = host.world();
-        let (_, tank_position) = own_unit(world, Team::Player, UnitKind::Tank);
+        let (_, tank_position) = own_unit(world, Team::Azure, UnitKind::Tank);
         let fallen_at = tank_position + Vec3::new(3.0, 0.0, 0.0);
         let mut commands = world.commands();
         let fallen = spawn_unit(&mut commands, UnitKind::Tank, Team::Crimson, fallen_at, 0.0);
@@ -1097,7 +1097,7 @@ mod tests {
         let tank_position = world
             .query::<(&Unit, &Team, &Transform)>()
             .iter(world)
-            .find(|(unit, team, _)| **team == Team::Player && unit.0 == UnitKind::Tank)
+            .find(|(unit, team, _)| **team == Team::Azure && unit.0 == UnitKind::Tank)
             .map(|(.., transform)| transform.translation)
             .expect("the player has a tank");
         let mut commands = world.commands();
@@ -1167,12 +1167,12 @@ mod tests {
         let mut host = WorldHost::new(29);
         let (mut player, mut mirror) = entered_with_mirror(&mut host);
         let world = host.world();
-        let (_, tank_position) = own_unit(world, Team::Player, UnitKind::Tank);
+        let (_, tank_position) = own_unit(world, Team::Azure, UnitKind::Tank);
         let mut commands = world.commands();
         spawn_unit(
             &mut commands,
             UnitKind::Harvester,
-            Team::Player,
+            Team::Azure,
             tank_position,
             0.0,
         );
@@ -1191,7 +1191,7 @@ mod tests {
         let mut host = WorldHost::new(29);
         let (mut player, mut mirror) = entered_with_mirror(&mut host);
         let world = host.world();
-        let (scout, scout_position) = own_unit(world, Team::Player, UnitKind::Scout);
+        let (scout, scout_position) = own_unit(world, Team::Azure, UnitKind::Scout);
         let far_off = scout_position + Vec3::new(0.0, 0.0, -30.0);
         world.get_mut::<Transform>(scout).unwrap().translation = far_off;
         let origin = world_to_cell(far_off) + IVec2::new(2, 0);
@@ -1264,7 +1264,7 @@ mod tests {
         assert_eq!(mirror.side.lanes[0].ready, Some(BuildingKind::PowerPlant));
         assert!(mirror.told.contains(&SideNews::Finished(power_plant)));
 
-        let origin = free_site_near_base(host.world(), Team::Player, BuildingKind::PowerPlant);
+        let origin = free_site_near_base(host.world(), Team::Azure, BuildingKind::PowerPlant);
         player.send(&Message::Orders {
             commands: vec![PlayerCommand::PlaceStructure {
                 kind: BuildingKind::PowerPlant,
@@ -1358,7 +1358,7 @@ mod tests {
             ..AbsenceRules::default()
         });
         let (mut player, mut mirror) = entered_with_mirror(&mut host);
-        let team = Team::Player;
+        let team = Team::Azure;
         let world = host.world();
         let refinery = free_site_near_base(world, team, BuildingKind::Refinery);
         world.resource_scope(|world, mut map: Mut<GameMap>| {
@@ -1842,7 +1842,7 @@ mod tests {
             "shown before it was explored"
         );
         let world = host.world();
-        let (scout, _) = own_unit(world, Team::Player, UnitKind::Scout);
+        let (scout, _) = own_unit(world, Team::Azure, UnitKind::Scout);
         let beside = cell_center(origin_of(site) + IVec2::new(0, 4));
         world.get_mut::<Transform>(scout).unwrap().translation = beside;
         run(&mut host, 1, &mut mirror, &mut player);
@@ -1894,7 +1894,7 @@ mod tests {
     fn a_side_at_the_unit_limit_deploys_no_more_until_it_loses_one() {
         let mut host = WorldHost::new(29);
         let (mut player, mut mirror) = entered_with_mirror(&mut host);
-        let team = Team::Player;
+        let team = Team::Azure;
         let world = host.world();
         let barracks = free_site_near_base(world, team, BuildingKind::Barracks);
         let (_, tank_position) = own_unit(world, team, UnitKind::Tank);
@@ -2113,7 +2113,7 @@ mod tests {
         let mut host = WorldHost::new(29);
         let (mut first, first_team) = enter(&mut host);
         let (mut second, second_team) = enter(&mut host);
-        assert_eq!(first_team, Team::Player);
+        assert_eq!(first_team, Team::Azure);
         assert_eq!(second_team, Team::from_index(4));
         let mut second_mirror = WorldMirror::default();
         second.send(&Message::Orders {

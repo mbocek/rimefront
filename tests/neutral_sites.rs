@@ -96,22 +96,22 @@ fn levels_without_sites_stay_as_they_were() {
 #[test]
 fn a_captured_supply_depot_pays_its_owner() {
     let mut battle = field_with_sites();
-    capture(&mut battle, Team::Player, BuildingKind::SupplyDepot);
-    let before = battle.credits(Team::Player);
+    capture(&mut battle, Team::Azure, BuildingKind::SupplyDepot);
+    let before = battle.credits(Team::Azure);
     battle.run_for(20.0);
-    let earned = battle.credits(Team::Player) - before;
+    let earned = battle.credits(Team::Azure) - before;
     assert!((150..=250).contains(&earned), "earned {earned} in 20 s");
 }
 
 #[test]
 fn a_captured_field_hospital_heals_its_owners_infantry() {
     let mut battle = field_with_sites();
-    capture(&mut battle, Team::Player, BuildingKind::FieldHospital);
+    capture(&mut battle, Team::Azure, BuildingKind::FieldHospital);
     let (_, origin) = held_by(&mut battle, BuildingKind::FieldHospital)
         .first()
         .map(|&(entity, _)| (entity, battle_origin(&mut battle, entity)))
         .unwrap();
-    let wounded = battle.spawn_unit(UnitKind::Rifleman, Team::Player, origin + IVec2::new(-2, 0));
+    let wounded = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, origin + IVec2::new(-2, 0));
     battle.world().get_mut::<Health>(wounded).unwrap().current = 10.0;
     battle.run_for(5.0);
     let health = battle.world().get::<Health>(wounded).unwrap().current;
@@ -125,7 +125,7 @@ fn battle_origin(battle: &mut Battle, building: Entity) -> IVec2 {
 #[test]
 fn a_destroyed_site_returns_to_nobody() {
     let mut battle = field_with_sites();
-    let depot = capture(&mut battle, Team::Player, BuildingKind::SupplyDepot);
+    let depot = capture(&mut battle, Team::Azure, BuildingKind::SupplyDepot);
     let origin = battle_origin(&mut battle, depot);
     battle.world().get_mut::<Health>(depot).unwrap().current = 0.0;
     battle.run_for(1.0);
@@ -139,7 +139,7 @@ fn a_destroyed_site_returns_to_nobody() {
 #[test]
 fn the_computer_sends_an_engineer_to_take_a_site() {
     let mut battle = Battle::on_level(level_with_sites());
-    battle.add_ai(Team::Player, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
     let taken = battle.run_until(8.0 * 60.0, |battle| {
         BuildingKind::NEUTRAL_SITES
             .into_iter()

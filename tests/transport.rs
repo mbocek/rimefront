@@ -28,7 +28,7 @@ fn squad(battle: &mut Battle, count: i32) -> Vec<Entity> {
         .map(|k| {
             battle.spawn_unit(
                 UnitKind::Rifleman,
-                Team::Player,
+                Team::Azure,
                 DEPOT + IVec2::new(k % 3, 3 + k / 3),
             )
         })
@@ -41,7 +41,7 @@ fn board(battle: &mut Battle, soldiers: &[Entity], carrier: Entity) {
         .map(|&soldier| battle.sim_id(soldier))
         .collect();
     let carrier = battle.sim_id(carrier);
-    battle.issue(Team::Player, PlayerCommand::Board { units, carrier });
+    battle.issue(Team::Azure, PlayerCommand::Board { units, carrier });
     battle.run_for(10.0);
 }
 
@@ -59,7 +59,7 @@ fn embarked(battle: &mut Battle, soldier: Entity) -> bool {
 #[test]
 fn infantry_climbs_in_and_cannot_be_hit_inside() {
     let mut battle = open_field();
-    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Player, DEPOT);
+    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Azure, DEPOT);
     let soldiers = squad(&mut battle, 3);
     board(&mut battle, &soldiers, carrier);
     assert_eq!(riding(&mut battle, carrier), 3);
@@ -75,7 +75,7 @@ fn infantry_climbs_in_and_cannot_be_hit_inside() {
 #[test]
 fn a_carrier_takes_at_most_its_capacity() {
     let mut battle = open_field();
-    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Player, DEPOT);
+    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Azure, DEPOT);
     let soldiers = squad(&mut battle, 7);
     board(&mut battle, &soldiers, carrier);
     assert_eq!(riding(&mut battle, carrier), CARRIER_CAPACITY);
@@ -89,7 +89,7 @@ fn a_carrier_takes_at_most_its_capacity() {
 #[test]
 fn passengers_ride_along_and_get_out_on_free_ground() {
     let mut battle = open_field();
-    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Player, DEPOT);
+    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Azure, DEPOT);
     let soldiers = squad(&mut battle, 4);
     board(&mut battle, &soldiers, carrier);
     battle.order_move(carrier, DEPOT + IVec2::new(12, 0));
@@ -105,7 +105,7 @@ fn passengers_ride_along_and_get_out_on_free_ground() {
         );
     }
     let carriers = vec![battle.sim_id(carrier)];
-    battle.issue(Team::Player, PlayerCommand::Unload { carriers });
+    battle.issue(Team::Azure, PlayerCommand::Unload { carriers });
     battle.run_for(0.5);
     assert_eq!(riding(&mut battle, carrier), 0);
     let mut cells = Vec::new();
@@ -127,12 +127,12 @@ fn passengers_ride_along_and_get_out_on_free_ground() {
 #[test]
 fn passengers_fire_from_the_hatches() {
     let mut battle = open_field();
-    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Player, DEPOT);
+    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Azure, DEPOT);
     let soldiers = squad(&mut battle, 3);
     board(&mut battle, &soldiers, carrier);
     let units = vec![battle.sim_id(carrier)];
     battle.issue(
-        Team::Player,
+        Team::Azure,
         PlayerCommand::SetStance {
             units,
             stance: Stance::HoldFire,
@@ -147,14 +147,14 @@ fn passengers_fire_from_the_hatches() {
     let by_riflemen = battle
         .ledger()
         .dealt
-        .get(&(Team::Player, DamageSource::Unit(UnitKind::Rifleman)))
+        .get(&(Team::Azure, DamageSource::Unit(UnitKind::Rifleman)))
         .copied()
         .unwrap_or(0.0);
     assert!(by_riflemen > 0.0, "the passengers did not fire");
     let by_carrier = battle
         .ledger()
         .dealt
-        .get(&(Team::Player, DamageSource::Unit(UnitKind::TroopCarrier)))
+        .get(&(Team::Azure, DamageSource::Unit(UnitKind::TroopCarrier)))
         .copied()
         .unwrap_or(0.0);
     assert_eq!(by_carrier, 0.0, "the carrier fired while holding fire");
@@ -163,7 +163,7 @@ fn passengers_fire_from_the_hatches() {
 #[test]
 fn passengers_escape_a_destroyed_carrier_hurt() {
     let mut battle = open_field();
-    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Player, DEPOT);
+    let carrier = battle.spawn_unit(UnitKind::TroopCarrier, Team::Azure, DEPOT);
     let soldiers = squad(&mut battle, 2);
     board(&mut battle, &soldiers, carrier);
     battle.world().get_mut::<Health>(carrier).unwrap().current = 0.0;

@@ -390,13 +390,13 @@ impl Gathering {
             && seated.iter().all(|seat| seat.ready)
     }
 
-    /// Starts the battle: the owner plays `Team::Player`, every guest their seat, and the room's relay takes over.
+    /// Starts the battle: the owner plays `Team::Azure`, every guest their seat, and the room's relay takes over.
     fn begin(self) -> Option<Relay> {
         let (level, players) = self.battle?;
         let owner = self.owner?;
         owner.go();
         let mut links = vec![owner];
-        let mut remote_teams = vec![Team::Player];
+        let mut remote_teams = vec![Team::Azure];
         let mut watchers = Vec::new();
         for seat in self.seats {
             seat.link.go();

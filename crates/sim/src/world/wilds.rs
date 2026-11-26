@@ -552,7 +552,7 @@ mod tests {
         let base = base_sites()[0];
         world
             .resource_mut::<Intel>()
-            .vision_mut(crate::sim::catalog::Team::Player)
+            .vision_mut(crate::sim::catalog::Team::Azure)
             .reveal_around([(cell_center(base), 10.0)]);
         let before = crystal_and_obstacles(world.resource::<GameMap>(), narrow.cells());
         let wider = MapBounds {
@@ -571,7 +571,7 @@ mod tests {
         );
         let explored = world
             .resource::<Intel>()
-            .vision(crate::sim::catalog::Team::Player)
+            .vision(crate::sim::catalog::Team::Azure)
             .is_explored(cell_center(base));
         assert!(explored, "known ground stays known");
 

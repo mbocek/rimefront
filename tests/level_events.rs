@@ -26,12 +26,12 @@ fn reinforcements_and_credits_arrive_on_time_and_head_for_the_base() {
                 text: "Armour is on its way.".into(),
             },
             EventAction::Reinforcements {
-                team: Team::Player,
+                team: Team::Azure,
                 units: vec![UnitKind::Bulwark, UnitKind::Bulwark],
                 from: BaseSite::NorthWest,
             },
             EventAction::Credits {
-                team: Team::Player,
+                team: Team::Azure,
                 amount: 1000,
             },
         ],
@@ -39,14 +39,14 @@ fn reinforcements_and_credits_arrive_on_time_and_head_for_the_base() {
     battle.run_for(5.0);
     assert!(
         battle
-            .units(Team::Player, Some(UnitKind::Bulwark))
+            .units(Team::Azure, Some(UnitKind::Bulwark))
             .is_empty()
     );
-    let credits_before = battle.credits(Team::Player);
+    let credits_before = battle.credits(Team::Azure);
     battle.run_for(3.0);
-    let bulwarks = battle.units(Team::Player, Some(UnitKind::Bulwark));
+    let bulwarks = battle.units(Team::Azure, Some(UnitKind::Bulwark));
     assert_eq!(bulwarks.len(), 2);
-    assert!(battle.credits(Team::Player) >= credits_before + 1000);
+    assert!(battle.credits(Team::Azure) >= credits_before + 1000);
 
     let base = cell_center(BaseSite::SouthWest.origin());
     let arrived_at = battle.position(bulwarks[0]).distance(base);
@@ -57,7 +57,7 @@ fn reinforcements_and_credits_arrive_on_time_and_head_for_the_base() {
     );
     battle.run_for(10.0);
     assert_eq!(
-        battle.units(Team::Player, Some(UnitKind::Bulwark)).len(),
+        battle.units(Team::Azure, Some(UnitKind::Bulwark)).len(),
         2,
         "an event happens only once"
     );

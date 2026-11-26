@@ -276,7 +276,7 @@ impl NetSession {
 
     /// Keeps `listener` open during the battle so guests can still join, offered `level`.
     pub fn with_open_door(mut self, listener: TcpListener, level: LevelDefinition) -> Self {
-        let players = std::iter::once(Team::Player)
+        let players = std::iter::once(Team::Azure)
             .chain(self.remote_teams.iter().copied())
             .collect();
         self.relay.open_door(level, players, &self.remote_teams);

@@ -32,7 +32,7 @@ fn a_gunship_flies_straight_over_the_river_at_altitude() {
         "the test needs the river between the banks"
     );
 
-    let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Player, NORTH_BANK);
+    let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Azure, NORTH_BANK);
     battle.order_move(gunship, SOUTH_BANK);
     assert_eq!(battle.world().get::<Mobile>(gunship).unwrap().path.len(), 1);
     let flight_secs =
@@ -50,7 +50,7 @@ fn a_gunship_flies_straight_over_the_river_at_altitude() {
 #[test]
 fn tanks_cannot_hit_a_gunship_but_rocketeers_can() {
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Crimson, FIELD + IVec2::new(4, 0));
     battle.run_for(6.0);
     let tank_target = battle
@@ -65,7 +65,7 @@ fn tanks_cannot_hit_a_gunship_but_rocketeers_can() {
         "the gunship did not attack"
     );
 
-    battle.spawn_unit(UnitKind::Rocketeer, Team::Player, FIELD + IVec2::new(1, 2));
+    battle.spawn_unit(UnitKind::Rocketeer, Team::Azure, FIELD + IVec2::new(1, 2));
     battle.run_for(6.0);
     assert!(
         health(&mut battle, gunship) < full,
@@ -77,20 +77,20 @@ fn tanks_cannot_hit_a_gunship_but_rocketeers_can() {
 fn gunships_come_from_the_helipad_and_are_repaired_over_it() {
     let mut battle = Battle::sandbox();
     let pad_origin = IVec2::new(14, 50);
-    battle.construct(BuildingKind::Helipad, Team::Player, pad_origin);
+    battle.construct(BuildingKind::Helipad, Team::Azure, pad_origin);
     battle.construct(
         BuildingKind::TechCenter,
-        Team::Player,
+        Team::Azure,
         pad_origin + IVec2::new(0, 4),
     );
-    battle.set_credits(Team::Player, 5000);
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Gunship)));
+    battle.set_credits(Team::Azure, 5000);
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Gunship)));
     battle.run_until(40.0, |battle| {
         !battle
-            .units(Team::Player, Some(UnitKind::Gunship))
+            .units(Team::Azure, Some(UnitKind::Gunship))
             .is_empty()
     });
-    let gunship = battle.units(Team::Player, Some(UnitKind::Gunship))[0];
+    let gunship = battle.units(Team::Azure, Some(UnitKind::Gunship))[0];
     let pad_centre = footprint_center(pad_origin, BuildingKind::Helipad.spec().footprint);
     let launch_distance = battle.position(gunship).xz().distance(pad_centre.xz());
     assert!(
@@ -113,7 +113,7 @@ fn gunships_come_from_the_helipad_and_are_repaired_over_it() {
 #[test]
 fn a_flak_cannon_shoots_down_gunships_and_ignores_ground_units() {
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::FlakCannon, Team::Player, FIELD);
+    battle.construct(BuildingKind::FlakCannon, Team::Azure, FIELD);
     let tank = battle.spawn_unit(UnitKind::Tank, Team::Crimson, FIELD + IVec2::new(4, 0));
     if let Some(mut mobile) = battle.world().get_mut::<Mobile>(tank) {
         mobile.stop();
@@ -134,7 +134,7 @@ fn a_flak_cannon_shoots_down_gunships_and_ignores_ground_units() {
 #[test]
 fn a_flak_track_beats_a_gunship() {
     let mut battle = Battle::sandbox();
-    let flak = battle.spawn_unit(UnitKind::FlakTrack, Team::Player, FIELD);
+    let flak = battle.spawn_unit(UnitKind::FlakTrack, Team::Azure, FIELD);
     let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Crimson, FIELD + IVec2::new(5, 0));
     battle.run_until(40.0, |battle| !battle.alive(gunship) || !battle.alive(flak));
     assert!(battle.alive(flak), "the gunship won against its counter");

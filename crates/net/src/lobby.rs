@@ -277,7 +277,7 @@ impl NetLobby {
                 offer.your_team
             }
             LobbyPhase::Countdown { local_team, .. } => *local_team,
-            _ => Some(Team::Player),
+            _ => Some(Team::Azure),
         }
     }
 
@@ -435,7 +435,7 @@ impl NetLobby {
                 Some(BattleStart {
                     level: *level,
                     session,
-                    local_team: local_team.unwrap_or(Team::Player),
+                    local_team: local_team.unwrap_or(Team::Azure),
                 })
             }
             next => {
@@ -553,12 +553,12 @@ impl NetLobby {
         }
         let remote_teams = players
             .into_iter()
-            .filter(|&team| team != Team::Player)
+            .filter(|&team| team != Team::Azure)
             .collect();
         self.changed_to(LobbyPhase::Countdown {
             level,
             links: vec![link],
-            local_team: Some(Team::Player),
+            local_team: Some(Team::Azure),
             remote_teams,
             relays: false,
             watchers: Vec::new(),
@@ -774,7 +774,7 @@ impl NetLobby {
         self.changed_to(LobbyPhase::Countdown {
             level,
             links: seats.into_iter().map(|seat| seat.link).collect(),
-            local_team: Some(Team::Player),
+            local_team: Some(Team::Azure),
             remote_teams,
             relays: true,
             watchers,

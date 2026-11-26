@@ -67,12 +67,12 @@ fn the_game_plays_a_world_it_runs_itself() {
     });
     assert!(entered, "the world never showed the player their forces");
     let world = app.world_mut();
-    assert_eq!(world.resource::<LocalTeam>().0, Team::Player);
+    assert_eq!(world.resource::<LocalTeam>().0, Team::Azure);
     let command_centers = world
         .query::<(&Building, &Team)>()
         .iter(world)
         .filter(|(building, team)| {
-            building.kind == BuildingKind::CommandCenter && **team == Team::Player
+            building.kind == BuildingKind::CommandCenter && **team == Team::Azure
         })
         .count();
     assert_eq!(command_centers, 1);
@@ -82,7 +82,7 @@ fn the_game_plays_a_world_it_runs_itself() {
     let now = *world.resource::<SimulationTick>();
     world.resource_mut::<CommandQueue>().issue(
         now,
-        Team::Player,
+        Team::Azure,
         PlayerCommand::Ground {
             units: vec![id],
             goal: world_to_cell(start) + IVec2::new(0, -8),
@@ -104,7 +104,7 @@ fn the_game_plays_a_world_it_runs_itself() {
     let now = *world.resource::<SimulationTick>();
     world.resource_mut::<CommandQueue>().issue(
         now,
-        Team::Player,
+        Team::Azure,
         PlayerCommand::Enqueue {
             item: power_plant,
             copies: 1,
@@ -113,7 +113,7 @@ fn the_game_plays_a_world_it_runs_itself() {
     let building = run_until(&mut app, |world| {
         let lane = world
             .resource::<Production>()
-            .lane(Team::Player, Lane::Structures);
+            .lane(Team::Azure, Lane::Structures);
         lane.queue.front() == Some(&power_plant) && lane.progress_fraction() > 0.0
     });
     assert!(

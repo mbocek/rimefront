@@ -54,7 +54,7 @@ fn check_battlefield(size: MapSize) {
     );
     assert!(
         battle
-            .building(Team::Player, BuildingKind::CommandCenter)
+            .building(Team::Azure, BuildingKind::CommandCenter)
             .is_some()
     );
 }

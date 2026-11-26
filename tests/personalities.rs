@@ -153,9 +153,9 @@ fn pressure_on_a_passive_player_by_personality() {
             .to_level();
             let mut battle = Battle::on_level(level);
             battle.run_for(1.0);
-            let untouched = structure_health(&mut battle, Team::Player);
+            let untouched = structure_health(&mut battle, Team::Azure);
             let first_hit = battle.run_until(LIMIT_SECS, |battle| {
-                structure_health(battle, Team::Player) < untouched - 1.0
+                structure_health(battle, Team::Azure) < untouched - 1.0
             });
             first_hits.push(first_hit.map_or(f32::NAN, |_| battle.elapsed_secs / 60.0));
             battle.run_until(LIMIT_SECS - battle.elapsed_secs, |battle| {

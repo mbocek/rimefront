@@ -42,7 +42,7 @@ fn bystander(battle: &mut Battle) -> Entity {
 #[test]
 fn a_plain_move_walks_past_enemies() {
     let mut battle = Battle::sandbox();
-    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Player, START);
+    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, START);
     let harvester = bystander(&mut battle);
     give(&mut battle, rifleman, &[Order::Move(DESTINATION)]);
     let took = battle.run_until(40.0, |battle| near(battle, rifleman, DESTINATION));
@@ -56,7 +56,7 @@ fn a_plain_move_walks_past_enemies() {
 #[test]
 fn an_attack_move_fights_on_the_way_and_then_arrives() {
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, START);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, START);
     let harvester = bystander(&mut battle);
     give(&mut battle, tank, &[Order::AttackMove(DESTINATION)]);
     let took = battle.run_until(120.0, |battle| near(battle, tank, DESTINATION));
@@ -70,7 +70,7 @@ fn an_attack_move_fights_on_the_way_and_then_arrives() {
 #[test]
 fn queued_waypoints_are_visited_in_order() {
     let mut battle = Battle::sandbox();
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, START);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, START);
     let first = IVec2::new(20, 55);
     give(
         &mut battle,
@@ -89,7 +89,7 @@ fn queued_waypoints_are_visited_in_order() {
 #[test]
 fn a_patrol_keeps_going_back_and_forth() {
     let mut battle = Battle::sandbox();
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, START);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, START);
     give(
         &mut battle,
         scout,
@@ -120,8 +120,8 @@ fn a_patrol_keeps_going_back_and_forth() {
 #[test]
 fn trained_units_head_for_the_rally_point() {
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::PowerPlant, Team::Player, IVec2::new(6, 47));
-    battle.construct(BuildingKind::Barracks, Team::Player, IVec2::new(10, 52));
+    battle.construct(BuildingKind::PowerPlant, Team::Azure, IVec2::new(6, 47));
+    battle.construct(BuildingKind::Barracks, Team::Azure, IVec2::new(10, 52));
     let rally = IVec2::new(24, 40);
     let world = battle.world();
     let barracks = world
@@ -131,9 +131,9 @@ fn trained_units_head_for_the_rally_point() {
         .map(|(entity, _)| entity)
         .unwrap();
     world.entity_mut(barracks).insert(RallyPoint(rally));
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Rifleman)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
     battle.run_for(UnitKind::Rifleman.spec().build_secs + 20.0);
-    let recruit = battle.units(Team::Player, Some(UnitKind::Rifleman))[0];
+    let recruit = battle.units(Team::Azure, Some(UnitKind::Rifleman))[0];
     assert!(
         near(&mut battle, recruit, rally),
         "the recruit did not reach the rally point"
@@ -143,7 +143,7 @@ fn trained_units_head_for_the_rally_point() {
 #[test]
 fn saves_keep_orders_and_rally_points() {
     let mut battle = Battle::on_level(LevelDefinition::default());
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, START);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, START);
     give(
         &mut battle,
         scout,

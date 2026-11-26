@@ -24,13 +24,13 @@ fn move_order(battle: &mut Battle, unit: Entity, goal: IVec2) -> PlayerCommand {
 #[test]
 fn a_command_moves_only_the_issuing_teams_units() {
     let mut battle = Battle::sandbox();
-    let own = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let own = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     let enemy = battle.spawn_unit(UnitKind::Tank, Team::Crimson, FIELD + IVec2::new(-12, 12));
     let goal = FIELD + IVec2::new(6, 0);
     let order = move_order(&mut battle, own, goal);
-    battle.issue(Team::Player, order);
+    battle.issue(Team::Azure, order);
     let stolen = move_order(&mut battle, enemy, goal);
-    battle.issue(Team::Player, stolen);
+    battle.issue(Team::Azure, stolen);
     let enemy_start = battle.position(enemy);
     battle.run_for(8.0);
     assert!(battle.position(own).distance(cell_center(goal)) < 2.5);
@@ -44,10 +44,10 @@ fn a_command_moves_only_the_issuing_teams_units() {
 fn production_and_placement_go_through_commands() {
     let mut battle = Battle::sandbox();
     let base = player_base_cell();
-    battle.construct(BuildingKind::CommandCenter, Team::Player, base);
-    battle.set_credits(Team::Player, 5000);
+    battle.construct(BuildingKind::CommandCenter, Team::Azure, base);
+    battle.set_credits(Team::Azure, 5000);
     battle.issue(
-        Team::Player,
+        Team::Azure,
         PlayerCommand::Enqueue {
             item: BuildItem::Structure(BuildingKind::PowerPlant),
             copies: 1,
@@ -55,7 +55,7 @@ fn production_and_placement_go_through_commands() {
     );
     battle.run_for(BuildingKind::PowerPlant.spec().build_secs + 1.0);
     battle.issue(
-        Team::Player,
+        Team::Azure,
         PlayerCommand::PlaceStructure {
             kind: BuildingKind::PowerPlant,
             origin: base + IVec2::new(4, 0),
@@ -64,7 +64,7 @@ fn production_and_placement_go_through_commands() {
     battle.run_for(1.0);
     assert!(
         battle
-            .building(Team::Player, BuildingKind::PowerPlant)
+            .building(Team::Azure, BuildingKind::PowerPlant)
             .is_some()
     );
 }
@@ -75,10 +75,10 @@ fn the_same_commands_on_the_same_ticks_replay_the_same_battle() {
         let mut battle = Battle::standard();
         battle.run_for(5.0);
         if with_orders {
-            let tanks = battle.units(Team::Player, Some(UnitKind::Tank));
+            let tanks = battle.units(Team::Azure, Some(UnitKind::Tank));
             let units = tanks.iter().map(|&tank| battle.sim_id(tank)).collect();
             battle.issue(
-                Team::Player,
+                Team::Azure,
                 PlayerCommand::Ground {
                     units,
                     goal: IVec2::new(32, 32),
@@ -119,8 +119,8 @@ fn a_group_moves_each_unit_at_its_own_speed_unless_told_to_keep_together() {
     const SECS: f32 = 4.0;
     let tank_speed = UnitKind::Tank.spec().speed;
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, FIELD + IVec2::new(0, 2));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, FIELD + IVec2::new(0, 2));
     let start = battle.position(scout);
     let order = group_order(
         &mut battle,
@@ -129,7 +129,7 @@ fn a_group_moves_each_unit_at_its_own_speed_unless_told_to_keep_together() {
         GroundOrder::Move,
         false,
     );
-    battle.issue(Team::Player, order);
+    battle.issue(Team::Azure, order);
     battle.run_for(SECS);
     let travelled = battle.position(scout).distance(start);
     assert!(
@@ -145,12 +145,12 @@ fn a_group_told_to_keep_together_moves_at_the_pace_of_its_slowest_unit() {
     let scout_speed = UnitKind::Scout.spec().speed;
     assert!(scout_speed > tank_speed * 1.5);
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, FIELD + IVec2::new(0, 2));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, FIELD + IVec2::new(0, 2));
     let goal = FIELD + IVec2::new(20, 0);
     let start = battle.position(scout);
     let order = group_order(&mut battle, &[tank, scout], goal, GroundOrder::Move, true);
-    battle.issue(Team::Player, order);
+    battle.issue(Team::Azure, order);
     battle.run_for(SECS);
     let in_the_group = battle.position(scout).distance(start);
     assert!(
@@ -166,7 +166,7 @@ fn a_group_told_to_keep_together_moves_at_the_pace_of_its_slowest_unit() {
         GroundOrder::Move,
         true,
     );
-    battle.issue(Team::Player, alone);
+    battle.issue(Team::Azure, alone);
     battle.run_for(SECS);
     let on_its_own = battle.position(scout).distance(start);
     assert!(
@@ -180,8 +180,8 @@ fn an_attack_move_group_told_to_keep_together_keeps_its_pace_until_it_meets_the_
     const SECS: f32 = 4.0;
     let tank_speed = UnitKind::Tank.spec().speed;
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, FIELD + IVec2::new(0, 2));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, FIELD + IVec2::new(0, 2));
     let start = battle.position(scout);
     let order = group_order(
         &mut battle,
@@ -190,7 +190,7 @@ fn an_attack_move_group_told_to_keep_together_keeps_its_pace_until_it_meets_the_
         GroundOrder::AttackMove,
         true,
     );
-    battle.issue(Team::Player, order);
+    battle.issue(Team::Azure, order);
     battle.run_for(SECS);
     let travelled = battle.position(scout).distance(start);
     assert!(

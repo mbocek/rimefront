@@ -82,13 +82,13 @@ fn crimson_buildings(battle: &mut Battle, kind: BuildingKind) -> usize {
 fn the_computer_answers_enemy_gunships_with_flak() {
     let mut battle = fogless_match();
     let command_center = battle
-        .building(Team::Player, BuildingKind::CommandCenter)
+        .building(Team::Azure, BuildingKind::CommandCenter)
         .unwrap();
     let home = world_to_cell(battle.position(command_center));
     for offset in 0..4 {
         battle.spawn_unit(
             UnitKind::Gunship,
-            Team::Player,
+            Team::Azure,
             home + IVec2::new(-3, offset),
         );
     }
@@ -149,7 +149,7 @@ fn computer_scouts_raid_a_harvester_they_can_see() {
             CRIMSON_BASE + IVec2::new(-3, offset),
         );
     }
-    let harvester = battle.spawn_unit(UnitKind::Harvester, Team::Player, IVec2::new(30, 34));
+    let harvester = battle.spawn_unit(UnitKind::Harvester, Team::Azure, IVec2::new(30, 34));
     let took = battle.run_until(40.0, |battle| {
         battle
             .world()
@@ -163,7 +163,7 @@ fn computer_scouts_raid_a_harvester_they_can_see() {
 fn a_big_wave_splits_to_come_from_two_sides() {
     let mut battle = fogless_sandbox();
     battle.construct(BuildingKind::CommandCenter, Team::Crimson, CRIMSON_BASE);
-    battle.construct(BuildingKind::PowerPlant, Team::Player, IVec2::new(12, 50));
+    battle.construct(BuildingKind::PowerPlant, Team::Azure, IVec2::new(12, 50));
     battle.add_ai(Team::Crimson, CRIMSON_BASE, Difficulty::Normal);
     let wave: Vec<Entity> = (0..8)
         .map(|index| {

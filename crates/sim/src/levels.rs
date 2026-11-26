@@ -365,7 +365,7 @@ impl LevelDefinition {
     }
 
     pub fn force_of(&self, team: Team) -> Option<&ForceSetup> {
-        if team == Team::Player {
+        if team == Team::Azure {
             return Some(&self.player);
         }
         self.opponents()

@@ -42,7 +42,7 @@ pub fn set_up_side_preview(
         TextureFormat::Rgba8UnormSrgb,
         None,
     ));
-    let (scene, _) = models.unit(UnitKind::Tank, Team::Player);
+    let (scene, _) = models.unit(UnitKind::Tank, Team::Azure);
     commands.spawn((
         scene,
         Painted::Preview,
@@ -143,7 +143,7 @@ pub(super) fn spawn_color_picker(
                 let choices =
                     std::iter::once(None).chain(SIDE_PALETTE.iter().map(|&(_, color)| Some(color)));
                 for color in choices {
-                    let fill = color.map_or(Team::Player.ui_color(), SideColor::color);
+                    let fill = color.map_or(Team::Azure.ui_color(), SideColor::color);
                     let picked = color == chosen;
                     let mut swatch = swatches.spawn((
                         ColorSwatch(color),

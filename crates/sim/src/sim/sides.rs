@@ -239,7 +239,7 @@ mod tests {
         assert_eq!(*credits.of(late), 100);
         *credits.of_mut(late) -= 30;
         assert_eq!(
-            [Team::Player, Team::Amber, late].map(|team| *credits.of(team)),
+            [Team::Azure, Team::Amber, late].map(|team| *credits.of(team)),
             [100, 105, 70]
         );
     }
@@ -249,7 +249,7 @@ mod tests {
         let last = Team::from_index(Team::MOST - 1);
         let set: SideSet = [Team::Crimson, last].into_iter().collect();
         assert!(set.contains(Team::Crimson) && set.contains(last));
-        assert!(!set.contains(Team::Player) && !set.contains(Team::from_index(64)));
+        assert!(!set.contains(Team::Azure) && !set.contains(Team::from_index(64)));
     }
 
     #[test]

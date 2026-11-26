@@ -170,7 +170,7 @@ fn bring_reinforcements(
     let corner = corner_of(from);
     let inward = (map_middle_cell() - corner).signum();
     let facing = crate::sim::components::yaw_towards(cell_center(corner), cell_center(player_base));
-    let order = if team == Team::Player {
+    let order = if team == Team::Azure {
         Order::Move(player_base)
     } else {
         Order::AttackMove(player_base)

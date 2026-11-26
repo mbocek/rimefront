@@ -55,7 +55,7 @@ fn hunt_enemies(battle: &mut Battle, team: Team) {
 #[test]
 fn both_sides_start_with_the_same_forces() {
     let mut battle = Battle::standard();
-    for team in [Team::Player, Team::Crimson] {
+    for team in [Team::Azure, Team::Crimson] {
         assert_eq!(battle.buildings(team), vec![BuildingKind::CommandCenter]);
         assert_eq!(battle.units(team, None).len(), 5);
         assert_eq!(battle.credits(team), STARTING_CREDITS);
@@ -67,7 +67,7 @@ fn infantry_crosses_the_river_through_a_ford() {
     let mut battle = Battle::sandbox();
     let start = IVec2::new(10, 50);
     let goal = IVec2::new(12, 12);
-    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Player, start);
+    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, start);
     battle.order_move(rifleman, goal);
     let took = battle.run_until(120.0, |battle| arrived(battle, rifleman, goal));
     assert!(took.is_some(), "rifleman never reached the far bank");
@@ -76,7 +76,7 @@ fn infantry_crosses_the_river_through_a_ford() {
 #[test]
 fn vehicles_drive_to_their_destination() {
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, IVec2::new(20, 50));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, IVec2::new(20, 50));
     let goal = IVec2::new(45, 50);
     battle.order_move(tank, goal);
     let took = battle
@@ -92,62 +92,56 @@ fn vehicles_drive_to_their_destination() {
 #[test]
 fn a_refinery_brings_a_harvester_that_earns_credits() {
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::Refinery, Team::Player, PLAYER_REFINERY_SITE);
+    battle.construct(BuildingKind::Refinery, Team::Azure, PLAYER_REFINERY_SITE);
     assert_eq!(
-        battle.units(Team::Player, Some(UnitKind::Harvester)).len(),
+        battle.units(Team::Azure, Some(UnitKind::Harvester)).len(),
         1,
         "refinery comes with a harvester"
     );
-    let before = battle.credits(Team::Player);
-    let took = battle.run_until(180.0, |battle| battle.credits(Team::Player) >= before + 500);
+    let before = battle.credits(Team::Azure);
+    let took = battle.run_until(180.0, |battle| battle.credits(Team::Azure) >= before + 500);
     assert!(took.is_some(), "no full load delivered in 3 minutes");
 }
 
 #[test]
 fn barracks_train_queued_infantry() {
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::CommandCenter, Team::Player, IVec2::new(6, 52));
-    battle.construct(BuildingKind::PowerPlant, Team::Player, IVec2::new(6, 47));
-    battle.construct(BuildingKind::Barracks, Team::Player, IVec2::new(10, 52));
-    let before = battle.credits(Team::Player);
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Rifleman)));
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Rifleman)));
+    battle.construct(BuildingKind::CommandCenter, Team::Azure, IVec2::new(6, 52));
+    battle.construct(BuildingKind::PowerPlant, Team::Azure, IVec2::new(6, 47));
+    battle.construct(BuildingKind::Barracks, Team::Azure, IVec2::new(10, 52));
+    let before = battle.credits(Team::Azure);
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
     assert_eq!(
-        battle.credits(Team::Player),
+        battle.credits(Team::Azure),
         before - 2 * UnitKind::Rifleman.spec().cost
     );
 
     battle.run_for(UnitKind::Rifleman.spec().build_secs * 2.0 + 1.0);
-    assert_eq!(
-        battle.units(Team::Player, Some(UnitKind::Rifleman)).len(),
-        2
-    );
+    assert_eq!(battle.units(Team::Azure, Some(UnitKind::Rifleman)).len(), 2);
 }
 
 #[test]
 fn low_power_halves_production_speed() {
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::Barracks, Team::Player, IVec2::new(10, 52));
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Rifleman)));
+    battle.construct(BuildingKind::Barracks, Team::Azure, IVec2::new(10, 52));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
     let build_secs = UnitKind::Rifleman.spec().build_secs;
     battle.run_for(build_secs + 1.0);
     assert!(
         battle
-            .units(Team::Player, Some(UnitKind::Rifleman))
+            .units(Team::Azure, Some(UnitKind::Rifleman))
             .is_empty(),
         "built at full speed without power"
     );
     battle.run_for(build_secs);
-    assert_eq!(
-        battle.units(Team::Player, Some(UnitKind::Rifleman)).len(),
-        1
-    );
+    assert_eq!(battle.units(Team::Azure, Some(UnitKind::Rifleman)).len(), 1);
 }
 
 #[test]
 fn a_tank_defeats_a_rifle_squad() {
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, OPEN_FIELD);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, OPEN_FIELD);
     for offset in [IVec2::new(4, 0), IVec2::new(4, 1), IVec2::new(5, -1)] {
         battle.spawn_unit(UnitKind::Rifleman, Team::Crimson, OPEN_FIELD + offset);
     }
@@ -155,7 +149,7 @@ fn a_tank_defeats_a_rifle_squad() {
     assert!(took.is_some(), "riflemen survived");
     assert!(battle.alive(tank));
     assert!(
-        battle.damage_taken(Team::Player) > 0.0,
+        battle.damage_taken(Team::Azure) > 0.0,
         "riflemen should at least scratch the tank"
     );
 }
@@ -163,7 +157,7 @@ fn a_tank_defeats_a_rifle_squad() {
 #[test]
 fn a_gun_turret_stops_a_raiding_scout() {
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::GunTurret, Team::Player, OPEN_FIELD);
+    battle.construct(BuildingKind::GunTurret, Team::Azure, OPEN_FIELD);
     let scout = battle.spawn_unit(
         UnitKind::Scout,
         Team::Crimson,
@@ -177,7 +171,7 @@ fn a_gun_turret_stops_a_raiding_scout() {
 #[test]
 fn artillery_splash_hurts_a_whole_group() {
     let mut battle = Battle::sandbox();
-    let howitzer = battle.spawn_unit(UnitKind::Artillery, Team::Player, OPEN_FIELD);
+    let howitzer = battle.spawn_unit(UnitKind::Artillery, Team::Azure, OPEN_FIELD);
     let squad: Vec<Entity> = [IVec2::new(8, 0), IVec2::new(8, 1), IVec2::new(9, 0)]
         .into_iter()
         .map(|offset| battle.spawn_unit(UnitKind::Tank, Team::Crimson, OPEN_FIELD + offset))
@@ -250,14 +244,14 @@ fn the_enemy_builds_a_working_economy() {
 #[test]
 fn the_enemy_goes_on_the_attack() {
     let mut battle = Battle::standard();
-    let took = battle.run_until(240.0, |battle| battle.damage_taken(Team::Player) > 0.0);
+    let took = battle.run_until(240.0, |battle| battle.damage_taken(Team::Azure) > 0.0);
     assert!(took.is_some(), "the enemy never fired at the player");
 }
 
 #[test]
 fn a_defenceless_player_is_defeated() {
     let mut battle = Battle::standard();
-    battle.despawn_units(Team::Player);
+    battle.despawn_units(Team::Azure);
     let took = battle.run_until(20.0 * 60.0, |battle| {
         battle.outcome() != GameOutcome::Ongoing
     });
@@ -272,7 +266,7 @@ fn a_strong_player_army_wins_the_match() {
         for column in 0..4 {
             battle.spawn_unit(
                 UnitKind::Tank,
-                Team::Player,
+                Team::Azure,
                 IVec2::new(12 + column * 2, 46 + row * 2),
             );
         }
@@ -280,12 +274,12 @@ fn a_strong_player_army_wins_the_match() {
     for column in 0..3 {
         battle.spawn_unit(
             UnitKind::Artillery,
-            Team::Player,
+            Team::Azure,
             IVec2::new(12 + column * 2, 54),
         );
     }
     let took = battle.run_until(15.0 * 60.0, |battle| {
-        hunt_enemies(battle, Team::Player);
+        hunt_enemies(battle, Team::Azure);
         battle.outcome() != GameOutcome::Ongoing
     });
     assert!(took.is_some(), "match never ended");
@@ -300,7 +294,7 @@ fn saving_and_loading_restores_the_battle() {
     battle.run_for(0.1);
 
     let snapshot = |battle: &mut Battle| {
-        let teams = [Team::Player, Team::Crimson];
+        let teams = [Team::Azure, Team::Crimson];
         let credits = teams.map(|team| battle.credits(team));
         let units = teams.map(|team| battle.units(team, None).len());
         let mut buildings = teams.map(|team| battle.buildings(team));
@@ -311,7 +305,7 @@ fn saving_and_loading_restores_the_battle() {
     };
     let saved = snapshot(&mut battle);
 
-    battle.set_credits(Team::Player, 1);
+    battle.set_credits(Team::Azure, 1);
     battle.run_for(30.0);
     battle.world().resource_mut::<SaveRequests>().load = Some(1);
     battle.run_for(0.3);

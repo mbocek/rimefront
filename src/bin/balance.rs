@@ -91,7 +91,7 @@ fn duel(attacker: UnitKind, defender: UnitKind, attacker_west: bool) -> f32 {
     deploy_squad(
         &mut battle,
         attacker,
-        Team::Player,
+        Team::Azure,
         attacker_front,
         defender_front,
     );
@@ -105,9 +105,9 @@ fn duel(attacker: UnitKind, defender: UnitKind, attacker_west: bool) -> f32 {
     let fielded =
         |kind: UnitKind| ((DUEL_BUDGET / kind.spec().cost).max(1) * kind.spec().cost) as f32;
     battle.run_until(DUEL_TIME_LIMIT_SECS, |battle| {
-        battle.units(Team::Player, None).is_empty() || battle.units(Team::Crimson, None).is_empty()
+        battle.units(Team::Azure, None).is_empty() || battle.units(Team::Crimson, None).is_empty()
     });
-    let attacker_left = army_value(&mut battle, Team::Player) / fielded(attacker);
+    let attacker_left = army_value(&mut battle, Team::Azure) / fielded(attacker);
     let defender_left = army_value(&mut battle, Team::Crimson) / fielded(defender);
     attacker_left - defender_left
 }
@@ -205,7 +205,7 @@ fn ai_match(
         level: Some(level),
     });
     battle.add_ai_with(
-        Team::Player,
+        Team::Azure,
         challenger_site.origin(),
         challenger,
         challenger_style,
@@ -213,7 +213,7 @@ fn ai_match(
     battle
         .world()
         .resource_mut::<Economies>()
-        .of_mut(Team::Player)
+        .of_mut(Team::Azure)
         .income_rate = challenger.income_rate();
     let took = battle.run_until(MATCH_TIME_LIMIT_SECS, |battle| {
         battle.outcome() != GameOutcome::Ongoing

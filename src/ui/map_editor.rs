@@ -255,7 +255,7 @@ fn spawn_level_page(
         false,
     );
     panel.spawn(fonts.heading(tr("SIDES"), 15.0, TEXT_DIM));
-    let faction = tr_owned(&Team::Player.name_in(level.player_faction));
+    let faction = tr_owned(&Team::Azure.name_in(level.player_faction));
     let faction_label = tr_fmt("Your faction: {}", &[&faction]);
     spawn_button(panel, fonts, &faction_label, EditorButton::Faction, false);
     let sides = std::iter::once((tr("You").to_string(), level.player.site, None)).chain(
@@ -687,7 +687,7 @@ pub fn draw_brush_outline(cursor: Res<Cursor>, editor: Res<MapEditor>, mut gizmo
 /// Rings where the bases stand, since nothing can be painted there.
 pub fn mark_base_sites(level: Res<ActiveLevel>, mut gizmos: Gizmos) {
     let footprint = BuildingKind::CommandCenter.spec().footprint;
-    let sides = std::iter::once((Team::Player, level.0.player.site)).chain(
+    let sides = std::iter::once((Team::Azure, level.0.player.site)).chain(
         level
             .0
             .opponents()

@@ -42,9 +42,9 @@ fn target_at(battle: &mut Battle, offset: IVec2) -> Entity {
 }
 
 fn tank_with(battle: &mut Battle, stance: Stance) -> Entity {
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, POST);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, POST);
     let units = vec![battle.sim_id(tank)];
-    battle.issue(Team::Player, PlayerCommand::SetStance { units, stance });
+    battle.issue(Team::Azure, PlayerCommand::SetStance { units, stance });
     battle.run_for(0.2);
     assert_eq!(battle.world().get::<Stance>(tank), Some(&stance));
     tank
@@ -103,7 +103,7 @@ fn a_unit_holding_fire_shoots_only_when_ordered() {
     let units = vec![battle.sim_id(tank)];
     let ordered = battle.sim_id(target);
     battle.issue(
-        Team::Player,
+        Team::Azure,
         PlayerCommand::Attack {
             units,
             target: ordered,

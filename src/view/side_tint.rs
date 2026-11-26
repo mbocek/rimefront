@@ -79,7 +79,7 @@ impl SideColors {
                 .copied()
                 .unwrap_or_else(|| team.model_tint()),
             Painted::Unclaimed => UNCLAIMED_GREY,
-            Painted::Preview => self.preview.unwrap_or_else(|| Team::Player.model_tint()),
+            Painted::Preview => self.preview.unwrap_or_else(|| Team::Azure.model_tint()),
         }
     }
 

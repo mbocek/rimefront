@@ -24,7 +24,7 @@ fn grenadiers_break_a_bunched_rifle_squad_of_the_same_price() {
     let riflemen = squad(
         &mut battle,
         UnitKind::Rifleman,
-        Team::Player,
+        Team::Azure,
         FIELD + IVec2::new(4, 0),
         5,
     );
@@ -39,7 +39,7 @@ fn grenadiers_break_a_bunched_rifle_squad_of_the_same_price() {
 fn a_tank_rolls_over_grenadiers() {
     let mut battle = Battle::sandbox();
     let grenadiers = squad(&mut battle, UnitKind::Grenadier, Team::Crimson, FIELD, 3);
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD + IVec2::new(5, 0));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD + IVec2::new(5, 0));
     battle.run_until(60.0, |battle| {
         survivors(battle, &grenadiers) == 0 || !battle.alive(tank)
     });
@@ -63,9 +63,9 @@ fn health(battle: &mut Battle, unit: Entity) -> f32 {
 #[test]
 fn a_repair_truck_mends_vehicles_in_the_field_but_not_soldiers() {
     let mut battle = Battle::sandbox();
-    battle.spawn_unit(UnitKind::RepairTruck, Team::Player, FIELD);
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD + IVec2::new(4, 0));
-    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Player, FIELD + IVec2::new(-1, 1));
+    battle.spawn_unit(UnitKind::RepairTruck, Team::Azure, FIELD);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD + IVec2::new(4, 0));
+    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, FIELD + IVec2::new(-1, 1));
     let tank_before = wound(&mut battle, tank, 0.4);
     let rifleman_before = wound(&mut battle, rifleman, 0.4);
     battle.run_for(12.0);
@@ -96,8 +96,8 @@ fn a_stealth_tank_keeping_still_blends_into_the_ground() {
 fn a_stealth_tank_caught_in_the_open_falls_to_a_pair_of_battle_tanks() {
     let mut battle = Battle::sandbox();
     let stealth_tank = battle.spawn_unit(UnitKind::StealthTank, Team::Crimson, FIELD);
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD + IVec2::new(4, 0));
-    let second_tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD + IVec2::new(4, 2));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD + IVec2::new(4, 0));
+    let second_tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD + IVec2::new(4, 2));
     battle.run_until(60.0, |battle| {
         !battle.alive(stealth_tank) || !battle.alive(tank) && !battle.alive(second_tank)
     });
@@ -107,7 +107,7 @@ fn a_stealth_tank_caught_in_the_open_falls_to_a_pair_of_battle_tanks() {
 #[test]
 fn raider_bikes_run_down_a_howitzer() {
     let mut battle = Battle::sandbox();
-    let howitzer = battle.spawn_unit(UnitKind::Artillery, Team::Player, FIELD);
+    let howitzer = battle.spawn_unit(UnitKind::Artillery, Team::Azure, FIELD);
     let bikes = squad(
         &mut battle,
         UnitKind::RaiderBike,
@@ -128,7 +128,7 @@ fn riflemen_shoot_raider_bikes_off_the_road() {
     let riflemen = squad(
         &mut battle,
         UnitKind::Rifleman,
-        Team::Player,
+        Team::Azure,
         FIELD + IVec2::new(4, 0),
         7,
     );
@@ -148,15 +148,15 @@ fn a_bomber_strikes_once_then_lands_on_its_helipad_to_rearm() {
     use rimefront::sim::player_commands::PlayerCommand;
     let mut battle = Battle::sandbox();
     let pad_origin = IVec2::new(12, 50);
-    battle.construct(BuildingKind::Helipad, Team::Player, pad_origin);
+    battle.construct(BuildingKind::Helipad, Team::Azure, pad_origin);
     let pad_cell = pad_origin + IVec2::ONE;
-    let bomber = battle.spawn_unit(UnitKind::Bomber, Team::Player, pad_cell);
+    let bomber = battle.spawn_unit(UnitKind::Bomber, Team::Azure, pad_cell);
     let pad = battle.position(bomber);
     let tank = battle.spawn_unit(UnitKind::Tank, Team::Crimson, pad_cell + IVec2::new(14, -6));
     let full = health(&mut battle, tank);
     let units = vec![battle.sim_id(bomber)];
     let target = battle.sim_id(tank);
-    battle.issue(Team::Player, PlayerCommand::Attack { units, target });
+    battle.issue(Team::Azure, PlayerCommand::Attack { units, target });
 
     battle.run_until(30.0, |battle| health(battle, tank) < full);
     assert!(health(&mut battle, tank) < full, "the bombs never fell");
@@ -175,7 +175,7 @@ fn a_bomber_strikes_once_then_lands_on_its_helipad_to_rearm() {
 #[test]
 fn a_fighter_shoots_down_a_gunship_but_leaves_ground_units_alone() {
     let mut battle = Battle::sandbox();
-    let fighter = battle.spawn_unit(UnitKind::Fighter, Team::Player, FIELD);
+    let fighter = battle.spawn_unit(UnitKind::Fighter, Team::Azure, FIELD);
     let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Crimson, FIELD + IVec2::new(5, 0));
     let tank = battle.spawn_unit(UnitKind::Tank, Team::Crimson, FIELD + IVec2::new(3, 2));
     let tank_full = health(&mut battle, tank);
@@ -194,7 +194,7 @@ fn a_fighter_shoots_down_a_gunship_but_leaves_ground_units_alone() {
 #[test]
 fn a_waiting_fighter_circles_where_it_stopped() {
     let mut battle = Battle::sandbox();
-    let fighter = battle.spawn_unit(UnitKind::Fighter, Team::Player, FIELD);
+    let fighter = battle.spawn_unit(UnitKind::Fighter, Team::Azure, FIELD);
     battle.run_for(0.5);
     let start = battle.position(fighter);
     let mut farthest: f32 = 0.0;
@@ -214,8 +214,8 @@ fn a_bomber_lifts_straight_off_its_pad_before_flying_away() {
     use rimefront::sim::catalog::BuildingKind;
     let mut battle = Battle::sandbox();
     let pad_origin = IVec2::new(12, 50);
-    battle.construct(BuildingKind::Helipad, Team::Player, pad_origin);
-    let bomber = battle.spawn_unit(UnitKind::Bomber, Team::Player, pad_origin + IVec2::ONE);
+    battle.construct(BuildingKind::Helipad, Team::Azure, pad_origin);
+    let bomber = battle.spawn_unit(UnitKind::Bomber, Team::Azure, pad_origin + IVec2::ONE);
     battle.run_for(1.0);
     let on_pad = battle.position(bomber);
     battle.order_move(bomber, pad_origin + IVec2::new(20, 0));

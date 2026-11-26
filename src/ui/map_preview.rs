@@ -27,7 +27,7 @@ pub fn map_preview(level: &LevelDefinition) -> Image {
         .get_resource::<GameMap>()
         .map(|map| terrain_pixels(map, level))
         .unwrap_or_else(|| vec![0; resolution().element_product() as usize * 4]);
-    let sides = std::iter::once((Team::Player, level.player.site)).chain(
+    let sides = std::iter::once((Team::Azure, level.player.site)).chain(
         level
             .opponents()
             .map(|(team, enemy)| (team, enemy.force.site)),
@@ -70,7 +70,7 @@ mod tests {
         let pixels = preview.data.as_ref().unwrap();
         let player_base = cell_pixel(level.player.site.origin()) + cell_pixels();
         let at = ((player_base.y * resolution().x as i32 + player_base.x) * 4) as usize;
-        let blue = Team::Player.ui_color().to_srgba();
+        let blue = Team::Azure.ui_color().to_srgba();
         assert_eq!(pixels[at + 2], (blue.blue * 255.0) as u8);
     }
 }

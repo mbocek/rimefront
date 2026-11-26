@@ -20,16 +20,16 @@ fn battle_with_full_base(team: Team) -> Battle {
 
 #[test]
 fn the_coalition_cannot_order_syndicate_arms() {
-    let mut battle = battle_with_full_base(Team::Player);
+    let mut battle = battle_with_full_base(Team::Azure);
     for item in [
         BuildItem::Unit(UnitKind::FlameTrooper),
         BuildItem::Unit(UnitKind::MissileTruck),
         BuildItem::Structure(BuildingKind::RocketBunker),
     ] {
-        assert!(!battle.enqueue(Team::Player, item), "{item:?} was accepted");
+        assert!(!battle.enqueue(Team::Azure, item), "{item:?} was accepted");
     }
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Sniper)));
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Bulwark)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Sniper)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Bulwark)));
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn a_flame_trooper_burns_a_rifle_squad_at_close_range() {
         .map(|k| {
             battle.spawn_unit(
                 UnitKind::Rifleman,
-                Team::Player,
+                Team::Azure,
                 FIELD + IVec2::new(2, k - 1),
             )
         })
@@ -83,7 +83,7 @@ fn a_flame_trooper_burns_a_rifle_squad_at_close_range() {
 fn a_rocket_bunker_shoots_down_aircraft() {
     let mut battle = Battle::sandbox();
     battle.construct(BuildingKind::RocketBunker, Team::Crimson, FIELD);
-    let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Player, FIELD + IVec2::new(4, 0));
+    let gunship = battle.spawn_unit(UnitKind::Gunship, Team::Azure, FIELD + IVec2::new(4, 0));
     let full = health(&mut battle, gunship);
     battle.run_for(6.0);
     assert!(
@@ -107,10 +107,10 @@ fn a_syndicate_campaign_level_swaps_the_armouries() {
         .find(|level| level.player_faction == rimefront::sim::catalog::Faction::Syndicate)
         .expect("the campaign has Syndicate missions");
     let mut battle = Battle::on_level(level);
-    battle.set_credits(Team::Player, 20_000);
+    battle.set_credits(Team::Azure, 20_000);
     battle.set_credits(Team::Crimson, 20_000);
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::FlameTrooper)));
-    assert!(!battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Sniper)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::FlameTrooper)));
+    assert!(!battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Sniper)));
     assert!(battle.enqueue(Team::Crimson, BuildItem::Unit(UnitKind::Sniper)));
     assert!(!battle.enqueue(Team::Crimson, BuildItem::Unit(UnitKind::FlameTrooper)));
 }

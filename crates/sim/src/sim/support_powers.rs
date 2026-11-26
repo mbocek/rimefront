@@ -226,11 +226,11 @@ mod tests {
     fn a_power_waits_for_its_charge_and_its_structure() {
         let mut powers = SupportPowers::default();
         let owned = [BuildingKind::CommandCenter];
-        assert!(!powers.call(Team::Player, SupportPower::ReconSweep, IVec2::ZERO, &owned));
+        assert!(!powers.call(Team::Azure, SupportPower::ReconSweep, IVec2::ZERO, &owned));
         powers.recharge.set_all([0.0; 2]);
-        assert!(!powers.call(Team::Player, SupportPower::Barrage, IVec2::ZERO, &owned));
-        assert!(powers.call(Team::Player, SupportPower::ReconSweep, IVec2::ZERO, &owned));
-        assert!(!powers.is_charged(Team::Player, SupportPower::ReconSweep));
+        assert!(!powers.call(Team::Azure, SupportPower::Barrage, IVec2::ZERO, &owned));
+        assert!(powers.call(Team::Azure, SupportPower::ReconSweep, IVec2::ZERO, &owned));
+        assert!(!powers.is_charged(Team::Azure, SupportPower::ReconSweep));
         assert!(powers.is_charged(Team::Crimson, SupportPower::ReconSweep));
     }
 }

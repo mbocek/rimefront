@@ -10,7 +10,7 @@ const MATCH_SECS: f32 = 8.0 * 60.0;
 
 fn computer_against_computer() -> Battle {
     let mut battle = Battle::standard();
-    battle.add_ai(Team::Player, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
     battle
 }
 
@@ -30,7 +30,7 @@ fn the_same_battle_plays_out_identically_twice() {
         );
     }
     assert!(
-        first.damage_taken(Team::Player) + first.damage_taken(Team::Crimson) > 0.0,
+        first.damage_taken(Team::Azure) + first.damage_taken(Team::Crimson) > 0.0,
         "nothing happened, so the comparison proves little"
     );
 }
@@ -105,7 +105,7 @@ fn restart_match(battle: &mut Battle) {
 
 fn computer_battle_checksums(battle: &mut Battle) -> Vec<u64> {
     step_to_tick(battle, COMMANDER_JOINS_AT_TICK);
-    battle.add_ai(Team::Player, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
     (1..=4)
         .map(|sample| {
             step_to_tick(

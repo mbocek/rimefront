@@ -16,7 +16,7 @@ step is one commit and is worth having on its own, for ordinary matches too.
 - Unit separation and target choice compare every unit with every other one.
 - Landscapes, roads and crystal fields are authored for the 64-cell map and stretched; there are four base
   sites in the corners and every map is point-symmetric.
-- Four fixed teams (`Team::Player`, `Crimson`, `Amber`, `Violet`).
+- Four fixed teams (`Team::Azure`, `Crimson`, `Amber`, `Violet`).
 - Network play is lockstep ([determinism.md](determinism.md), [server.md](server.md)): every machine runs the
   whole battle, the server only relays orders, and a late guest catches up by replaying the full order history.
 
@@ -196,7 +196,7 @@ for ordinary network matches.
     themselves. `RIMEFRONT_CAPTURE_CLAIM_SITES=6` gives out sites two seconds into a capture run, to look
     at it.
 11. **Sides as data.** Done. A `Team` is a side number; the four a level names keep their names
-    (`Team::Player` and the rest), and their look (name, colour, model tint) comes from a table that repeats
+    (`Team::Azure` and the rest), and their look (name, colour, model tint) comes from a table that repeats
     past eight sides, the models having four tints. Saved text still names the four sides as before and
     numbers the others (`"Side4"`). The sides in a battle are the `Sides` resource; `sim::sides::admit_side`
     lets one more in, with fog and intel of its own, in a camp of its own: `Diplomacy` gives every side a

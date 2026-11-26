@@ -12,7 +12,7 @@ fn a_side_that_joins_sees_for_itself_and_fights_everyone() {
     let newcomer = admit_side(battle.world());
     assert_eq!(newcomer, Team::from_index(4));
     let tank = battle.spawn_unit(UnitKind::Tank, newcomer, IVec2::new(30, 45));
-    let target = battle.spawn_unit(UnitKind::Rifleman, Team::Player, IVec2::new(33, 45));
+    let target = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, IVec2::new(33, 45));
     battle.run_for(0.5);
     let seen = battle
         .world()
@@ -24,7 +24,7 @@ fn a_side_that_joins_sees_for_itself_and_fights_everyone() {
     battle.run_for(10.0);
     assert!(battle.alive(tank));
     assert!(!battle.alive(target), "the newcomer never fought");
-    assert!(battle.damage_taken(Team::Player) > 0.0);
+    assert!(battle.damage_taken(Team::Azure) > 0.0);
 }
 
 #[test]
@@ -37,12 +37,12 @@ fn a_sheltered_side_neither_suffers_nor_deals_harm() {
     battle.world().resource_mut::<Shelter>().0.insert(away);
     battle.construct(BuildingKind::GunTurret, away, IVec2::new(30, 45));
     battle.spawn_unit(UnitKind::Tank, away, IVec2::new(30, 49));
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, IVec2::new(34, 47));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, IVec2::new(34, 47));
     let turret = battle.building(away, BuildingKind::GunTurret).unwrap();
     let turret_id = battle.sim_id(turret);
     let tank_id = battle.sim_id(tank);
     battle.issue(
-        Team::Player,
+        Team::Azure,
         PlayerCommand::Attack {
             units: vec![tank_id],
             target: turret_id,
@@ -55,7 +55,7 @@ fn a_sheltered_side_neither_suffers_nor_deals_harm() {
         "the sheltered side was hurt"
     );
     assert_eq!(
-        battle.damage_taken(Team::Player),
+        battle.damage_taken(Team::Azure),
         0.0,
         "the sheltered side fired"
     );

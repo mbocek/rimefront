@@ -68,7 +68,7 @@ impl ForcePreset {
 
 /// The sides a level has, the player first: the ones an event can name.
 pub fn sides(level: &LevelDefinition) -> Vec<Team> {
-    std::iter::once(Team::Player)
+    std::iter::once(Team::Azure)
         .chain(level.opponents().map(|(team, _)| team))
         .collect()
 }
@@ -200,12 +200,12 @@ pub fn cycle_action(level: &mut LevelDefinition, index: usize) {
     };
     let next = match main_action(event) {
         None => Some(EventAction::Reinforcements {
-            team: Team::Player,
+            team: Team::Azure,
             units: ForcePreset::Infantry.units(faction),
             from: corner,
         }),
         Some(EventAction::Reinforcements { .. }) => Some(EventAction::Credits {
-            team: Team::Player,
+            team: Team::Azure,
             amount: 1000,
         }),
         Some(_) => None,
@@ -354,7 +354,7 @@ mod tests {
         assert_eq!(
             main_action(&level.events[index]),
             Some(&EventAction::Credits {
-                team: Team::Player,
+                team: Team::Azure,
                 amount: 2000
             })
         );

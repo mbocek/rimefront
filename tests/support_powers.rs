@@ -35,13 +35,13 @@ fn health_of(battle: &mut Battle, team: Team, kind: BuildingKind) -> f32 {
 }
 
 fn call(battle: &mut Battle, power: SupportPower, cell: IVec2) {
-    battle.issue(Team::Player, PlayerCommand::CallSupport { power, cell });
+    battle.issue(Team::Azure, PlayerCommand::CallSupport { power, cell });
 }
 
 #[test]
 fn a_barrage_needs_a_tech_center_and_its_charge_then_hits_the_spot() {
     let mut battle = field(false);
-    battle.construct(BuildingKind::CommandCenter, Team::Player, HOME);
+    battle.construct(BuildingKind::CommandCenter, Team::Azure, HOME);
     battle.construct(BuildingKind::PowerPlant, Team::Crimson, TARGET);
     let intact = BuildingKind::PowerPlant.spec().max_health;
     battle.run_for(SupportPower::Barrage.recharge_secs() + 1.0);
@@ -54,7 +54,7 @@ fn a_barrage_needs_a_tech_center_and_its_charge_then_hits_the_spot() {
     );
     battle.construct(
         BuildingKind::TechCenter,
-        Team::Player,
+        Team::Azure,
         HOME + IVec2::new(4, 0),
     );
     battle.run_for(0.5);
@@ -66,13 +66,13 @@ fn a_barrage_needs_a_tech_center_and_its_charge_then_hits_the_spot() {
 #[test]
 fn a_recon_flight_reveals_the_spot_for_a_while() {
     let mut battle = field(true);
-    battle.construct(BuildingKind::CommandCenter, Team::Player, HOME);
+    battle.construct(BuildingKind::CommandCenter, Team::Azure, HOME);
     let spot = cell_center(TARGET);
     let seen = |battle: &mut Battle| {
         battle
             .world()
             .resource::<Intel>()
-            .vision(Team::Player)
+            .vision(Team::Azure)
             .is_visible(spot)
     };
     battle.run_for(SupportPower::ReconSweep.recharge_secs() + 1.0);
@@ -87,7 +87,7 @@ fn a_recon_flight_reveals_the_spot_for_a_while() {
 #[test]
 fn computer_commanders_call_barrages() {
     let mut battle = Battle::standard();
-    battle.add_ai(Team::Player, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
     battle.run_for(12.0 * 60.0);
     let ledger = battle.ledger();
     let by_support = |team| {
@@ -98,7 +98,7 @@ fn computer_commanders_call_barrages() {
             .unwrap_or(0.0)
     };
     assert!(
-        by_support(Team::Player) + by_support(Team::Crimson) > 0.0,
+        by_support(Team::Azure) + by_support(Team::Crimson) > 0.0,
         "no commander called a barrage in twelve minutes"
     );
 }

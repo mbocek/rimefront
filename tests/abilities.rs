@@ -34,10 +34,10 @@ fn drive(battle: &mut Battle, unit: Entity, goal: IVec2) {
 }
 
 fn bury_a_mine_at_the_field(battle: &mut Battle) {
-    battle.set_credits(Team::Player, 1000);
-    let engineer = battle.spawn_unit(UnitKind::Engineer, Team::Player, FIELD);
+    battle.set_credits(Team::Azure, 1000);
+    let engineer = battle.spawn_unit(UnitKind::Engineer, Team::Azure, FIELD);
     let id = battle.sim_id(engineer);
-    battle.issue(Team::Player, PlayerCommand::LayMines { units: vec![id] });
+    battle.issue(Team::Azure, PlayerCommand::LayMines { units: vec![id] });
     battle.run_for(2.0);
     battle.world().entity_mut(engineer).despawn();
 }
@@ -47,7 +47,7 @@ fn an_engineer_buries_a_mine_that_blows_up_under_an_enemy_tank() {
     let mut battle = Battle::sandbox();
     bury_a_mine_at_the_field(&mut battle);
     assert_eq!(mines(&mut battle), 1);
-    assert_eq!(battle.credits(Team::Player), 1000 - MINE_COST);
+    assert_eq!(battle.credits(Team::Azure), 1000 - MINE_COST);
 
     let tank = battle.spawn_unit(UnitKind::Tank, Team::Crimson, FIELD + IVec2::new(6, 0));
     battle.world().entity_mut(tank).remove::<Weapon>();
@@ -61,7 +61,7 @@ fn an_engineer_buries_a_mine_that_blows_up_under_an_enemy_tank() {
 fn own_vehicles_drive_over_their_mines() {
     let mut battle = Battle::sandbox();
     bury_a_mine_at_the_field(&mut battle);
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD + IVec2::new(6, 0));
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD + IVec2::new(6, 0));
     drive(&mut battle, tank, FIELD - IVec2::new(4, 0));
     battle.run_for(8.0);
     assert_eq!(mines(&mut battle), 1);
@@ -71,7 +71,7 @@ fn own_vehicles_drive_over_their_mines() {
 #[test]
 fn a_still_sniper_hides_from_a_distant_tank_until_an_enemy_comes_close() {
     let mut battle = Battle::sandbox();
-    let sniper = battle.spawn_unit(UnitKind::Sniper, Team::Player, FIELD);
+    let sniper = battle.spawn_unit(UnitKind::Sniper, Team::Azure, FIELD);
     battle.world().entity_mut(sniper).remove::<Weapon>();
     battle.run_for(4.0);
     battle.spawn_unit(UnitKind::Tank, Team::Crimson, FIELD + IVec2::new(5, 0));
@@ -94,7 +94,7 @@ fn a_still_sniper_hides_from_a_distant_tank_until_an_enemy_comes_close() {
 #[test]
 fn without_camouflage_the_same_tank_finds_the_sniper() {
     let mut battle = Battle::sandbox();
-    let sniper = battle.spawn_unit(UnitKind::Sniper, Team::Player, FIELD);
+    let sniper = battle.spawn_unit(UnitKind::Sniper, Team::Azure, FIELD);
     battle
         .world()
         .entity_mut(sniper)
@@ -138,6 +138,6 @@ fn buried_mines_survive_saving_and_loading() {
     let world = battle.world();
     let restored: Vec<Mine> = world.query::<&Mine>().iter(world).copied().collect();
     assert_eq!(restored.len(), 1);
-    assert_eq!(restored[0].team, Team::Player);
+    assert_eq!(restored[0].team, Team::Azure);
     assert_eq!(restored[0].cell, FIELD);
 }

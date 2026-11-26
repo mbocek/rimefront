@@ -41,7 +41,7 @@ The server (`src/net/server.rs`) adds rooms. A room is named by the path of the 
 (`Link::requested_path`). Before its battle a room gathers: whoever sends it a battle (`OpenRoom`) owns it,
 whatever order the handshakes finish in; guests waiting for it are then offered seats, the owner hears how many
 are seated and ready (`RoomStatus`), and its `Start` begins the battle once all are. The owner plays
-`Team::Player`, the guests their seats, and the room's `Relay` takes over. A room closes when its owner leaves
+`Team::Azure`, the guests their seats, and the room's `Relay` takes over. A room closes when its owner leaves
 before the battle, or when its battle loses a player for good or everyone has gone. Refusals (`Refused`) carry a
 reason the game shows translated: no room in the address, a full room, a room name already open, another version.
 

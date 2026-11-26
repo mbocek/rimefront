@@ -252,7 +252,7 @@ pub fn deploy_level_forces(
         return;
     }
 
-    economies.of_mut(Team::Player).credits = level.player.credits;
+    economies.of_mut(Team::Azure).credits = level.player.credits;
     for (team, enemy) in level.opponents() {
         let economy = economies.of_mut(team);
         economy.credits = enemy.force.credits;
@@ -270,7 +270,7 @@ pub fn deploy_level_forces(
     if !rules.starting_forces {
         return;
     }
-    deploy_force(&mut commands, &mut map, Team::Player, &level.player);
+    deploy_force(&mut commands, &mut map, Team::Azure, &level.player);
     for (team, enemy) in level.opponents() {
         deploy_force(&mut commands, &mut map, team, &enemy.force);
     }

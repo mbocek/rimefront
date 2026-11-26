@@ -40,14 +40,14 @@ fn every_campaign_mission_sets_up_its_battle() {
         let mut battle = Battle::on_level(level.clone());
         assert!(
             battle
-                .buildings(Team::Player)
+                .buildings(Team::Azure)
                 .contains(&BuildingKind::CommandCenter),
             "{}",
             level.name
         );
         for building in &level.player.buildings {
             assert!(
-                battle.buildings(Team::Player).contains(building),
+                battle.buildings(Team::Azure).contains(building),
                 "{}: missing {building:?}",
                 level.name
             );
@@ -67,7 +67,7 @@ fn every_campaign_mission_sets_up_its_battle() {
             assert_eq!(battle.credits(team), enemy.force.credits);
         }
         assert_eq!(
-            battle.units(Team::Player, None).len(),
+            battle.units(Team::Azure, None).len(),
             level.player.units.len() + free_harvesters(&level.player.buildings)
         );
         battle.run_for(30.0);
@@ -99,11 +99,11 @@ fn three_enemy_commanders_each_build_a_base() {
 #[test]
 fn alliances_decide_who_fights_whom() {
     let against_syndicate = Diplomacy::default();
-    assert!(against_syndicate.hostile(Team::Crimson, Team::Player));
-    assert!(against_syndicate.hostile(Team::Player, Team::Violet));
+    assert!(against_syndicate.hostile(Team::Crimson, Team::Azure));
+    assert!(against_syndicate.hostile(Team::Azure, Team::Violet));
     assert!(!against_syndicate.hostile(Team::Crimson, Team::Amber));
     let pairs = Diplomacy::of(Alliance::TwoAgainstTwo);
-    assert!(!pairs.hostile(Team::Player, Team::Amber));
+    assert!(!pairs.hostile(Team::Azure, Team::Amber));
     assert!(!pairs.hostile(Team::Crimson, Team::Violet));
     assert!(pairs.hostile(Team::Amber, Team::Violet));
     let everyone = Diplomacy::of(Alliance::FreeForAll);
@@ -111,9 +111,9 @@ fn alliances_decide_who_fights_whom() {
     assert!(!everyone.hostile(Team::Violet, Team::Violet));
     let mut joined = Diplomacy::default();
     let newcomer = Team::from_index(6);
-    assert!(joined.hostile(newcomer, Team::Player) && joined.hostile(newcomer, Team::Crimson));
-    joined.join_camp_of(newcomer, Team::Player);
-    assert!(!joined.hostile(newcomer, Team::Player));
+    assert!(joined.hostile(newcomer, Team::Azure) && joined.hostile(newcomer, Team::Crimson));
+    joined.join_camp_of(newcomer, Team::Azure);
+    assert!(!joined.hostile(newcomer, Team::Azure));
     assert!(joined.hostile(newcomer, Team::Crimson));
     assert!(joined.hostile(newcomer, Team::from_index(5)));
 }
@@ -128,10 +128,10 @@ fn a_two_against_two_battle_takes_every_corner_and_ends() {
     let level = options.to_level();
     assert_eq!(level.enemies.len(), 3);
     let mut battle = Battle::on_level(level);
-    battle.add_ai(Team::Player, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
     battle.run_for(60.0);
     assert!(battle.outcome() == GameOutcome::Ongoing);
-    assert!(battle.hostile_units(Team::Player) > 0);
+    assert!(battle.hostile_units(Team::Azure) > 0);
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn a_full_treasury_wins_an_economy_mission() {
     let mut battle = Battle::on_level(quiet_level(Objective::ReachCredits { credits: 9000 }));
     battle.run_for(1.0);
     assert_eq!(battle.outcome(), GameOutcome::Ongoing);
-    battle.set_credits(Team::Player, 9500);
+    battle.set_credits(Team::Azure, 9500);
     battle.run_for(0.5);
     assert_eq!(battle.outcome(), GameOutcome::Victory);
 }
@@ -196,9 +196,9 @@ fn missions_can_withhold_units() {
         available_units: vec![UnitKind::Rifleman, UnitKind::Harvester],
         ..quiet_level(Objective::DestroyAllEnemies)
     });
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Rifleman)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
     assert!(
-        !battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Tank)),
+        !battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Tank)),
         "tanks are not part of this mission"
     );
 }
@@ -206,8 +206,8 @@ fn missions_can_withhold_units() {
 #[test]
 fn a_medic_patches_up_wounded_infantry() {
     let mut battle = Battle::sandbox();
-    let soldier = battle.spawn_unit(UnitKind::Rifleman, Team::Player, OPEN_FIELD);
-    battle.spawn_unit(UnitKind::Medic, Team::Player, OPEN_FIELD + IVec2::new(4, 0));
+    let soldier = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, OPEN_FIELD);
+    battle.spawn_unit(UnitKind::Medic, Team::Azure, OPEN_FIELD + IVec2::new(4, 0));
     battle.world().get_mut::<Health>(soldier).unwrap().current = 10.0;
     battle.run_for(12.0);
     let health = battle.world().get::<Health>(soldier).unwrap().current;
@@ -221,7 +221,7 @@ fn rocketeers_take_down_a_tank() {
     for row in 0..3 {
         battle.spawn_unit(
             UnitKind::Rocketeer,
-            Team::Player,
+            Team::Azure,
             OPEN_FIELD + IVec2::new(0, row),
         );
     }
@@ -232,7 +232,7 @@ fn rocketeers_take_down_a_tank() {
 #[test]
 fn a_bulwark_outfights_a_battle_tank() {
     let mut battle = Battle::sandbox();
-    let bulwark = battle.spawn_unit(UnitKind::Bulwark, Team::Player, OPEN_FIELD);
+    let bulwark = battle.spawn_unit(UnitKind::Bulwark, Team::Azure, OPEN_FIELD);
     let tank = battle.spawn_unit(UnitKind::Tank, Team::Crimson, OPEN_FIELD + IVec2::new(5, 0));
     let took = battle.run_until(60.0, |battle| !battle.alive(tank) || !battle.alive(bulwark));
     assert!(took.is_some(), "the duel never ended");
@@ -308,7 +308,7 @@ fn walls_left_standing_do_not_keep_the_enemy_alive() {
 fn walls_block_movement() {
     let mut battle = Battle::sandbox();
     let wall = IVec2::new(25, 45);
-    battle.construct(BuildingKind::Wall, Team::Player, wall);
+    battle.construct(BuildingKind::Wall, Team::Azure, wall);
     assert!(!battle.world().resource::<GameMap>().is_passable(wall));
 }
 
@@ -325,7 +325,7 @@ fn capturing_the_enemy_command_center_wins_silent_takeover() {
         .building(Team::Crimson, BuildingKind::CommandCenter)
         .unwrap();
     let origin = battle.world().get::<Building>(enemy_center).unwrap().origin;
-    let engineer = battle.spawn_unit(UnitKind::Engineer, Team::Player, origin + IVec2::new(-3, 1));
+    let engineer = battle.spawn_unit(UnitKind::Engineer, Team::Azure, origin + IVec2::new(-3, 1));
     battle
         .world()
         .entity_mut(engineer)

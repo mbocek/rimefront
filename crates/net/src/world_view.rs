@@ -795,7 +795,7 @@ mod tests {
                     at: Spot::at(Vec3::Z),
                 },
                 Effect::Told {
-                    team: Team::Player,
+                    team: Team::Azure,
                     news: SideNews::Promoted(
                         UnitKind::ALL[UnitKind::ALL.len() - 1],
                         Default::default(),

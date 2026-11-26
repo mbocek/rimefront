@@ -30,8 +30,8 @@ fn connected_pair() -> (Battle, Battle) {
     let (host_end, _) = listener.accept().unwrap();
     let mut host = Battle::standard();
     let mut guest = Battle::standard();
-    host.join_network(host_end, Side::Host, Team::Player, Team::Crimson);
-    guest.join_network(guest_end, Side::Guest, Team::Crimson, Team::Player);
+    host.join_network(host_end, Side::Host, Team::Azure, Team::Crimson);
+    guest.join_network(guest_end, Side::Guest, Team::Crimson, Team::Azure);
     (host, guest)
 }
 
@@ -79,7 +79,7 @@ fn play_until(host: &mut Battle, guest: &mut Battle, ticks: u64) {
 fn two_machines_play_the_same_battle_from_each_others_orders() {
     let (mut host, mut guest) = connected_pair();
     play_until(&mut host, &mut guest, 60);
-    attack_with_tanks(&mut host, Team::Player, IVec2::new(40, 20));
+    attack_with_tanks(&mut host, Team::Azure, IVec2::new(40, 20));
     attack_with_tanks(&mut guest, Team::Crimson, IVec2::new(20, 44));
     play_until(&mut host, &mut guest, TICKS_TO_PLAY);
     while host.tick() > guest.tick() {
@@ -93,7 +93,7 @@ fn two_machines_play_the_same_battle_from_each_others_orders() {
         simulation_checksum(guest.world())
     );
     assert!(
-        host.damage_taken(Team::Player) > 0.0 && host.damage_taken(Team::Crimson) > 0.0,
+        host.damage_taken(Team::Azure) > 0.0 && host.damage_taken(Team::Crimson) > 0.0,
         "the tanks never met, so the orders did not travel"
     );
     let round_trip = host
@@ -162,12 +162,12 @@ fn each_player_wins_or_loses_from_their_own_side() {
     use rimefront::sim::player_commands::LocalTeam;
     let mut guest = Battle::standard();
     guest.world().insert_resource(LocalTeam(Team::Crimson));
-    guest.despawn_units(Team::Player);
+    guest.despawn_units(Team::Azure);
     let world = guest.world();
     let coalition_structures: Vec<Entity> = world
         .query::<(Entity, &Building, &Team)>()
         .iter(world)
-        .filter(|(_, _, team)| **team == Team::Player)
+        .filter(|(_, _, team)| **team == Team::Azure)
         .map(|(entity, ..)| entity)
         .collect();
     for structure in coalition_structures {
@@ -245,7 +245,7 @@ fn the_guest_reads_the_offer_and_both_start_after_the_countdown() {
     assert_eq!(joined.level, level);
     assert_eq!(
         (hosted.local_team, joined.local_team),
-        (Team::Player, Team::Crimson)
+        (Team::Azure, Team::Crimson)
     );
 }
 
@@ -324,9 +324,9 @@ fn four_connected_battles() -> Vec<(Battle, Team)> {
     let mut host = Battle::on_level(level);
     host.join_session(
         NetSession::new(host_links, guests.to_vec(), true),
-        Team::Player,
+        Team::Azure,
     );
-    battles.insert(0, (host, Team::Player));
+    battles.insert(0, (host, Team::Azure));
     battles
 }
 
@@ -399,7 +399,7 @@ fn three_players_take_their_seats_and_start_together() {
     }
     let mut teams: Vec<Team> = started.iter().map(|start| start.local_team).collect();
     teams.sort_by_key(|team| team.index());
-    assert_eq!(teams, vec![Team::Player, Team::Crimson, Team::Amber]);
+    assert_eq!(teams, vec![Team::Azure, Team::Crimson, Team::Amber]);
 }
 
 #[test]
@@ -460,13 +460,13 @@ fn duel_with_a_spectator() -> (Battle, Battle, Battle) {
             true,
         )
         .with_watchers([1]),
-        Team::Player,
+        Team::Azure,
     );
     let mut guest = Battle::standard();
     guest.join_session(
         NetSession::new(
             vec![Link::guest_side(guest_end).unwrap()],
-            vec![Team::Player],
+            vec![Team::Azure],
             false,
         ),
         Team::Crimson,
@@ -475,9 +475,9 @@ fn duel_with_a_spectator() -> (Battle, Battle, Battle) {
     watcher.join_session(
         NetSession::watching(
             vec![Link::guest_side(watcher_end).unwrap()],
-            vec![Team::Player, Team::Crimson],
+            vec![Team::Azure, Team::Crimson],
         ),
-        Team::Player,
+        Team::Azure,
     );
     (host, guest, watcher)
 }
@@ -489,7 +489,7 @@ fn a_spectator_follows_the_battle_without_holding_it_up() {
     let mut rounds = 0;
     while host.tick() < ticks || guest.tick() < ticks {
         if host.tick() == 40 {
-            attack_with_tanks(&mut host, Team::Player, IVec2::new(48, 16));
+            attack_with_tanks(&mut host, Team::Azure, IVec2::new(48, 16));
         }
         for battle in [&mut host, &mut guest] {
             if battle.tick() < ticks {
@@ -570,7 +570,7 @@ fn a_guest_beyond_the_seats_is_offered_to_watch() {
     assert_eq!(hosted.session.remote_teams(), &[Team::Crimson]);
     assert_eq!(
         watching.session.remote_teams(),
-        &[Team::Player, Team::Crimson]
+        &[Team::Azure, Team::Crimson]
     );
 }
 
@@ -596,26 +596,26 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
             true,
         )
         .with_open_door(door, level),
-        Team::Player,
+        Team::Azure,
     );
     let mut guest = Battle::standard();
     guest.join_session(
         NetSession::new(
             vec![Link::guest_side(guest_end).unwrap()],
-            vec![Team::Player],
+            vec![Team::Azure],
             false,
         ),
         Team::Crimson,
     );
     play_until(&mut host, &mut guest, 40);
-    attack_with_tanks(&mut host, Team::Player, IVec2::new(48, 16));
+    attack_with_tanks(&mut host, Team::Azure, IVec2::new(48, 16));
     attack_with_tanks(&mut guest, Team::Crimson, IVec2::new(16, 48));
     play_until(&mut host, &mut guest, 300);
     let teal = SideColor([20, 170, 180]);
     let gold = SideColor([230, 200, 40]);
     host.world()
         .resource_mut::<NetSession>()
-        .paint(Team::Player, teal);
+        .paint(Team::Azure, teal);
     guest
         .world()
         .resource_mut::<NetSession>()
@@ -661,7 +661,7 @@ fn a_spectator_who_joins_late_catches_up_and_follows_the_battle() {
     seen.sort_by_key(|(team, _)| *team);
     assert_eq!(
         seen,
-        [(Team::Player, teal), (Team::Crimson, gold)],
+        [(Team::Azure, teal), (Team::Crimson, gold)],
         "the late spectator sees the sides in other colours than the players chose"
     );
     assert_eq!(
@@ -692,19 +692,19 @@ fn a_player_whose_connection_drops_rejoins_and_the_battle_goes_on() {
             true,
         )
         .with_open_door(door, level),
-        Team::Player,
+        Team::Azure,
     );
     let mut guest = Battle::standard();
     guest.join_session(
         NetSession::new(
             vec![Link::guest_side(guest_end).unwrap()],
-            vec![Team::Player],
+            vec![Team::Azure],
             false,
         ),
         Team::Crimson,
     );
     play_until(&mut host, &mut guest, 40);
-    attack_with_tanks(&mut host, Team::Player, IVec2::new(48, 16));
+    attack_with_tanks(&mut host, Team::Azure, IVec2::new(48, 16));
     attack_with_tanks(&mut guest, Team::Crimson, IVec2::new(16, 48));
     guest.issue(
         Team::Crimson,

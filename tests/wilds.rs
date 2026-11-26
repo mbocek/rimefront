@@ -27,7 +27,7 @@ fn the_computer_builds_a_base_in_the_wilds() {
         );
         assert!(
             battle
-                .building(Team::Player, BuildingKind::CommandCenter)
+                .building(Team::Azure, BuildingKind::CommandCenter)
                 .is_some()
         );
     }

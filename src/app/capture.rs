@@ -272,7 +272,7 @@ fn select_all_own_units(
         return;
     }
     for (entity, team) in &units {
-        if *team == Team::Player {
+        if *team == Team::Azure {
             commands.entity(entity).insert(Selected);
         }
     }

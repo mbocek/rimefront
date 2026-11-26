@@ -14,7 +14,7 @@ const SAMPLES: usize = 8;
 
 fn fingerprints_of_the_reference_battle() -> Vec<u64> {
     let mut battle = Battle::standard();
-    battle.add_ai(Team::Player, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
     (0..SAMPLES)
         .map(|_| {
             battle.run_for(SAMPLE_EVERY_SECS);

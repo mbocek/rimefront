@@ -77,9 +77,9 @@ fn a_link_talks_over_wss_to_a_server_with_a_trusted_certificate() {
         },
     )
     .unwrap();
-    link.say(Team::Player, "over TLS");
+    link.say(Team::Azure, "over TLS");
     assert!(news_within(&mut link, |news| {
-        *news == LobbyNews::Chat(Team::Player, "over TLS".to_string())
+        *news == LobbyNews::Chat(Team::Azure, "over TLS".to_string())
     }));
 }
 

@@ -131,7 +131,7 @@ pub struct LocalTeam(pub Team);
 
 impl Default for LocalTeam {
     fn default() -> Self {
-        Self(Team::Player)
+        Self(Team::Azure)
     }
 }
 

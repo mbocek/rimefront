@@ -615,7 +615,7 @@ mod tests {
             units: vec![unit],
             mines: Vec::new(),
             unclaimed_sites: vec![(BuildingKind::SupplyDepot, IVec2::new(-30, 40))],
-            explored: vec![(Team::Player, vec![0b1010_0101, 0xff])],
+            explored: vec![(Team::Azure, vec![0b1010_0101, 0xff])],
         }
     }
 

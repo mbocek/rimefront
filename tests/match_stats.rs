@@ -12,13 +12,13 @@ const FIELD: IVec2 = IVec2::new(20, 45);
 fn the_tally_counts_kills_losses_damage_and_new_units() {
     let mut battle = Battle::sandbox();
     battle.run_for(1.0);
-    battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     let prey = battle.spawn_unit(UnitKind::Harvester, Team::Crimson, FIELD + IVec2::new(4, 0));
     battle.run_until(120.0, |battle| !battle.alive(prey));
     battle.run_for(0.5);
 
     let stats = battle.world().resource::<MatchStats>();
-    let player = *stats.of(Team::Player);
+    let player = *stats.of(Team::Azure);
     let crimson = *stats.of(Team::Crimson);
     assert_eq!(player.enemies_destroyed, 1);
     assert_eq!(crimson.units_lost, 1);
@@ -29,12 +29,12 @@ fn the_tally_counts_kills_losses_damage_and_new_units() {
         "the tank spawned after the start counts as trained"
     );
 
-    battle.construct(BuildingKind::PowerPlant, Team::Player, IVec2::new(6, 47));
-    battle.construct(BuildingKind::Barracks, Team::Player, IVec2::new(10, 52));
-    battle.set_credits(Team::Player, 1000);
-    assert!(battle.enqueue(Team::Player, BuildItem::Unit(UnitKind::Rifleman)));
+    battle.construct(BuildingKind::PowerPlant, Team::Azure, IVec2::new(6, 47));
+    battle.construct(BuildingKind::Barracks, Team::Azure, IVec2::new(10, 52));
+    battle.set_credits(Team::Azure, 1000);
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
     battle.run_for(UnitKind::Rifleman.spec().build_secs + 1.0);
-    let player = *battle.world().resource::<MatchStats>().of(Team::Player);
+    let player = *battle.world().resource::<MatchStats>().of(Team::Azure);
     assert_eq!(player.units_trained, 2);
     assert_eq!(player.structures_built, 2);
 }
@@ -44,7 +44,7 @@ fn an_attack_on_a_harvester_is_announced_with_its_place() {
     use rimefront::sim::notifications::{LastAlert, Notifications};
     let mut battle = Battle::sandbox();
     let field = IVec2::new(24, 45);
-    battle.spawn_unit(UnitKind::Harvester, Team::Player, field);
+    battle.spawn_unit(UnitKind::Harvester, Team::Azure, field);
     battle.spawn_unit(UnitKind::Rifleman, Team::Crimson, field + IVec2::new(3, 0));
     battle.run_for(4.0);
     let world = battle.world();
@@ -69,11 +69,11 @@ fn only_the_local_side_is_told_its_news() {
     use rimefront::sim::notifications::Notifications;
     use rimefront::sim::player_commands::PlayerCommand;
     let mut battle = Battle::sandbox();
-    battle.construct(BuildingKind::CommandCenter, Team::Player, IVec2::new(6, 47));
-    battle.set_credits(Team::Player, 1000);
+    battle.construct(BuildingKind::CommandCenter, Team::Azure, IVec2::new(6, 47));
+    battle.set_credits(Team::Azure, 1000);
     battle.set_credits(Team::Crimson, 0);
     let power_plant = BuildItem::Structure(BuildingKind::PowerPlant);
-    for team in [Team::Player, Team::Crimson] {
+    for team in [Team::Azure, Team::Crimson] {
         battle.issue(
             team,
             PlayerCommand::Enqueue {

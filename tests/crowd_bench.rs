@@ -27,7 +27,7 @@ fn spread_fights(fights: i32) -> Battle {
                 UnitKind::Rifleman
             };
             let cell = corner + IVec2::new(i % 10, i / 10);
-            battle.spawn_unit(kind, Team::Player, cell);
+            battle.spawn_unit(kind, Team::Azure, cell);
             battle.spawn_unit(kind, Team::Crimson, cell + IVec2::new(0, 16));
         }
     }
@@ -45,11 +45,11 @@ fn simulation_time_of_spread_out_fights() {
         battle.run_for(SECONDS_OF_FIGHTING);
         let units = fights * UNITS_PER_SIDE_IN_A_FIGHT * 2;
         let survivors =
-            battle.units(Team::Player, None).len() + battle.units(Team::Crimson, None).len();
+            battle.units(Team::Azure, None).len() + battle.units(Team::Crimson, None).len();
         eprintln!(
             "{units} units: {:.2} s, {survivors} survive, {:.0} damage taken by the player",
             started.elapsed().as_secs_f32(),
-            battle.damage_taken(Team::Player)
+            battle.damage_taken(Team::Azure)
         );
     }
 }

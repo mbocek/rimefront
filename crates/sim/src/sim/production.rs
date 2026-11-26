@@ -560,7 +560,7 @@ mod tests {
 
     fn rich() -> Economies {
         let mut economies = Economies::default();
-        economies.of_mut(Team::Player).credits = 100_000;
+        economies.of_mut(Team::Azure).credits = 100_000;
         economies
     }
 
@@ -660,19 +660,19 @@ mod tests {
     fn enqueueing_charges_and_cancelling_refunds() {
         let mut economies = Economies::default();
         let mut production = Production::default();
-        let start = economies.of(Team::Player).credits;
+        let start = economies.of(Team::Azure).credits;
         let rifleman = BuildItem::Unit(UnitKind::Rifleman);
         assert!(
             production
-                .enqueue(&mut economies, Team::Player, rifleman, &BASE)
+                .enqueue(&mut economies, Team::Azure, rifleman, &BASE)
                 .is_ok()
         );
-        assert_eq!(economies.of(Team::Player).credits, start - rifleman.cost());
-        production.cancel(&mut economies, Team::Player, rifleman);
-        assert_eq!(economies.of(Team::Player).credits, start);
+        assert_eq!(economies.of(Team::Azure).credits, start - rifleman.cost());
+        production.cancel(&mut economies, Team::Azure, rifleman);
+        assert_eq!(economies.of(Team::Azure).credits, start);
         assert!(
             production
-                .lane(Team::Player, Lane::Infantry)
+                .lane(Team::Azure, Lane::Infantry)
                 .queue
                 .is_empty()
         );
@@ -701,16 +701,16 @@ mod tests {
         let tank = BuildItem::Unit(UnitKind::Tank);
         assert_eq!(tank.missing_requirement(&BASE), Some(BuildingKind::Factory));
         assert_eq!(
-            production.enqueue(&mut economies, Team::Player, tank, &BASE),
+            production.enqueue(&mut economies, Team::Azure, tank, &BASE),
             Err(EnqueueRefusal::Requires(BuildingKind::Factory))
         );
 
         let mut poor = Economies::default();
-        poor.of_mut(Team::Player).credits = 50;
+        poor.of_mut(Team::Azure).credits = 50;
         assert_eq!(
             production.enqueue(
                 &mut poor,
-                Team::Player,
+                Team::Azure,
                 BuildItem::Unit(UnitKind::Rifleman),
                 &BASE
             ),
@@ -723,9 +723,9 @@ mod tests {
         let mut production = Production::default();
         let mut economies = rich();
         let turret = BuildItem::Structure(BuildingKind::GunTurret);
-        production.forbid(Team::Player, vec![turret]);
+        production.forbid(Team::Azure, vec![turret]);
         assert_eq!(
-            production.enqueue(&mut economies, Team::Player, turret, &BASE),
+            production.enqueue(&mut economies, Team::Azure, turret, &BASE),
             Err(EnqueueRefusal::NotInMission)
         );
         assert_eq!(
@@ -742,7 +742,7 @@ mod tests {
         let accepted = (0..MAX_QUEUE_LENGTH + 3)
             .filter(|_| {
                 production
-                    .enqueue(&mut economies, Team::Player, plant, &BASE)
+                    .enqueue(&mut economies, Team::Azure, plant, &BASE)
                     .is_ok()
             })
             .count();
@@ -755,16 +755,16 @@ mod tests {
         let mut economies = rich();
         let item = BuildItem::Unit(UnitKind::Rifleman);
         production
-            .enqueue(&mut economies, Team::Player, item, &BASE)
+            .enqueue(&mut economies, Team::Azure, item, &BASE)
             .unwrap();
         production
-            .enqueue(&mut economies, Team::Player, item, &BASE)
+            .enqueue(&mut economies, Team::Azure, item, &BASE)
             .unwrap();
         production
-            .lane_mut(Team::Player, Lane::Infantry)
+            .lane_mut(Team::Azure, Lane::Infantry)
             .progress_secs = 3.0;
-        production.cancel_at(&mut economies, Team::Player, Lane::Infantry, 0);
-        let lane = production.lane(Team::Player, Lane::Infantry);
+        production.cancel_at(&mut economies, Team::Azure, Lane::Infantry, 0);
+        let lane = production.lane(Team::Azure, Lane::Infantry);
         assert_eq!(lane.queue.len(), 1);
         assert_eq!(lane.progress_secs, 0.0);
     }
@@ -773,16 +773,16 @@ mod tests {
     fn a_finished_structure_waiting_for_placement_can_be_refunded() {
         let mut production = Production::default();
         let mut economies = Economies::default();
-        let before = economies.of(Team::Player).credits;
-        production.lane_mut(Team::Player, Lane::Structures).ready = Some(BuildingKind::PowerPlant);
-        production.cancel_ready_structure(&mut economies, Team::Player);
+        let before = economies.of(Team::Azure).credits;
+        production.lane_mut(Team::Azure, Lane::Structures).ready = Some(BuildingKind::PowerPlant);
+        production.cancel_ready_structure(&mut economies, Team::Azure);
         assert_eq!(
-            economies.of(Team::Player).credits,
+            economies.of(Team::Azure).credits,
             before + BuildingKind::PowerPlant.spec().cost
         );
         assert!(
             production
-                .lane(Team::Player, Lane::Structures)
+                .lane(Team::Azure, Lane::Structures)
                 .ready
                 .is_none()
         );

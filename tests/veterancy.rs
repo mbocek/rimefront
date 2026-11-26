@@ -45,7 +45,7 @@ fn park_harvesters(battle: &mut Battle, count: i32) -> Vec<Entity> {
 #[test]
 fn destroying_enemies_promotes_and_toughens_a_unit() {
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     let prey = park_harvesters(&mut battle, 1);
     battle.run_until(120.0, |battle| !battle.alive(prey[0]));
     battle.run_for(0.5);
@@ -58,7 +58,7 @@ fn destroying_enemies_promotes_and_toughens_a_unit() {
 #[test]
 fn three_times_its_price_in_kills_makes_an_elite() {
     let mut battle = Battle::sandbox();
-    let tank = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
+    let tank = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
     let prey = park_harvesters(&mut battle, 3);
     battle.run_until(300.0, |battle| {
         prey.iter().all(|&harvester| !battle.alive(harvester))
@@ -70,8 +70,8 @@ fn three_times_its_price_in_kills_makes_an_elite() {
 #[test]
 fn veterans_hit_harder() {
     let mut battle = Battle::sandbox();
-    battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD);
-    let veteran = battle.spawn_unit(UnitKind::Tank, Team::Player, FIELD + IVec2::new(0, 12));
+    battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD);
+    let veteran = battle.spawn_unit(UnitKind::Tank, Team::Azure, FIELD + IVec2::new(0, 12));
     battle.world().entity_mut(veteran).insert(Veterancy {
         experience: UnitKind::Tank.spec().cost as f32,
         rank: Rank::Veteran,
@@ -102,7 +102,7 @@ fn veterans_hit_harder() {
 #[test]
 fn saves_keep_experience_and_rank() {
     let mut battle = Battle::on_level(LevelDefinition::default());
-    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Player, FIELD);
+    let rifleman = battle.spawn_unit(UnitKind::Rifleman, Team::Azure, FIELD);
     battle.world().entity_mut(rifleman).insert(Veterancy {
         experience: UnitKind::Rifleman.spec().cost as f32 * 3.0,
         rank: Rank::Recruit,

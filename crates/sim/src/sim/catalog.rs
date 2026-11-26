@@ -4,18 +4,19 @@ use serde::{Deserialize, Serialize};
 use crate::sim::cues::Sound;
 
 /// A side in the battle. The first four are the sides a level names; a world that players join has more.
+/// Which side is played from this machine is `LocalTeam`, not necessarily `Team::Azure`.
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Team(u8);
 
 #[allow(non_upper_case_globals)]
 impl Team {
-    pub const Player: Team = Team(0);
+    pub const Azure: Team = Team(0);
     pub const Crimson: Team = Team(1);
     pub const Amber: Team = Team(2);
     pub const Violet: Team = Team(3);
 
-    /// The sides a level names, the player's first.
-    pub const ALL: [Team; 4] = [Team::Player, Team::Crimson, Team::Amber, Team::Violet];
+    /// The sides a level names, the one its player leads first.
+    pub const ALL: [Team; 4] = [Team::Azure, Team::Crimson, Team::Amber, Team::Violet];
     pub const OPPONENTS: [Team; 3] = [Team::Crimson, Team::Amber, Team::Violet];
     pub const MOST: usize = u8::MAX as usize + 1;
 
@@ -37,7 +38,7 @@ impl Team {
     }
 
     pub fn name_in(self, faction: Faction) -> String {
-        if self == Team::Player {
+        if self == Team::Azure {
             return faction.name().to_string();
         }
         format!("{} {}", self.look().name, faction.name())
@@ -68,6 +69,7 @@ impl Team {
     }
 }
 
+/// Saved games, levels and replays name the first side "Player", from before sides were named by colour.
 const NAMED_SIDES: [&str; 4] = ["Player", "Crimson", "Amber", "Violet"];
 
 struct SideLook {
@@ -198,7 +200,7 @@ impl Faction {
 
     /// The player leads the level's chosen faction and every computer side the other one.
     pub fn of(team: Team, player_faction: Faction) -> Faction {
-        if team == Team::Player {
+        if team == Team::Azure {
             player_faction
         } else {
             player_faction.opposite()
@@ -245,7 +247,7 @@ impl Alliance {
 
     fn camp(self, team: Team) -> usize {
         match self {
-            Alliance::CoalitionAgainstSyndicate => usize::from(team != Team::Player),
+            Alliance::CoalitionAgainstSyndicate => usize::from(team != Team::Azure),
             Alliance::FreeForAll => team.index(),
             Alliance::TwoAgainstTwo => usize::from(matches!(team, Team::Crimson | Team::Violet)),
         }
@@ -1587,7 +1589,7 @@ mod tests {
             r#""Crimson""#
         );
         for team in [
-            Team::Player,
+            Team::Azure,
             Team::Violet,
             Team::from_index(4),
             Team::from_index(200),

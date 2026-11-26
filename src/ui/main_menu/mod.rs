@@ -728,9 +728,9 @@ fn level_facts(level: &LevelDefinition) -> Vec<(String, String, Color)> {
             TEXT_MAIN,
         ),
         (
-            tr_owned(&Team::Player.name_in(level.player_faction)),
+            tr_owned(&Team::Azure.name_in(level.player_faction)),
             format!("{}  ·  ${}", level.player.site.name(), level.player.credits),
-            Team::Player.ui_color(),
+            Team::Azure.ui_color(),
         ),
     ];
     for (team, enemy) in level.opponents() {

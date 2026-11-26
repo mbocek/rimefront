@@ -569,7 +569,7 @@ mod tests {
         };
         let link = Link::guest_side_to(stream, dialling).unwrap();
         let line = Message::Chat {
-            team: Team::Player,
+            team: Team::Azure,
             text: "x".repeat(100),
         };
         let taken = (0..10_000).take_while(|_| link.send(&line)).count();
@@ -594,7 +594,7 @@ mod tests {
             })
             .collect();
         let long = Message::CatchUp {
-            through: vec![(Team::Player, 400), (Team::Crimson, 400)],
+            through: vec![(Team::Azure, 400), (Team::Crimson, 400)],
             turns,
         };
         let compact_length = postcard::to_stdvec(&long).unwrap().len() + 1;
@@ -622,7 +622,7 @@ mod tests {
                 commands: vec![PlayerCommand::Stop { units: Vec::new() }],
             },
             Message::Checksum {
-                team: Team::Player,
+                team: Team::Azure,
                 tick: 3,
                 sum: u64::MAX,
             },
@@ -647,7 +647,7 @@ mod tests {
             version: "9.9.9".into(),
             level: Box::default(),
             your_team: Some(later),
-            players: vec![Team::Player, later],
+            players: vec![Team::Azure, later],
             under_way: false,
         };
         let bytes = encode(&showing).unwrap();

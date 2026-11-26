@@ -20,7 +20,7 @@ fn mirrored_duel(map_seed: u64) -> Battle {
     level.enemies[0].force.site = BaseSite::NorthEast;
     let mut battle = Battle::on_level(level);
     battle.add_ai(
-        Team::Player,
+        Team::Azure,
         BaseSite::SouthWest.origin(),
         Difficulty::Normal,
     );
@@ -65,7 +65,7 @@ fn opposite_corners_play_the_same_opening_in_mirror_image() {
     let mut south_west_units: Vec<Vec3> = world
         .query::<(&Unit, &Team, &Transform)>()
         .iter(world)
-        .filter(|(_, team, _)| **team == Team::Player)
+        .filter(|(_, team, _)| **team == Team::Azure)
         .map(|(_, _, transform)| mirrored(transform.translation))
         .collect();
     let mut north_east_units: Vec<Vec3> = world
@@ -103,5 +103,5 @@ fn opposite_corners_play_the_same_opening_in_mirror_image() {
         sites.sort_by_key(|(kind, origin)| (kind.clone(), origin.x, origin.y));
         sites
     };
-    assert_eq!(layout(Team::Player, true), layout(Team::Crimson, false));
+    assert_eq!(layout(Team::Azure, true), layout(Team::Crimson, false));
 }

@@ -18,14 +18,14 @@ fn seen_locally(battle: &mut Battle, entity: Entity) -> bool {
         .world()
         .resource::<Targets>()
         .get(entity)
-        .is_some_and(|target| target.seen_by(Team::Player))
+        .is_some_and(|target| target.seen_by(Team::Azure))
 }
 
 fn sight_at(battle: &mut Battle, cell: IVec2) -> CellSight {
     battle
         .world()
         .resource::<Intel>()
-        .vision(Team::Player)
+        .vision(Team::Azure)
         .sight_at(cell)
 }
 
@@ -49,7 +49,7 @@ fn the_enemy_base_starts_hidden_and_the_own_base_visible() {
 #[test]
 fn units_reveal_the_ground_they_cross_and_remember_it() {
     let mut battle = Battle::sandbox();
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, IVec2::new(20, 50));
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, IVec2::new(20, 50));
     let far_point = IVec2::new(45, 50);
     battle.run_for(0.5);
     assert_eq!(sight_at(&mut battle, far_point), CellSight::Unexplored);
@@ -70,7 +70,7 @@ fn units_reveal_the_ground_they_cross_and_remember_it() {
 #[test]
 fn artillery_needs_a_spotter_to_fire_beyond_its_own_sight() {
     let mut battle = Battle::sandbox();
-    battle.spawn_unit(UnitKind::Artillery, Team::Player, OPEN_FIELD);
+    battle.spawn_unit(UnitKind::Artillery, Team::Azure, OPEN_FIELD);
     battle.construct(
         BuildingKind::PowerPlant,
         Team::Crimson,
@@ -93,7 +93,7 @@ fn artillery_needs_a_spotter_to_fire_beyond_its_own_sight() {
 
     battle.spawn_unit(
         UnitKind::Rifleman,
-        Team::Player,
+        Team::Azure,
         OPEN_FIELD + IVec2::new(4, 0),
     );
     battle.run_for(10.0);
@@ -121,7 +121,7 @@ fn enemy_artillery_needs_a_spotter_too() {
     battle.spawn_unit(UnitKind::Artillery, Team::Crimson, OPEN_FIELD);
     battle.construct(
         BuildingKind::PowerPlant,
-        Team::Player,
+        Team::Azure,
         OPEN_FIELD + IVec2::new(8, -1),
     );
     let full_health = BuildingKind::PowerPlant.spec().max_health;
@@ -179,7 +179,7 @@ fn levels_can_switch_the_fog_off() {
 #[test]
 fn exploration_is_kept_in_save_games() {
     let mut battle = Battle::sandbox();
-    let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, IVec2::new(20, 50));
+    let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, IVec2::new(20, 50));
     let far_point = IVec2::new(45, 50);
     battle.order_move(scout, far_point);
     battle.run_for(10.0);
@@ -198,14 +198,14 @@ fn rain_shortens_how_far_units_see() {
             weather,
             ..default()
         });
-        let scout = battle.spawn_unit(UnitKind::Scout, Team::Player, OPEN_FIELD);
+        let scout = battle.spawn_unit(UnitKind::Scout, Team::Azure, OPEN_FIELD);
         battle.run_for(1.0);
         let reach = UnitKind::Scout.spec().sight * share;
         let spot = battle.position(scout) + Vec3::new(reach, 0.0, 0.0);
         battle
             .world()
             .resource::<Intel>()
-            .vision(Team::Player)
+            .vision(Team::Azure)
             .is_visible(spot)
     };
     assert!(sees_at(Weather::Clear, 0.85));

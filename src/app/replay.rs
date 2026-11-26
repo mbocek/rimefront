@@ -151,14 +151,7 @@ impl Actor {
     }
 
     pub fn unclaimed_site(id: u32, kind: BuildingKind, position: Vec3, facing: f32) -> Self {
-        let mut actor = Self::new(
-            id,
-            Look::Building(kind),
-            Team::Player,
-            position,
-            facing,
-            1.0,
-        );
+        let mut actor = Self::new(id, Look::Building(kind), Team::Azure, position, facing, 1.0);
         actor.2 = UNCLAIMED_CODE;
         actor
     }
@@ -180,7 +173,7 @@ impl Actor {
         Team::ALL
             .get(self.2 as usize)
             .copied()
-            .unwrap_or(Team::Player)
+            .unwrap_or(Team::Azure)
     }
 
     /// Ground position; the height comes from the landscape when it is shown.

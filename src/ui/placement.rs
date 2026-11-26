@@ -274,16 +274,16 @@ mod tests {
         });
         world.insert_resource(GameMap::open_field());
         let mut economies = Economies::default();
-        economies.of_mut(Team::Player).credits = BuildingKind::Wall.spec().cost * 3 + 10;
+        economies.of_mut(Team::Azure).credits = BuildingKind::Wall.spec().cost * 3 + 10;
         world.insert_resource(economies);
         world.insert_resource(Intel::new(false));
-        world.insert_resource(LocalTeam(Team::Player));
+        world.insert_resource(LocalTeam(Team::Azure));
         world.spawn((
             Building {
                 kind: BuildingKind::CommandCenter,
                 origin: IVec2::new(10, 10),
             },
-            Team::Player,
+            Team::Azure,
         ));
 
         world.run_system_once(preview_wall_drag).unwrap();

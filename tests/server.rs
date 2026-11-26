@@ -161,7 +161,7 @@ fn duel_on_a_server(server: &RunningServer, room: &str) -> (Battle, Battle) {
     let guest_start = starts.next().unwrap();
     assert_eq!(
         (owner_start.local_team, guest_start.local_team),
-        (Team::Player, Team::Crimson)
+        (Team::Azure, Team::Crimson)
     );
     (battle_for(owner_start), battle_for(guest_start))
 }
@@ -171,7 +171,7 @@ fn two_players_meet_in_a_room_and_play_one_battle_through_the_server() {
     let server = RunningServer::start();
     let (mut owner, mut guest) = duel_on_a_server(&server, "duel");
     play_until(&mut owner, &mut guest, 40);
-    attack_with_tanks(&mut owner, Team::Player, IVec2::new(48, 16));
+    attack_with_tanks(&mut owner, Team::Azure, IVec2::new(48, 16));
     attack_with_tanks(&mut guest, Team::Crimson, IVec2::new(16, 48));
     play_until(&mut owner, &mut guest, 400);
     level_up_to(&mut owner, &mut guest);
@@ -186,7 +186,7 @@ fn rooms_on_one_server_keep_their_battles_apart() {
     let server = RunningServer::start();
     let (mut first_owner, mut first_guest) = duel_on_a_server(&server, "north");
     let (mut second_owner, mut second_guest) = duel_on_a_server(&server, "south");
-    attack_with_tanks(&mut first_owner, Team::Player, IVec2::new(48, 16));
+    attack_with_tanks(&mut first_owner, Team::Azure, IVec2::new(48, 16));
     play_until(&mut first_owner, &mut first_guest, 200);
     play_until(&mut second_owner, &mut second_guest, 200);
     level_up_to(&mut first_owner, &mut first_guest);
@@ -211,7 +211,7 @@ fn a_late_spectator_and_a_returning_player_catch_up_through_the_server() {
     let server = RunningServer::start();
     let (mut owner, mut guest) = duel_on_a_server(&server, "long");
     play_until(&mut owner, &mut guest, 40);
-    attack_with_tanks(&mut owner, Team::Player, IVec2::new(48, 16));
+    attack_with_tanks(&mut owner, Team::Azure, IVec2::new(48, 16));
     attack_with_tanks(&mut guest, Team::Crimson, IVec2::new(16, 48));
     play_until(&mut owner, &mut guest, 300);
 
@@ -340,5 +340,5 @@ fn a_player_enters_the_world_a_server_runs() {
         std::thread::sleep(Duration::from_millis(2));
     }
     stop.store(true, Ordering::Relaxed);
-    assert_eq!(entered, Some(Team::Player));
+    assert_eq!(entered, Some(Team::Azure));
 }

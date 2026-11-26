@@ -17,7 +17,7 @@ fn soldiers_at_home_rush_to_a_harvester_under_fire() {
         Team::Crimson,
         base + IVec2::new(-24, 12),
     );
-    battle.spawn_unit(UnitKind::Rifleman, Team::Player, base + IVec2::new(-26, 12));
+    battle.spawn_unit(UnitKind::Rifleman, Team::Azure, base + IVec2::new(-26, 12));
     battle.run_until(5.0, |battle| {
         let world = battle.world();
         let ordered = world
@@ -43,7 +43,7 @@ fn soldiers_at_home_rush_to_a_harvester_under_fire() {
 fn a_rocketeer_picks_the_tank_over_a_closer_rifleman() {
     let mut battle = Battle::sandbox();
     let field = IVec2::new(24, 45);
-    let rocketeer = battle.spawn_unit(UnitKind::Rocketeer, Team::Player, field);
+    let rocketeer = battle.spawn_unit(UnitKind::Rocketeer, Team::Azure, field);
     battle.spawn_unit(UnitKind::Rifleman, Team::Crimson, field + IVec2::new(3, 0));
     let tank = battle.spawn_unit(UnitKind::Tank, Team::Crimson, field + IVec2::new(4, 1));
     battle.run_for(1.0);

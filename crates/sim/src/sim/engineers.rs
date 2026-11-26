@@ -173,21 +173,21 @@ mod tests {
         let allied = Diplomacy::default();
         let plant = BuildingKind::PowerPlant;
         assert_eq!(
-            job_for(&allied, Team::Player, Some(Team::Crimson), plant, &intact),
+            job_for(&allied, Team::Azure, Some(Team::Crimson), plant, &intact),
             Some(EngineerJob::Capture)
         );
         assert_eq!(
-            job_for(&allied, Team::Player, Some(Team::Player), plant, &damaged),
+            job_for(&allied, Team::Azure, Some(Team::Azure), plant, &damaged),
             Some(EngineerJob::Repair)
         );
         assert_eq!(
-            job_for(&allied, Team::Player, Some(Team::Player), plant, &intact),
+            job_for(&allied, Team::Azure, Some(Team::Azure), plant, &intact),
             None
         );
         assert_eq!(
             job_for(
                 &allied,
-                Team::Player,
+                Team::Azure,
                 Some(Team::Crimson),
                 BuildingKind::Wall,
                 &intact

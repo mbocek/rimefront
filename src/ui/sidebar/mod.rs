@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn a_unit_tooltip_names_the_building_that_builds_it() {
         let item = BuildItem::Unit(UnitKind::Tank);
-        let (_, details) = describe_item(item, &[], &Production::default(), Team::Player);
+        let (_, details) = describe_item(item, &[], &Production::default(), Team::Azure);
         let factory = UnitKind::Tank.spec().producer.spec().name;
         assert!(
             details.contains(&format!("Built at {factory}")),

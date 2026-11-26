@@ -136,13 +136,13 @@ pub fn slot_summary(directory: &SaveDirectory, slot: usize) -> Option<String> {
     let own_units = save
         .units
         .iter()
-        .filter(|unit| unit.team() == Team::Player)
+        .filter(|unit| unit.team() == Team::Azure)
         .count();
     Some(tr_fmt(
         "{}  -  ${}, {} units",
         &[
             &describe_age(save.saved_at_unix_secs),
-            &save.credits[Team::Player.index()],
+            &save.credits[Team::Azure.index()],
             &own_units,
         ],
     ))
@@ -246,7 +246,7 @@ pub fn write_requested_save(
         camera_focus: cameras
             .single()
             .map_or([0.0; 3], |camera| camera.focus.to_array()),
-        explored: intel.vision(Team::Player).explored_cells(),
+        explored: intel.vision(Team::Azure).explored_cells(),
         explored_by_syndicate: Vec::new(),
         unclaimed_sites: unclaimed_sites
             .iter()
@@ -374,7 +374,7 @@ pub fn restore_pending_load(
 /// Saves from before every opponent had its own view kept one shared Syndicate view for all of them.
 fn restore_explored_ground(intel: &mut Intel, save: &SaveGame) {
     intel
-        .vision_mut(Team::Player)
+        .vision_mut(Team::Azure)
         .restore_explored(&save.explored);
     for (index, opponent) in Team::OPPONENTS.into_iter().enumerate() {
         let explored = save

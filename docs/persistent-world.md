@@ -482,7 +482,11 @@ world 29 (Apple M5 Pro, release build), before and after the four fixes it led t
 - **A side that fell started again among the army that beat it**: the first run counted 644 falls in five
   hours, the same sides falling every few minutes; a newcomer is now given a site nobody stands near.
 
-Still open: one tick an hour or so takes 60 to 100 ms; the world widening for newcomers is one cause (hour 4
-above), the others are not found yet. Six hours of world take about four minutes, so ten days take about
+Still open: one tick an hour or so takes 50 to 85 ms. Timing every phase of the slow ticks of six hours of
+world 29 (2026-11-26) found only one cause: a newcomer for whom too few free sites are left widens the world
+by a ring of squares on the spot (`claim_starting_site`), and generating the ring's chunks takes about 0.6 ms a
+chunk: 17 ms for 32 chunks, 56 ms for 64, 46 ms for 96. The site search itself takes under half a
+millisecond. The way out is to widen ahead of need and generate a few chunks a tick, which means a ring that
+is not finished yet must stay closed, be saved half-made and be left out of the site search. Six hours of world take about four minutes, so ten days take about
 three hours.
 

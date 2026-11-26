@@ -374,3 +374,36 @@ fn snow_slows_wheels_more_than_tracks() {
     );
     assert!(tank_in_snow < tank_in_summer);
 }
+
+#[test]
+fn winter_freezes_the_river_into_ice_that_carries_units_but_no_structures() {
+    use rimefront::world::map::is_water;
+    use rimefront::world::season::Season;
+    use rimefront::world::terrain::Landscape;
+    let river_cells = || -> Vec<IVec2> {
+        map_bounds()
+            .cells()
+            .filter(|&cell| is_water(Landscape::River, cell))
+            .collect()
+    };
+    let mut summer = Battle::on_level(LevelDefinition::default());
+    let water = river_cells();
+    assert!(!water.is_empty());
+    let map = summer.world().resource::<GameMap>();
+    assert!(water.iter().all(|&cell| !map.is_passable(cell)));
+
+    let mut winter = Battle::on_level(LevelDefinition {
+        season: Season::Winter,
+        ..default()
+    });
+    let map = winter.world().resource::<GameMap>();
+    let last = map_bounds().max();
+    let inside = |cell: &&IVec2| cell.x != last.x && cell.y != last.y;
+    assert!(
+        water
+            .iter()
+            .filter(inside)
+            .all(|&cell| map.is_passable(cell))
+    );
+    assert!(water.iter().all(|&cell| !map.is_buildable(cell)));
+}

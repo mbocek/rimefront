@@ -14,6 +14,7 @@ use crate::sim::sim_math;
 use crate::world::chunked_grid::ChunkedGrid;
 use crate::world::map_regions::Regions;
 use crate::world::scenery::{self, SceneryLayout};
+use crate::world::season::Season;
 use crate::world::terrain::{Landscape, approximate_ground};
 use crate::world::wilds;
 
@@ -331,6 +332,8 @@ pub struct CrystalVisual {
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 struct MapCell {
     blocked: bool,
+    /// Frozen water: units cross it, nothing is built on it.
+    ice: bool,
     building: Option<Entity>,
     crystal: u32,
 }
@@ -388,7 +391,27 @@ impl GameMap {
     }
 
     pub fn is_buildable(&self, cell: IVec2) -> bool {
-        self.is_passable(cell) && self.crystal_at(cell) == 0
+        self.is_passable(cell) && self.crystal_at(cell) == 0 && !self.is_ice(cell)
+    }
+
+    pub fn is_ice(&self, cell: IVec2) -> bool {
+        self.cells.get(cell).is_some_and(|at| at.ice)
+    }
+
+    /// Turns the open water of a finished map to ice, leaving the ground, crystal and scenery as they were.
+    fn freeze_water(&mut self, landscape: Landscape) {
+        let last = map_bounds().max();
+        for cell in map_bounds().cells() {
+            let unmirrored_edge = landscape.is_mirrored() && (cell.x == last.x || cell.y == last.y);
+            if !is_water(landscape, cell) || unmirrored_edge {
+                continue;
+            }
+            if let Some(at) = self.cells.get_mut(cell) {
+                at.blocked = false;
+                at.ice = true;
+            }
+        }
+        self.regions_mut().forget_all();
     }
 
     pub fn set_building(&mut self, origin: IVec2, footprint: IVec2, occupant: Option<Entity>) {
@@ -727,6 +750,9 @@ pub fn generate_map(mut commands: Commands, level: Res<ActiveLevel>) {
     } else {
         wilds::generate_wilds(&mut commands, &mut map, &mut scenery, level.0.map_seed)
     };
+    if level.0.season == Season::Winter {
+        map.freeze_water(landscape);
+    }
     commands.insert_resource(map);
     commands.insert_resource(scenery);
     commands.insert_resource(CrystalFields(fields));

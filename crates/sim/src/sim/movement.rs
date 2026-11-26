@@ -9,6 +9,8 @@ use crate::sim::sim_math;
 use crate::sim::sorties::Sortie;
 use crate::sim::spatial_index::SpatialIndex;
 use crate::world::map::{CELL_SIZE, GameMap, cell_center, in_far_half, world_to_cell};
+use crate::world::season::Season;
+use crate::world::terrain::WATER_LEVEL;
 
 const WAYPOINT_REACHED_DISTANCE: f32 = 0.2;
 /// Two vehicles heading for the same waypoint from opposite sides push each other off it for ever,
@@ -110,10 +112,19 @@ pub fn settle_on_terrain(
     )>,
 ) {
     let landscape = level.0.landscape;
+    let frozen = level.0.season == Season::Winter;
+    let ground_height = |x: f32, z: f32| {
+        let height = landscape.height(x, z);
+        if frozen {
+            height.max(WATER_LEVEL)
+        } else {
+            height
+        }
+    };
     for (mobile, mut transform, armor, radius, sortie) in &mut units {
         let heading = Quat::from_rotation_y(mobile.facing);
         let position = transform.translation;
-        let center_height = landscape.height(position.x, position.z);
+        let center_height = ground_height(position.x, position.z);
         if mobile.flying {
             let nose_down = if mobile.is_moving() {
                 FLIGHT_NOSE_DOWN
@@ -139,7 +150,7 @@ pub fn settle_on_terrain(
         let half_width = radius.0 * VEHICLE_HALF_WIDTH_PER_RADIUS;
         let height_at = |offset: Vec3| {
             let probe = position + offset;
-            landscape.height(probe.x, probe.z)
+            ground_height(probe.x, probe.z)
         };
         let (front, back) = (
             height_at(forward * half_length),

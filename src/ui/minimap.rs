@@ -16,6 +16,7 @@ use crate::view::fog_view::Discovered;
 use crate::view::local_view::LocalView;
 use crate::view::side_tint::SideColors;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_cells, map_bounds};
+use crate::world::season::Season;
 use crate::world::terrain::GroundLayers;
 use crate::world::wilds::WorldWidened;
 
@@ -54,6 +55,7 @@ fn cell_under_pixel(pixel: IVec2) -> IVec2 {
 }
 const REFRESH_SECS: f32 = 0.2;
 const WATER: [u8; 3] = [38, 78, 104];
+const ICE: [u8; 3] = [168, 190, 204];
 const OBSTACLE: [u8; 3] = [34, 62, 30];
 const CRYSTAL: [u8; 3] = [90, 230, 210];
 const UNCLAIMED: [u8; 3] = [150, 152, 150];
@@ -121,6 +123,11 @@ pub fn terrain_pixels(map: &GameMap, level: &LevelDefinition) -> Vec<u8> {
     let landscape = level.landscape;
     let ground = GroundLayers::new(landscape);
     let grass = level.season.minimap_grass();
+    let water = if level.season == Season::Winter {
+        ICE
+    } else {
+        WATER
+    };
     let map_corner = map_bounds().world_min();
     let metres_per_pixel = CELL_SIZE / pixels_per_cell();
     let size = resolution();
@@ -130,7 +137,7 @@ pub fn terrain_pixels(map: &GameMap, level: &LevelDefinition) -> Vec<u8> {
             let world = map_corner + (Vec2::new(px as f32, py as f32) + 0.5) * metres_per_pixel;
             let cell = (world / CELL_SIZE).floor().as_ivec2();
             let rgb = if landscape.water_depth(world.x / CELL_SIZE, world.y / CELL_SIZE) > 0.25 {
-                WATER
+                water
             } else if !map.is_passable(cell) {
                 OBSTACLE
             } else {

@@ -419,13 +419,26 @@ impl MaterialExtension for FoggedWater {
     }
 }
 
-pub fn water_material(images: &mut Assets<Image>, fog: Handle<Image>) -> WaterMaterial {
+/// Winter's water: frozen over, which the simulation lets units cross.
+#[derive(Component)]
+pub struct Ice;
+
+pub fn water_material(
+    images: &mut Assets<Image>,
+    fog: Handle<Image>,
+    frozen: bool,
+) -> WaterMaterial {
+    let (base_color, perceptual_roughness, reflectance) = if frozen {
+        (Color::srgba(0.66, 0.76, 0.82, 0.94), 0.35, 0.45)
+    } else {
+        (Color::srgba(0.10, 0.27, 0.33, 0.78), 0.04, 0.6)
+    };
     WaterMaterial {
         base: StandardMaterial {
-            base_color: Color::srgba(0.10, 0.27, 0.33, 0.78),
+            base_color,
             alpha_mode: AlphaMode::Blend,
-            perceptual_roughness: 0.04,
-            reflectance: 0.6,
+            perceptual_roughness,
+            reflectance,
             normal_map_texture: Some(images.add(water_normal_map())),
             ..default()
         },
@@ -438,7 +451,7 @@ pub fn water_material(images: &mut Assets<Image>, fog: Handle<Image>) -> WaterMa
 
 pub fn animate_water(
     time: Res<Time>,
-    water: Query<&MeshMaterial3d<WaterMaterial>, With<WaterSurface>>,
+    water: Query<&MeshMaterial3d<WaterMaterial>, (With<WaterSurface>, Without<Ice>)>,
     mut materials: ResMut<Assets<WaterMaterial>>,
 ) {
     let Ok(handle) = water.single() else { return };

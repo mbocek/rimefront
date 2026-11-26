@@ -8,8 +8,11 @@ use bevy::tasks::{AsyncComputeTaskPool, Task, block_on};
 use crate::missions::levels::ActiveLevel;
 use crate::view::camera::{RtsCamera, ground_in_view};
 use crate::view::fog_view::FogTexture;
-use crate::view::terrain_material::{TerrainSurface, WaterMaterial, WaterSurface, water_material};
+use crate::view::terrain_material::{
+    Ice, TerrainSurface, WaterMaterial, WaterSurface, water_material,
+};
 use crate::world::map::{CELL_SIZE, CHUNK_CELLS, GameMap, map_bounds};
+use crate::world::season::Season;
 use crate::world::terrain::WATER_LEVEL;
 use crate::world::terrain::{FAR_RING_WIDTH, GroundLayers, LandscapeContext, OUTLANDS_WIDTH};
 use crate::world::wilds::WorldWidened;
@@ -343,6 +346,7 @@ pub fn spawn_terrain_visuals(
         &mut images,
         &mut water_materials,
         &fog,
+        level.0.season == Season::Winter,
     );
 }
 
@@ -352,6 +356,7 @@ fn spawn_water(
     images: &mut Assets<Image>,
     water_materials: &mut Assets<WaterMaterial>,
     fog: &FogTexture,
+    frozen: bool,
 ) {
     let bounds = map_bounds();
     let water_span = bounds.world_size() + Vec2::splat(2.0 * (OUTLANDS_WIDTH + FAR_RING_WIDTH));
@@ -362,12 +367,15 @@ fn spawn_water(
         .build()
         .with_generated_tangents()
         .expect("plane mesh has normals and UVs");
-    commands.spawn((
+    let mut water = commands.spawn((
         WaterSurface,
         Mesh3d(meshes.add(water_mesh)),
-        MeshMaterial3d(water_materials.add(water_material(images, fog.0.clone()))),
+        MeshMaterial3d(water_materials.add(water_material(images, fog.0.clone(), frozen))),
         Transform::from_xyz(water_middle.x, WATER_LEVEL, water_middle.y),
     ));
+    if frozen {
+        water.insert(Ice);
+    }
 }
 
 /// The ground and the water follow a world that widened during the match.
@@ -396,6 +404,7 @@ pub fn follow_widened_ground(
         &mut images,
         &mut water_materials,
         &fog,
+        level.0.season == Season::Winter,
     );
 }
 

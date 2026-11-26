@@ -235,7 +235,7 @@ pub struct MainMenu {
     random_seed: u64,
     completed_missions: Vec<String>,
     /// The map picture of the level last shown, kept until another level is shown.
-    preview: Option<(LevelDefinition, Handle<Image>)>,
+    preview: Option<(LevelDefinition, Option<Color>, Handle<Image>)>,
     message: Option<String>,
     needs_rebuild: bool,
 }
@@ -904,16 +904,20 @@ impl MainMenu {
         }
     }
 
-    fn update_preview(&mut self, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+    fn update_preview(
+        &mut self,
+        images: &mut Assets<Image>,
+        player_color: Option<Color>,
+    ) -> Option<Handle<Image>> {
         let level = self.previewed_level()?;
         let current = self
             .preview
             .as_ref()
-            .filter(|(shown, _)| *shown == level)
-            .map(|(_, image)| image.clone());
+            .filter(|(shown, color, _)| *shown == level && *color == player_color)
+            .map(|(_, _, image)| image.clone());
         Some(current.unwrap_or_else(|| {
-            let image = images.add(map_preview(&level));
-            self.preview = Some((level, image.clone()));
+            let image = images.add(map_preview(&level, player_color));
+            self.preview = Some((level, player_color, image.clone()));
             image
         }))
     }
@@ -1166,7 +1170,7 @@ pub fn refresh_main_menu(
             set_field(&mut column, |node| &mut node.display, shown);
         }
         rebuild_level_list(&mut commands, list, &fonts, &menu);
-        let preview = menu.update_preview(&mut images);
+        let preview = menu.update_preview(&mut images, settings.side_color.map(SideColor::color));
         rebuild_details(
             &mut commands,
             panel,

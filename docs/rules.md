@@ -106,8 +106,11 @@
   light machine gun. Right-click it with infantry selected and up to five soldiers climb in; U lets them out
   on free ground around it. Inside they ride along, cannot be hit or selected, and fire from the hatches at
   enemies within their reach (they hold position, or hold fire if told to). When the carrier is destroyed they
-  scramble out with half their health. Loading a save puts passengers beside their carrier. The computer does
-  not build carriers yet.
+  scramble out with half their health. Loading a save puts passengers beside their carrier. The computer builds
+  carriers too: infantry waiting at home climbs in, the carrier stays until everyone on the way is aboard,
+  sets off with the next wave and lets its soldiers out once an enemy is within 14 m or it stops away from home
+  (`ai::unload_carriers_at_the_front`). Over 1800 tournament matches the computers built about 1050; their own
+  gun deals 0.40 damage per credit, the soldiers they carry are counted on their own.
 - **Stances:** an armed unit is *aggressive* by default: it takes on enemies it sees and chases them. A unit
   told to *hold position* (H) fires only at enemies within its weapon's reach and stays where it is; one told
   to *hold fire* (F) shoots only at what it is ordered to attack; G makes it aggressive again. Ordered attacks

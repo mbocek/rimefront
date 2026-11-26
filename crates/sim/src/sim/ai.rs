@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bevy::prelude::*;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
@@ -23,6 +25,7 @@ use crate::sim::research::Upgrade;
 use crate::sim::servicing::{service_radius, waiting_spot};
 use crate::sim::structures::{BeingSold, Repairing, StructureOrder, StructureOrderKind};
 use crate::sim::support_powers::{SupportPower, SupportPowers};
+use crate::sim::transport::{BoardingTask, CARRIER_CAPACITY, Embarked, Passengers, Unloading};
 use crate::world::map::{
     CELL_SIZE, GameMap, cells_by_distance, footprint_cells, footprint_center, in_far_half,
     mirror_centre, opposite_cell, opposite_origin, world_to_cell,
@@ -281,6 +284,9 @@ type ArmyUnit<'a> = (
     Option<&'a AttackTarget>,
     Option<&'a mut Orders>,
     &'a SimId,
+    Option<&'a Passengers>,
+    Option<&'a BoardingTask>,
+    Has<Embarked>,
 );
 
 pub fn command_enemies(
@@ -355,7 +361,7 @@ pub fn command_enemies(
             intel: &intel,
             claimed_sites: claimed_sites(&starting_sites),
         };
-        direct_army(ai, &knowledge, &map, &buildings, &mut army);
+        direct_army(ai, &knowledge, &map, &buildings, &mut army, &mut commands);
     }
 }
 
@@ -686,7 +692,7 @@ fn plan_next_structure(
 
 /// Weighted wish lists, reweighted by what counters the enemies seen lately; anything the mission
 /// forbids is skipped.
-const VEHICLE_MIX: [(UnitKind, f32); 12] = [
+const VEHICLE_MIX: [(UnitKind, f32); 13] = [
     (UnitKind::Tank, 5.0),
     (UnitKind::Bulwark, 4.0),
     (UnitKind::Artillery, 3.0),
@@ -699,6 +705,7 @@ const VEHICLE_MIX: [(UnitKind, f32); 12] = [
     (UnitKind::RaiderBike, 3.0),
     (UnitKind::Bomber, 2.0),
     (UnitKind::Fighter, 1.5),
+    (UnitKind::TroopCarrier, 2.0),
 ];
 const INFANTRY_MIX: [(UnitKind, f32); 6] = [
     (UnitKind::Rifleman, 6.0),
@@ -866,6 +873,7 @@ fn direct_army(
     map: &GameMap,
     buildings: &Query<(&Building, &Team)>,
     army: &mut Query<ArmyUnit>,
+    commands: &mut Commands,
 ) {
     let team = ai.team;
     let home = footprint_center(ai.base, BuildingKind::CommandCenter.spec().footprint);
@@ -925,10 +933,35 @@ fn direct_army(
         .collect();
     stations.sort_by_key(|building| (building.origin.y, building.origin.x));
     let mut waiting_at_home = Vec::new();
-    for (entity, unit, &owner, transform, health, mobile, attack, orders, _) in
-        in_simulation_order(army.iter_mut(), |member| *member.8)
+    let mut seats = CarrierSeats::default();
+    for (
+        entity,
+        unit,
+        &owner,
+        transform,
+        health,
+        mobile,
+        attack,
+        orders,
+        _,
+        passengers,
+        boarding,
+        embarked,
+    ) in in_simulation_order(army.iter_mut(), |member| *member.8)
     {
-        let is_soldier = owner == team && fights(unit.0);
+        if owner != team {
+            continue;
+        }
+        if let Some(passengers) = passengers {
+            seats.note_carrier(entity, passengers);
+        }
+        if let Some(boarding) = boarding {
+            seats.note_boarding(boarding.carrier());
+        }
+        if embarked || boarding.is_some() {
+            continue;
+        }
+        let is_soldier = fights(unit.0);
         let Some(mut orders) = orders.filter(|_| is_soldier) else {
             continue;
         };
@@ -962,8 +995,109 @@ fn direct_army(
     if let Some(prey) = prey {
         raid(&mut waiting_at_home, prey);
     }
+    seats.fill_from(commands, &mut waiting_at_home);
     if let Some(objective) = assault_objective {
         launch_a_wave_when_ready(ai, waiting_at_home, map, home, objective);
+    }
+}
+
+/// The seats of a commander's carriers, and the soldiers on their way to them.
+#[derive(Default)]
+struct CarrierSeats {
+    free: BTreeMap<Entity, usize>,
+    boarding: BTreeMap<Entity, usize>,
+}
+
+impl CarrierSeats {
+    fn note_carrier(&mut self, carrier: Entity, passengers: &Passengers) {
+        self.free
+            .insert(carrier, CARRIER_CAPACITY - passengers.0.len());
+    }
+
+    fn note_boarding(&mut self, carrier: Entity) {
+        *self.boarding.entry(carrier).or_default() += 1;
+    }
+
+    /// Infantry waiting at home climbs into the carriers waiting there, and a carrier stays home while anyone
+    /// is still on the way to it, so it sets off full or with all the infantry there was.
+    fn fill_from(&self, commands: &mut Commands, waiting_at_home: &mut Vec<WaitingUnit>) {
+        let carriers: Vec<Entity> = waiting_at_home
+            .iter()
+            .filter(|(_, kind, _)| *kind == UnitKind::TroopCarrier)
+            .map(|(entity, ..)| *entity)
+            .collect();
+        for carrier in carriers {
+            let on_the_way = self.boarding.get(&carrier).copied().unwrap_or(0);
+            let mut free = self
+                .free
+                .get(&carrier)
+                .copied()
+                .unwrap_or(0)
+                .saturating_sub(on_the_way);
+            let mut called = 0;
+            while free > 0 {
+                let Some(index) = waiting_at_home
+                    .iter()
+                    .position(|(_, kind, _)| kind.spec().armor == ArmorClass::Infantry)
+                else {
+                    break;
+                };
+                let (soldier, ..) = waiting_at_home.swap_remove(index);
+                commands.entity(soldier).insert(BoardingTask::new(carrier));
+                free -= 1;
+                called += 1;
+            }
+            if on_the_way + called > 0 {
+                waiting_at_home.retain(|(entity, ..)| *entity != carrier);
+            }
+        }
+    }
+}
+
+/// How close an enemy brings a computer's carrier to let its soldiers out.
+const UNLOAD_NEAR_ENEMY: f32 = 14.0;
+
+/// A computer's carrier lets its soldiers out when it meets the enemy, or when it stops away from home.
+pub fn unload_carriers_at_the_front(
+    mut commands: Commands,
+    commanders: Res<AiCommanders>,
+    targets: Res<Targets>,
+    carriers: Query<
+        (
+            Entity,
+            &Team,
+            &Transform,
+            &Passengers,
+            &Mobile,
+            Option<&Orders>,
+            &SimId,
+        ),
+        Without<Unloading>,
+    >,
+) {
+    for (carrier, &team, transform, passengers, mobile, orders, _) in
+        in_simulation_order(carriers.iter(), |carrier| *carrier.6)
+    {
+        let Some(ai) = commanders.0.iter().find(|ai| ai.team == team) else {
+            continue;
+        };
+        if passengers.0.is_empty() {
+            continue;
+        }
+        let position = transform.translation;
+        let home = footprint_center(ai.base, BuildingKind::CommandCenter.spec().footprint);
+        if position.distance(home) < BASE_DEFENSE_RADIUS {
+            continue;
+        }
+        let enemy_near = targets.iter().any(|target| {
+            targets.hostile(target.team, team)
+                && target.seen_by(team)
+                && target.position.distance(position) < UNLOAD_NEAR_ENEMY
+        });
+        let arrived = !mobile.is_moving() && orders.is_none_or(|orders| orders.current.is_none());
+        if enemy_near || arrived {
+            commands.entity(carrier).insert(Unloading);
+        }
     }
 }
 

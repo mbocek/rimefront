@@ -196,3 +196,44 @@ fn a_big_wave_splits_to_come_from_two_sides() {
         "{straight} went straight and {flanking} round the flank"
     );
 }
+
+fn crimson_soldiers_riding(battle: &mut Battle) -> usize {
+    let world = battle.world();
+    world
+        .query::<(&rimefront::sim::transport::Embarked, &Team)>()
+        .iter(world)
+        .filter(|(_, team)| **team == Team::Crimson)
+        .count()
+}
+
+#[test]
+fn the_computer_drives_its_infantry_to_the_front_in_a_carrier_and_lets_it_out() {
+    let mut battle = fogless_match();
+    let home = rimefront::missions::levels::BaseSite::NorthEast.origin();
+    let carrier = battle.spawn_unit(
+        UnitKind::TroopCarrier,
+        Team::Crimson,
+        home + IVec2::new(-4, 4),
+    );
+    for step in 0..4 {
+        battle.spawn_unit(
+            UnitKind::Rifleman,
+            Team::Crimson,
+            home + IVec2::new(-6 + step, 6),
+        );
+    }
+    let boarded = battle.run_until(30.0, |battle| crimson_soldiers_riding(battle) >= 4);
+    assert!(boarded.is_some(), "the riflemen did not climb in");
+    let let_out = battle.run_until(6.0 * 60.0, |battle| {
+        let far_from_home = battle
+            .position(carrier)
+            .xz()
+            .distance(footprint_center(home, IVec2::splat(2)).xz())
+            > 40.0;
+        far_from_home && crimson_soldiers_riding(battle) == 0
+    });
+    assert!(
+        let_out.is_some(),
+        "the carrier never let its soldiers out at the front"
+    );
+}

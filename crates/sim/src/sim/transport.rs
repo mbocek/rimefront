@@ -45,6 +45,10 @@ impl BoardingTask {
             repath_secs: 0.0,
         }
     }
+
+    pub fn carrier(&self) -> Entity {
+        self.carrier
+    }
 }
 
 /// A carrier ordered to let its passengers out.

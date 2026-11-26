@@ -208,6 +208,7 @@ impl Plugin for SimulationPlugin {
                         structures::repair_structures,
                         structures::finish_sales,
                         engineers::carry_out_engineer_tasks,
+                        ai::unload_carriers_at_the_front,
                         transport::board_carriers,
                         medical::treat_wounded,
                         neutral_sites::deliver_supplies,

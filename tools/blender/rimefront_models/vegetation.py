@@ -119,73 +119,148 @@ def add_leaf_cards(bm, centre, radius, seed, count, amplitude):
 
 
 @dataclass(frozen=True)
-class Terrace:
-    """One layer of a crown: flattened faceted pads around the trunk at a height, as wide as `reach`."""
-    height: float
-    reach: float
-    pads: int
-    material_name: str
+class Lobe:
+    """One rounded mass of leaves in a crown."""
+    centre: Vector
+    radius: float
 
 
-def leaf_pad(material_name, centre, radius, seed):
-    """A flattened, faceted mass of leaves; flat shading keeps its facets crisp."""
-    part(material_name, lambda bm: geo.add_noisy_blob(bm, centre, radius, seed, subdivisions=1, amplitude=0.25,
-                                                       squash_bottom=0.25, squash_top=0.45),
-         name="LeafPad")
+BROADLEAF_SHADES = ("LeafDeep", "LeafMid", "LeafSun", "LeafLight")
+BIRCH_SHADES = ("LeafMid", "BirchLeaf", "BirchLeafLight")
+# A face this deep inside a neighbouring lobe can never be seen; dropping them halves the crown's triangles.
+HIDDEN_DEPTH = 0.78
 
 
-def add_terraced_crown(terraces, rng, seed, middle=(0.0, 0.0)):
-    """Layers of pads, widest and darkest below and smaller and sunlit above, the way an oak or a lime reads
-    from above; a quarter of the pads take a shade by chance so no layer is one flat colour."""
+def crown_lobes(rng, low, high, reach, ring, top, middle=(0.0, 0.0)):
+    """A central mass, a ring of lobes around its lower half and a few smaller ones on top."""
     middle = Vector((middle[0], middle[1], 0.0))
-    for terrace in terraces:
-        for k in range(terrace.pads):
-            angle = k * math.tau / terrace.pads + rng.uniform(-0.25, 0.25)
-            distance = terrace.reach * (rng.uniform(0.45, 0.7) if terrace.pads > 2 else 0.4)
-            spot = middle + Vector((math.cos(angle) * distance, math.sin(angle) * distance,
-                                    terrace.height + rng.uniform(-0.12, 0.12)))
-            radius = terrace.reach * rng.uniform(0.48, 0.6)
-            material_name = terrace.material_name if rng.random() > 0.25 else _leaf_in_light(rng.random())
-            seed += 1
-            leaf_pad(material_name, spot, radius, seed)
+    lobes = [Lobe(middle + Vector((0.0, 0.0, (low + high) / 2)), reach * 0.62)]
+    for k in range(ring):
+        angle = k * math.tau / ring + rng.uniform(-0.3, 0.3)
+        distance = reach * rng.uniform(0.5, 0.62)
+        height = low + (high - low) * rng.uniform(0.3, 0.45)
+        lobes.append(Lobe(middle + Vector((math.cos(angle) * distance, math.sin(angle) * distance, height)),
+                          reach * rng.uniform(0.42, 0.5)))
+    for k in range(top):
+        angle = k * math.tau / top + rng.uniform(-0.4, 0.4) + 0.5
+        distance = reach * rng.uniform(0.18, 0.32)
+        height = low + (high - low) * rng.uniform(0.68, 0.8)
+        lobes.append(Lobe(middle + Vector((math.cos(angle) * distance, math.sin(angle) * distance, height)),
+                          reach * rng.uniform(0.36, 0.44)))
+    return lobes
 
 
-def _leaf_in_light(light):
-    for threshold, material_name in ((0.78, "LeafSun"), (0.55, "LeafMid"), (0.36, "LeafOlive")):
-        if light > threshold:
-            return material_name
-    return "LeafDeep"
+def add_canopy(lobes, shades, seed):
+    """Smooth lobes merged into one crown, each face shaded by how high it sits and how much it faces the sky,
+    so every lobe reads as a sunlit clump of leaves over its own shadow."""
+    low = min(lobe.centre.z - lobe.radius * 0.6 for lobe in lobes)
+    high = max(lobe.centre.z + lobe.radius * 0.85 for lobe in lobes)
+
+    def build(bm):
+        for own, lobe in enumerate(lobes):
+            for face in geo.add_noisy_blob(bm, lobe.centre, lobe.radius, seed + own, subdivisions=2,
+                                           amplitude=0.3, squash_bottom=0.6, squash_top=0.85):
+                if _hidden_by_other_lobe(face.calc_center_median(), lobes, own):
+                    bm.faces.remove(face)
+        bm.verts.ensure_lookup_table()
+        for vert in [vert for vert in bm.verts if not vert.link_faces]:
+            bm.verts.remove(vert)
+        geo.recalc_normals(bm)
+        shade_rng = random.Random(seed)
+        for face in bm.faces:
+            height = (face.calc_center_median().z - low) / (high - low)
+            facing_sky = face.normal.z * 0.5 + 0.5
+            light = 0.35 * height + 0.65 * facing_sky + shade_rng.uniform(-0.04, 0.04)
+            face.material_index = min(len(shades) - 1, max(0, int(light * len(shades) - 0.6)))
+
+    part(shades[0], build, shading=SMOOTH, name="Canopy", extra_materials=shades[1:])
 
 
-def build_tree_broadleaf():
-    rng = random.Random(201)
+def _hidden_by_other_lobe(point, lobes, own):
+    return any(index != own and (point - lobe.centre).length < lobe.radius * HIDDEN_DEPTH
+               for index, lobe in enumerate(lobes))
+
+
+def add_bare_branches(material_name, stems, rng, length, radius, forks=(3, 3, 2)):
+    """Winter crown: each stem (start, direction) forks into rising branches, those into finer ones, `forks`
+    giving how many at each level; the last level are bare twigs of a few triangles each."""
+    tubes = []
+
+    def grow(start, direction, length, radius, level):
+        end = start + direction * length
+        if level == len(forks):
+            tubes.append(lambda bm, p=[start, end], r=radius: geo.add_tube(bm, p, [r, r * 0.4], 3))
+            return
+        bend = Vector((rng.uniform(-0.08, 0.08), rng.uniform(-0.08, 0.08), rng.uniform(0.0, 0.08))) * length
+        tubes.append(lambda bm, p=[start, start.lerp(end, 0.5) + bend, end], r=radius:
+                     geo.add_tube(bm, p, [r, r * 0.8, r * 0.6], 5))
+        side = direction.cross(UP)
+        side = side.normalized() if side.length > 0.01 else Vector((1.0, 0.0, 0.0))
+        over = side.cross(direction).normalized()
+        turn = rng.uniform(0.0, math.tau)
+        for k in range(forks[level]):
+            around = turn + k * math.tau / forks[level] + rng.uniform(-0.4, 0.4)
+            spread = rng.uniform(0.45, 0.8)
+            child = (direction * math.cos(spread)
+                     + (side * math.cos(around) + over * math.sin(around)) * math.sin(spread) + UP * 0.35)
+            grow(end - direction * length * 0.08, child.normalized(), length * rng.uniform(0.55, 0.7),
+                 radius * 0.6, level + 1)
+
+    for start, direction in stems:
+        grow(start, direction, length, radius, 0)
+    batch(material_name, tubes, shading=AUTO_SMOOTH, name="BareBranches")
+
+
+def limb_ends(paths):
+    return [(path[-1], (path[-1] - path[-2]).normalized()) for path in paths]
+
+
+def _broadleaf_wood(rng):
     add_trunk("Bark", [-0.1, 0.2, 0.9, 1.8, 2.7, 3.6], [0.52, 0.4, 0.34, 0.3, 0.25, 0.12], rng, segments=12)
     add_roots("Bark", 5, 0.34, 0.4, rng)
     limbs = [Limb(Vector((0, 0, rng.uniform(2.2, 2.8))), k * math.tau / 5 + rng.uniform(-0.25, 0.25),
                   rng.uniform(1.5, 1.9), rng.uniform(1.1, 1.5), 0.16) for k in range(5)]
-    paths = add_limbs("Bark", limbs, rng)
+    return add_limbs("Bark", limbs, rng)
+
+
+def build_tree_broadleaf():
+    rng = random.Random(201)
+    paths = _broadleaf_wood(rng)
     add_twigs("Bark", paths, rng)
-    add_terraced_crown([Terrace(3.55, 2.3, 9, "LeafDeep"), Terrace(4.15, 1.85, 7, "LeafOlive"),
-                        Terrace(4.7, 1.3, 5, "LeafMid"), Terrace(5.15, 0.7, 2, "LeafSun")], rng, 2010)
+    add_canopy(crown_lobes(rng, 3.2, 5.7, 2.4, ring=6, top=3), BROADLEAF_SHADES, 2010)
 
 
-def build_tree():
-    rng = random.Random(211)
+def build_tree_broadleaf_bare():
+    rng = random.Random(201)
+    paths = _broadleaf_wood(rng)
+    leader = (Vector((0.0, 0.0, 3.3)), UP)
+    add_bare_branches("Bark", [*limb_ends(paths), leader], rng, length=1.3, radius=0.12)
+
+
+def _common_tree_wood(rng):
     add_trunk("Bark", [-0.1, 0.2, 0.9, 1.8, 2.6, 3.3], [0.38, 0.27, 0.23, 0.2, 0.17, 0.08], rng, lean=(0.1, 0.05),
               segments=10)
     add_roots("Bark", 4, 0.24, 0.32, rng)
     limbs = [Limb(Vector((0.05, 0.02, rng.uniform(2.0, 2.4))), k * math.tau / 4 + rng.uniform(-0.3, 0.3),
                   rng.uniform(0.9, 1.15), rng.uniform(0.9, 1.2), 0.11) for k in range(4)]
-    paths = add_limbs("Bark", limbs, rng, segments=6)
+    return add_limbs("Bark", limbs, rng, segments=6)
+
+
+def build_tree():
+    rng = random.Random(211)
+    paths = _common_tree_wood(rng)
     add_twigs("Bark", paths, rng, length=0.45, radius=0.028)
-    add_terraced_crown([Terrace(3.15, 1.75, 7, "LeafDeep"), Terrace(3.65, 1.4, 6, "LeafOlive"),
-                        Terrace(4.1, 1.0, 4, "LeafMid"), Terrace(4.45, 0.55, 2, "LeafSun")], rng, 2110,
-                       middle=(0.1, 0.05))
+    add_canopy(crown_lobes(rng, 2.9, 4.8, 1.8, ring=5, top=2, middle=(0.1, 0.05)), BROADLEAF_SHADES, 2110)
 
 
-def build_tree_birch():
-    rng = random.Random(221)
+def build_tree_bare():
+    rng = random.Random(211)
+    paths = _common_tree_wood(rng)
+    leader = (Vector((0.1, 0.05, 3.0)), UP)
+    add_bare_branches("Bark", [*limb_ends(paths), leader], rng, length=1.0, radius=0.085)
 
+
+def _birch_wood(rng):
     def paint_bark_marks(side_faces, _caps):
         segments = 9
         for index, face in enumerate(side_faces):
@@ -202,15 +277,25 @@ def build_tree_birch():
         anchor = trunk[3 + k % 6] if 3 + k % 6 < len(trunk) else trunk[-2]
         limbs.append(Limb(anchor.copy(), k * 2.4 + rng.uniform(-0.3, 0.3), rng.uniform(0.7, 1.15),
                           rng.uniform(0.7, 1.1), 0.045))
-    paths = add_limbs("BirchBark", limbs, rng, segments=5)
-    seed = 2210
-    for index, path in enumerate(paths):
-        shades = ("BirchLeaf", "BirchLeafLight")
-        seed += 2
-        leaf_pad(shades[index % 2], path[-1] + UP * 0.1, rng.uniform(0.5, 0.62), seed)
-        leaf_pad(shades[(index + 1) % 2], path[1].lerp(path[-1], 0.5) + UP * 0.12, rng.uniform(0.36, 0.44), seed + 1)
-    leaf_pad("BirchLeafLight", trunk[-1] + UP * 0.3, 0.6, 2250)
-    leaf_pad("BirchLeaf", trunk[-3] + Vector((0.2, 0.3, 0.2)), 0.5, 2251)
+    return trunk, add_limbs("BirchBark", limbs, rng, segments=5)
+
+
+def build_tree_birch():
+    rng = random.Random(221)
+    trunk, paths = _birch_wood(rng)
+    lobes = [Lobe(trunk[-1] + UP * 0.3, 0.6), Lobe(trunk[-3] + Vector((0.2, 0.3, 0.2)), 0.5)]
+    for path in paths:
+        lobes.append(Lobe(path[-1] + UP * 0.1, rng.uniform(0.5, 0.62)))
+        lobes.append(Lobe(path[1].lerp(path[-1], 0.5) + UP * 0.12, rng.uniform(0.36, 0.44)))
+    add_canopy(lobes, BIRCH_SHADES, 2210)
+
+
+def build_tree_birch_bare():
+    rng = random.Random(221)
+    trunk, paths = _birch_wood(rng)
+    leader = (trunk[-2], (trunk[-1] - trunk[-2]).normalized())
+    # Birch twigs are dark brown; only the trunk and limbs are white.
+    add_bare_branches("Bark", [*limb_ends(paths), leader], rng, length=0.6, radius=0.03, forks=(2, 3))
 
 
 def build_tree_dead():

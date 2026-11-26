@@ -29,9 +29,35 @@ struct MergedModel {
     lean: f32,
 }
 
+/// Deciduous trees and the leafless model each stands as in winter.
+const BARE_IN_WINTER: [(&str, &str); 3] = [
+    ("tree", "tree_bare"),
+    ("tree_broadleaf", "tree_broadleaf_bare"),
+    ("tree_birch", "tree_birch_bare"),
+];
+
+fn shown_model(model_id: &str, season: Season) -> &str {
+    if season != Season::Winter {
+        return model_id;
+    }
+    BARE_IN_WINTER
+        .iter()
+        .find(|(leafy, _)| *leafy == model_id)
+        .map_or(model_id, |(_, bare)| bare)
+}
+
+fn leafy_model(model_id: &str) -> &str {
+    BARE_IN_WINTER
+        .iter()
+        .find(|(_, bare)| *bare == model_id)
+        .map_or(model_id, |(leafy, _)| leafy)
+}
+
 pub fn load_flat_scenery_sources(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let bare_models = BARE_IN_WINTER.iter().map(|(_, bare)| bare);
     let sources = crate::world::scenery::FLAT_SCENERY_MODELS
         .iter()
+        .chain(bare_models)
         .map(|&id| {
             (
                 id.to_string(),
@@ -83,11 +109,12 @@ pub fn merge_scenery_models(
         let Some(parts) = parts.filter(|parts| !parts.is_empty()) else {
             continue;
         };
-        let lean = sway_amplitude(&id).unwrap_or(0.0);
+        let plant = leafy_model(&id);
+        let lean = sway_amplitude(plant).unwrap_or(0.0);
         let merged = merge_parts(&parts).map(|(mesh, material)| MergedModel {
             seasonal_meshes: Season::ALL
                 .iter()
-                .map(|&season| meshes.add(in_season(&mesh, season, Foliage::of_model(&id))))
+                .map(|&season| meshes.add(in_season(&mesh, season, Foliage::of_model(plant))))
                 .collect(),
             material: materials.add(MovingMaterial {
                 base: material,
@@ -211,7 +238,7 @@ pub fn dress_flat_scenery(
 ) {
     let season = level.map_or(Season::Summer, |level| level.0.season);
     for (entity, scenery) in &undressed {
-        match library.merged.get(scenery.0) {
+        match library.merged.get(shown_model(scenery.0, season)) {
             Some(Some(model)) => {
                 commands.entity(entity).insert((
                     Mesh3d(model.seasonal_meshes[season.index()].clone()),

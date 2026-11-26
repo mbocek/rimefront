@@ -135,9 +135,10 @@ everything else spreads out from the centre (the fords move apart, the lake grow
 keeps its width. Forests, rocks and meadows grow with the area, so a Huge map has about 2.5 times as much
 scenery and costs more to draw. The map size is chosen when a match starts and kept per thread: every schedule runs on the thread that updates the app, so tests can play battles of different sizes side by side.
 Seasons: `Summer`, `Autumn` (birches turn yellow, broadleaf trees orange, shrubs red, grass straw; pines stay
-green; a warmer sun) or `Winter` (snow on open flat ground and on top of rocks, trees and logs, frosted
-leaves, a colder sun, and rain falls as snow). Each scenery model's colours are turned once per season when
-it is loaded, so seasons cost nothing while playing. The campaign's third and eighth missions are fought in winter, its fifth, seventh and
+green; a warmer sun) or `Winter` (snow on open flat ground and on top of rocks, trees and logs, broadleaf
+trees and birches stand bare, pines frosted, a colder sun, and rain falls as snow). Each scenery model's
+colours are turned once per season when it is loaded, and the bare trees are models of their own
+(`tree_bare`, `tree_broadleaf_bare`, `tree_birch_bare`), so seasons cost nothing while playing. The campaign's third and eighth missions are fought in winter, its fifth, seventh and
 ninth in autumn.
 Weather: `Clear` or `Rain` is how a match starts. From there the sky changes on its own: clear spells of a
 few minutes, clouds that dim the sun and smooth away the moving cloud shadows, and showers that fade in,

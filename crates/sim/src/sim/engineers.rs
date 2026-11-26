@@ -9,7 +9,7 @@ use crate::sim::movement::order_move;
 use crate::sim::notifications::{News, SideNews};
 use crate::sim::sides::Shelter;
 use crate::sim::spawn::spawn_building;
-use crate::world::map::{CELL_SIZE, GameMap, footprint_center};
+use crate::world::map::{CELL_SIZE, GameMap, footprint_center, world_to_cell};
 
 /// How close to a structure's walls an engineer has to get before it slips inside.
 const ENTRY_REACH: f32 = 1.6;
@@ -111,7 +111,7 @@ pub fn carry_out_engineer_tasks(
                     &mut mobile,
                     &map,
                     transform.translation,
-                    building.origin,
+                    world_to_cell(center),
                     true,
                 );
             }

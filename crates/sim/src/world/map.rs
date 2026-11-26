@@ -276,9 +276,12 @@ pub fn opposite_cell(cell: IVec2) -> IVec2 {
     mirror_sum() - cell
 }
 
-/// Whether a cell lies past the diagonal the map is mirrored across, nearer the far corner.
-fn beyond_mirror_diagonal(cell: IVec2) -> bool {
-    2 * (cell.x + cell.y) > mirror_sum().element_sum()
+/// Whether a cell lies past the diagonal the map is mirrored across, nearer the far corner. Of a cell on the
+/// diagonal and its twin, also on it, the one further east counts as past it.
+pub fn beyond_mirror_diagonal(cell: IVec2) -> bool {
+    let sum = mirror_sum();
+    let across = 2 * (cell.x + cell.y) - sum.element_sum();
+    across > 0 || (across == 0 && 2 * cell.x > sum.x)
 }
 
 /// The point the map is mirrored around, half a cell off the middle of the world.
@@ -612,11 +615,37 @@ pub fn footprint_center(origin: IVec2, footprint: IVec2) -> Vec3 {
     ))
 }
 
+/// A point on the edge between cells belongs to the cell nearer the south-west corner in the near half of the
+/// map and, in mirror image, to the one nearer the north-east corner in the far half, so the middle of a
+/// structure or a straight move resolves to twin cells for both corners.
 pub fn world_to_cell(position: Vec3) -> IVec2 {
+    let from_the_near_corner = cell_below(position);
+    let in_cells = position.xz() / CELL_SIZE;
+    let on_an_edge = in_cells.x.fract() == 0.0 || in_cells.y.fract() == 0.0;
+    if !on_an_edge {
+        return from_the_near_corner;
+    }
+    let mirrored = mirror_centre() * 2.0 - position;
+    let from_the_far_corner = opposite_cell(cell_below(mirrored));
+    if from_the_near_corner == from_the_far_corner || !in_the_far_half(position) {
+        from_the_near_corner
+    } else {
+        from_the_far_corner
+    }
+}
+
+fn cell_below(position: Vec3) -> IVec2 {
     IVec2::new(
         (position.x / CELL_SIZE).floor() as i32,
         (position.z / CELL_SIZE).floor() as i32,
     )
+}
+
+/// Points exactly on the mirror diagonal are split by which side of the middle they lie on.
+fn in_the_far_half(position: Vec3) -> bool {
+    let offset = position - mirror_centre();
+    let across = offset.x + offset.z;
+    across > 0.0 || (across == 0.0 && offset.x > 0.0)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1055,6 +1084,58 @@ mod tests {
             assert_eq!(
                 route.into_iter().map(opposite_cell).collect::<Vec<_>>(),
                 mirrored
+            );
+        }
+    }
+
+    #[test]
+    fn trips_from_the_mirror_diagonal_take_mirrored_routes() {
+        let map = map_with_river();
+        let sum = mirror_sum();
+        let start = IVec2::new(sum.x / 2 - 6, sum.y / 2 + 6);
+        let goal = IVec2::new(40, 20);
+        let route = map.find_path(start, goal).unwrap();
+        let mirrored = map
+            .find_path(opposite_cell(start), opposite_cell(goal))
+            .unwrap();
+        assert_eq!(
+            route.into_iter().map(opposite_cell).collect::<Vec<_>>(),
+            mirrored
+        );
+    }
+
+    #[test]
+    fn of_a_cell_and_its_twin_exactly_one_lies_beyond_the_diagonal() {
+        for cell in map_bounds().cells() {
+            let twin = opposite_cell(cell);
+            if twin != cell {
+                assert_ne!(
+                    beyond_mirror_diagonal(cell),
+                    beyond_mirror_diagonal(twin),
+                    "{cell}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_point_on_a_cell_edge_and_its_mirror_image_fall_in_twin_cells() {
+        let centre = mirror_centre();
+        for offset in [
+            Vec3::new(10.0, 0.0, 3.0),
+            Vec3::new(-10.0, 0.0, 3.0),
+            Vec3::new(7.0, 0.0, -8.0),
+            Vec3::new(5.0, 0.0, -5.0),
+            Vec3::new(-24.0, 0.0, 30.0),
+        ] {
+            let on_edges = (cell_center(world_to_cell(centre + offset))
+                + Vec3::splat(CELL_SIZE / 2.0))
+            .with_y(0.0);
+            let mirrored = centre * 2.0 - on_edges;
+            assert_eq!(
+                world_to_cell(mirrored),
+                opposite_cell(world_to_cell(on_edges)),
+                "{on_edges}"
             );
         }
     }

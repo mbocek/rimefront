@@ -16,7 +16,9 @@ use crate::sim::research::Upgrade;
 use crate::sim::sides::Shelter;
 use crate::sim::sides::{PerSide, Sides};
 use crate::sim::spawn::{exit_cell, spawn_building, spawn_unit};
-use crate::world::map::{GameMap, cell_center, footprint_cells, footprint_center, world_to_cell};
+use crate::world::map::{
+    GameMap, beyond_mirror_diagonal, cell_center, footprint_cells, footprint_center, world_to_cell,
+};
 
 pub const MAX_QUEUE_LENGTH: usize = 8;
 /// How many cells of empty ground may separate a new structure from an existing one.
@@ -426,7 +428,7 @@ fn deploy_unit(
     } else {
         cell_center(exit)
     };
-    let entity = spawn_unit(commands, kind, team, launch, 0.0);
+    let entity = spawn_unit(commands, kind, team, launch, facing_toward_the_middle(exit));
     if let Some(rally) = rally.filter(|_| kind != UnitKind::Harvester) {
         commands.entity(entity).insert(Orders {
             current: Some(Order::Move(rally.0)),
@@ -434,12 +436,34 @@ fn deploy_unit(
         });
         return entity;
     }
-    let rally = exit + IVec2::new(RALLY_DISTANCE_CELLS, rng.random_range(-2..=2));
-    let mut mobile = Mobile::for_unit(kind, 0.0);
+    let rally = exit
+        + step_toward_the_middle(
+            exit,
+            IVec2::new(RALLY_DISTANCE_CELLS, rng.random_range(-2..=2)),
+        );
+    let mut mobile = Mobile::for_unit(kind, facing_toward_the_middle(exit));
     if order_move(&mut mobile, map, cell_center(exit), rally, false) {
         commands.entity(entity).insert(mobile);
     }
     entity
+}
+
+/// A step taken from the south-west corner's point of view: bases in the far half take it in mirror image,
+/// so neither corner's units step out towards the map's edge.
+fn step_toward_the_middle(from: IVec2, step: IVec2) -> IVec2 {
+    if beyond_mirror_diagonal(from) {
+        -step
+    } else {
+        step
+    }
+}
+
+fn facing_toward_the_middle(from: IVec2) -> f32 {
+    if beyond_mirror_diagonal(from) {
+        std::f32::consts::PI
+    } else {
+        0.0
+    }
 }
 
 pub fn construct_building(
@@ -455,7 +479,13 @@ pub fn construct_building(
         let dock = map
             .nearest_passable(exit_cell(&building))
             .unwrap_or(exit_cell(&building));
-        spawn_unit(commands, UnitKind::Harvester, team, cell_center(dock), 0.0);
+        spawn_unit(
+            commands,
+            UnitKind::Harvester,
+            team,
+            cell_center(dock),
+            facing_toward_the_middle(dock),
+        );
     }
 }
 

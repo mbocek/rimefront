@@ -143,6 +143,7 @@ impl Plugin for SimulationPlugin {
             .init_resource::<match_flow::MatchClock>()
             .init_resource::<intel::Intel>()
             .init_resource::<ground::Ground>()
+            .init_resource::<sim::alliances::AllianceOffers>()
             .init_resource::<support_powers::SupportPowers>()
             .init_resource::<cadence::SimulationCadences>()
             .init_resource::<catalog::Diplomacy>()

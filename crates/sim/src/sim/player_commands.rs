@@ -1,4 +1,6 @@
+use crate::levels::{ActiveLevel, Objective};
 use crate::sim::abilities::{Mine, lay_mine};
+use crate::sim::alliances::{AllianceOffers, leave_alliance, offer_alliance};
 use crate::sim::intel::Intel;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -112,6 +114,12 @@ pub enum PlayerCommand {
         power: SupportPower,
         cell: IVec2,
     },
+    /// In a world: offer `to` an alliance, or accept the one it offered.
+    OfferAlliance {
+        to: Team,
+    },
+    /// In a world: stop being anyone's ally.
+    LeaveAlliance,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -285,7 +293,9 @@ type CommandedUnit<'a> = (
 pub struct Battlefield<'w, 's> {
     commands: Commands<'w, 's>,
     ids: Res<'w, SimEntities>,
-    diplomacy: Res<'w, Diplomacy>,
+    diplomacy: ResMut<'w, Diplomacy>,
+    alliance_offers: ResMut<'w, AllianceOffers>,
+    level: Res<'w, ActiveLevel>,
     map: ResMut<'w, GameMap>,
     production: ResMut<'w, Production>,
     economies: ResMut<'w, Economies>,
@@ -362,6 +372,17 @@ impl Battlefield<'_, '_> {
                 let owned = owned_kinds(&self.owners, team);
                 self.support.call(team, power, cell, &owned);
             }
+            PlayerCommand::OfferAlliance { to } if self.in_a_world() => offer_alliance(
+                &mut self.diplomacy,
+                &mut self.alliance_offers,
+                &mut self.news,
+                team,
+                to,
+            ),
+            PlayerCommand::LeaveAlliance if self.in_a_world() => {
+                leave_alliance(&mut self.diplomacy, &mut self.news, team)
+            }
+            PlayerCommand::OfferAlliance { .. } | PlayerCommand::LeaveAlliance => {}
             PlayerCommand::OrderStructure { building, kind } => {
                 if let Some(building) = self.own_structure(team, building) {
                     self.structure_orders.write(StructureOrder {
@@ -372,6 +393,11 @@ impl Battlefield<'_, '_> {
                 }
             }
         }
+    }
+
+    /// Alliances are made and broken only in persistent worlds; a level's sides keep the camps it gave them.
+    fn in_a_world(&self) -> bool {
+        self.level.0.objective == Objective::World
     }
 
     /// The team's own units among `ids`, in simulation order, so every machine walks them alike.

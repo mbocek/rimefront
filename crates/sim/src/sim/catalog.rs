@@ -280,9 +280,49 @@ impl Diplomacy {
     /// `team` leaves its camp for the camp of `ally`.
     pub fn join_camp_of(&mut self, team: Team, ally: Team) {
         let camp = self.camp(ally);
+        self.cover(team);
+        self.camps[team.index()] = camp;
+    }
+
+    /// `team` leaves its allies and stands alone.
+    pub fn leave_camp(&mut self, team: Team) {
+        self.cover(team);
+        self.camps[team.index()] = Team::MOST + team.index();
+    }
+
+    /// The other sides in `team`'s camp, lowest first.
+    pub fn allies_of(&self, team: Team) -> Vec<Team> {
+        (0..self.camps.len())
+            .map(Team::from_index)
+            .filter(|&other| other != team && !self.hostile(team, other))
+            .collect()
+    }
+
+    /// Every camp of more than one side, each lowest side first, the camps by their lowest side.
+    pub fn alliances(&self) -> Vec<Vec<Team>> {
+        let mut camps: Vec<Vec<Team>> = Vec::new();
+        for team in (0..self.camps.len()).map(Team::from_index) {
+            match camps.iter_mut().find(|camp| !self.hostile(camp[0], team)) {
+                Some(camp) => camp.push(team),
+                None => camps.push(vec![team]),
+            }
+        }
+        camps.retain(|camp| camp.len() > 1);
+        camps
+    }
+
+    /// Every side in a camp of its own, as in a free-for-all, then `team` and `allies` in one camp.
+    pub fn with_allies(team: Team, allies: &[Team]) -> Self {
+        let mut diplomacy = Self::of(Alliance::FreeForAll);
+        for &ally in allies {
+            diplomacy.join_camp_of(ally, team);
+        }
+        diplomacy
+    }
+
+    fn cover(&mut self, team: Team) {
         let own_camps = self.camps.len()..=team.index();
         self.camps.extend(own_camps.map(|index| Team::MOST + index));
-        self.camps[team.index()] = camp;
     }
 }
 

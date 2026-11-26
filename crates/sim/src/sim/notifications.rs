@@ -82,6 +82,49 @@ pub enum SideNews {
     BaseUnderAttack,
     HarvesterUnderAttack,
     LowPower,
+    /// Another side asks for an alliance; offering one back seals it.
+    AllianceOffered(Team),
+    AllianceFormed(Team),
+    /// The two sides are no longer allies.
+    AllianceLeft(Team),
+    /// The player came back to a world after being away.
+    WelcomeBack(AwayReport),
+}
+
+/// How long a player was away from a world and what their side lost meanwhile; the losses are `None` when the
+/// world was restarted while they were away and did not keep count.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct AwayReport {
+    pub minutes: u32,
+    pub losses: Option<AwayLosses>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub struct AwayLosses {
+    pub structures: u32,
+    pub units: u32,
+}
+
+impl AwayReport {
+    fn message(self) -> String {
+        let hours = self.minutes / 60;
+        let away = if hours > 0 {
+            tr_fmt("{} h {} min", &[&hours, &(self.minutes % 60)])
+        } else {
+            tr_fmt("{} min", &[&self.minutes])
+        };
+        match self.losses {
+            Some(AwayLosses {
+                structures: 0,
+                units: 0,
+            }) => tr_fmt("Welcome back after {}: nothing was lost", &[&away]),
+            Some(lost) => tr_fmt(
+                "Welcome back after {}: lost {} structures and {} units",
+                &[&away, &lost.structures, &lost.units],
+            ),
+            None => tr_fmt("Welcome back after {}", &[&away]),
+        }
+    }
 }
 
 impl SideNews {
@@ -113,6 +156,10 @@ impl SideNews {
             SideNews::BaseUnderAttack => tr("Our base is under attack!").into(),
             SideNews::HarvesterUnderAttack => tr("Our harvester is under attack!").into(),
             SideNews::LowPower => tr("Low power - production slowed").into(),
+            SideNews::AllianceOffered(team) => tr_fmt("{} offers an alliance", &[&team.name()]),
+            SideNews::AllianceFormed(team) => tr_fmt("Allied with {}", &[&team.name()]),
+            SideNews::AllianceLeft(team) => tr_fmt("No longer allied with {}", &[&team.name()]),
+            SideNews::WelcomeBack(report) => report.message(),
             SideNews::RepairStarted | SideNews::StructureSold | SideNews::CargoSold => return None,
         })
     }
@@ -135,7 +182,11 @@ impl SideNews {
             | SideNews::Sheltered
             | SideNews::CrystalSurfaced
             | SideNews::UnitLimitReached
-            | SideNews::LowPower => {
+            | SideNews::LowPower
+            | SideNews::AllianceOffered(_)
+            | SideNews::AllianceFormed(_)
+            | SideNews::AllianceLeft(_)
+            | SideNews::WelcomeBack(_) => {
                 return None;
             }
         })

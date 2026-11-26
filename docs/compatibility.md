@@ -59,8 +59,9 @@ the world and chunk files. When it fails:
 A saved world reads `SavedUnit` and `SavedBuilding` (`sim::records`), so their fields belong to the layout
 too.
 
-No release has saved a world yet: the layouts before 6 and the protocols before 7 were only ever on the
-way to the first, so they have no reader.
+Release 2.0.0 saved worlds in layout 6, which layout 7 still reads (`world_store::layout_6`, checked against
+`crates/net/fixtures/world_layout_6.txt`). The layouts before 6 and the protocols before 7 were only ever on
+the way to the first release, so they have no reader.
 
 ## Updating a server
 

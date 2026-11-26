@@ -666,5 +666,21 @@
   "{} + right click": "{} + pravý klik",
   "Alt (Option) + right click: the group keeps to its slowest unit": "Alt (Option) + pravý klik: skupina drží tempo najpomalšej jednotky",
   "The server has no room for another battle": "Server nemá miesto pre ďalšiu bitku",
-  "This room closed: its battle did not start in time": "Miestnosť sa zavrela: jej bitka sa nezačala včas"
+  "This room closed: its battle did not start in time": "Miestnosť sa zavrela: jej bitka sa nezačala včas",
+  "ALLIANCES": "SPOJENECTVÁ",
+  "No other players in the world yet.": "Vo svete zatiaľ nie sú ďalší hráči.",
+  "Offers you an alliance": "Ponúka vám spojenectvo",
+  "Accept alliance": "Prijať spojenectvo",
+  "Offer sent": "Ponuka odoslaná",
+  "Enemy": "Nepriateľ",
+  "Offer alliance": "Ponúknuť spojenectvo",
+  "Leave alliance": "Opustiť spojenectvo",
+  "{} offers an alliance": "{} ponúka spojenectvo",
+  "Allied with {}": "Spojenectvo s {}",
+  "No longer allied with {}": "Spojenectvo s {} skončilo",
+  "{} h {} min": "{} h {} min",
+  "{} min": "{} min",
+  "Welcome back after {}: nothing was lost": "Vitajte späť po {}: nič ste nestratili",
+  "Welcome back after {}: lost {} structures and {} units": "Vitajte späť po {}: stratili ste {} budov a {} jednotiek",
+  "Welcome back after {}": "Vitajte späť po {}"
 }

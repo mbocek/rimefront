@@ -1,7 +1,10 @@
 use crate::net::network::NetSession;
-use crate::sim::catalog::{SIDE_PALETTE, SideColor};
+use crate::net::world_client::WorldPolitics;
+use crate::sim::catalog::{SIDE_PALETTE, SideColor, Team};
 use crate::sim::notifications::Notifications;
+use crate::sim::player_commands::{CommandIssuer, PlayerCommand};
 use crate::ui::structure_tools::StructureTool;
+use crate::view::side_tint::SideColors;
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 
@@ -360,6 +363,8 @@ enum MenuAction {
     Save(usize),
     Load(usize),
     ResetKeys,
+    OfferAlliance(Team),
+    LeaveAlliance,
 }
 
 #[derive(Component)]
@@ -642,6 +647,7 @@ fn run_action(
     mut next_state: ResMut<NextState<GameState>>,
     mut exit: MessageWriter<AppExit>,
     (session, mut notifications): (Option<Res<NetSession>>, ResMut<Notifications>),
+    (mut issuer, politics): (CommandIssuer, Option<ResMut<WorldPolitics>>),
 ) {
     let Ok(button) = buttons.get(click.entity) else {
         return;
@@ -682,6 +688,91 @@ fn run_action(
             settings.keys.reset();
             menu.rebinding = None;
         }
+        MenuAction::OfferAlliance(to) => {
+            issuer.issue(PlayerCommand::OfferAlliance { to });
+            if let Some(mut politics) = politics {
+                politics.we_offered.insert(to);
+            }
+        }
+        MenuAction::LeaveAlliance => issuer.issue(PlayerCommand::LeaveAlliance),
+    }
+}
+
+/// The menu shows how alliances stand, so it is built again when they change.
+pub fn follow_world_politics(politics: Option<Res<WorldPolitics>>, mut menu: ResMut<MenuState>) {
+    if menu.open && politics.is_some_and(|politics| politics.is_changed()) {
+        menu.needs_rebuild = true;
+    }
+}
+
+/// The other players of a world, each with how an alliance with them stands and what can be done about it.
+fn spawn_alliances(
+    content: &mut ChildSpawnerCommands,
+    fonts: &UiFonts,
+    politics: &WorldPolitics,
+    local: Team,
+    colors: &SideColors,
+) {
+    content.spawn(fonts.heading(tr("ALLIANCES"), 18.0, ACCENT));
+    let others: Vec<Team> = politics
+        .players
+        .iter()
+        .copied()
+        .filter(|&team| team != local)
+        .collect();
+    if others.is_empty() {
+        content.spawn(fonts.text(tr("No other players in the world yet."), 15.0, TEXT_DIM));
+        return;
+    }
+    for team in others {
+        let allied = politics.allies.contains(&team);
+        let (status, action) = if allied {
+            (tr("Allied"), None)
+        } else if politics.offered_us.contains(&team) {
+            (
+                tr("Offers you an alliance"),
+                Some((tr("Accept alliance"), MenuAction::OfferAlliance(team))),
+            )
+        } else if politics.we_offered.contains(&team) {
+            (tr("Offer sent"), None)
+        } else {
+            (
+                tr("Enemy"),
+                Some((tr("Offer alliance"), MenuAction::OfferAlliance(team))),
+            )
+        };
+        content
+            .spawn(Node {
+                column_gap: Val::Px(12.0),
+                align_items: AlignItems::Center,
+                ..default()
+            })
+            .with_children(|row| {
+                row.spawn(fonts.heading(team.name(), 16.0, colors.ui_of(team)))
+                    .insert(Node {
+                        width: Val::Px(190.0),
+                        ..default()
+                    });
+                row.spawn(fonts.text(status, 15.0, TEXT_DIM)).insert(Node {
+                    width: Val::Px(170.0),
+                    ..default()
+                });
+                if let Some((label, action)) = action {
+                    let button = spawn_button(row, fonts, label, 180.0);
+                    row.commands()
+                        .entity(button)
+                        .insert(ActionButton(action))
+                        .observe(run_action);
+                }
+            });
+    }
+    if !politics.allies.is_empty() {
+        let leave = spawn_button(content, fonts, tr("Leave alliance"), 180.0);
+        content
+            .commands()
+            .entity(leave)
+            .insert(ActionButton(MenuAction::LeaveAlliance))
+            .observe(run_action);
     }
 }
 
@@ -922,6 +1013,7 @@ pub fn rebuild_menu_page(
     save_directory: Res<SaveDirectory>,
     battle: BattleSummary,
     contents: Query<Entity, With<MenuContent>>,
+    (politics, colors): (Option<Res<WorldPolitics>>, Res<SideColors>),
 ) {
     if !menu.needs_rebuild {
         return;
@@ -977,6 +1069,9 @@ pub fn rebuild_menu_page(
                     });
                     spawn_battle_card(row, &fonts, &battle);
                 });
+            if let Some(politics) = &politics {
+                spawn_alliances(content, &fonts, politics, battle.local.0, &colors);
+            }
         }
         MenuPage::Graphics => {
             for setting in GRAPHICS_SETTINGS {

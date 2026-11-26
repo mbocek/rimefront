@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -21,7 +21,7 @@ use crate::net::world_store::WorldStore;
 use crate::net::world_view::{
     Effect, FACING_STEPS, SideState, Spot, Thing, ThingState, ViewChange,
 };
-use crate::sim::catalog::{SideColor, Team};
+use crate::sim::catalog::{Diplomacy, SideColor, Team};
 use crate::sim::combat::{DamageSource, Destroyed};
 use crate::sim::components::{Building, Health};
 use crate::sim::cues::{BlastCue, SoundCue};
@@ -29,7 +29,7 @@ use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
 use crate::sim::neutral_sites::spawn_unclaimed_site;
-use crate::sim::notifications::News;
+use crate::sim::notifications::{News, SideNews};
 use crate::sim::outcome::GameOutcome;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
 use crate::sim::sides::{Shelter, Sides, side_stands};
@@ -316,7 +316,30 @@ pub fn enter_world(
     commands.insert_resource(MirroredBattle);
     commands.insert_resource(LocalTeam(team));
     commands.insert_resource(ActiveLevel(world_level(map_seed)));
+    commands.insert_resource(WorldPolitics::default());
     next_state.set(GameState::Playing);
+}
+
+/// Who the player may ally with in a world, and how their offers stand, for the pause menu.
+#[derive(Resource, Default, Debug)]
+pub struct WorldPolitics {
+    /// The sides players hold, the player's own among them.
+    pub players: Vec<Team>,
+    pub allies: Vec<Team>,
+    /// Sides that offered the player an alliance not answered yet.
+    pub offered_us: BTreeSet<Team>,
+    /// Sides the player offered an alliance, which did not answer yet.
+    pub we_offered: BTreeSet<Team>,
+}
+
+impl WorldPolitics {
+    fn allied_with(&mut self, allies: Vec<Team>) {
+        for ally in &allies {
+            self.offered_us.remove(ally);
+            self.we_offered.remove(ally);
+        }
+        self.allies = allies;
+    }
 }
 
 /// Every tick, shows what the world sent since the last: units and structures with the world's ids where
@@ -378,6 +401,17 @@ pub fn follow_world(world: &mut World) {
         }
         if let Some(sheltered) = change.sheltered {
             world.insert_resource(Shelter(sheltered.into_iter().collect()));
+        }
+        if let Some(allies) = change.allies {
+            world.insert_resource(Diplomacy::with_allies(side, &allies));
+            if let Some(mut politics) = world.get_resource_mut::<WorldPolitics>() {
+                politics.allied_with(allies);
+            }
+        }
+        if let (Some(players), Some(mut politics)) =
+            (change.players, world.get_resource_mut::<WorldPolitics>())
+        {
+            politics.players = players;
         }
     }
     glide(world);
@@ -526,6 +560,11 @@ fn show_effect(world: &mut World, side: Team, effect: Effect) {
             });
         }
         Effect::Told { news, at, .. } => {
+            if let (SideNews::AllianceOffered(from), Some(mut politics)) =
+                (news, world.get_resource_mut::<WorldPolitics>())
+            {
+                politics.offered_us.insert(from);
+            }
             world.write_message(News {
                 team: side,
                 news,
@@ -645,6 +684,7 @@ pub fn give_up_a_lost_world(
         lobby.fail(tr_owned(reason));
     }
     commands.remove_resource::<WorldClient>();
+    commands.remove_resource::<WorldPolitics>();
     if *state.get() == GameState::Playing {
         next_state.set(GameState::MainMenu);
     }
@@ -653,6 +693,7 @@ pub fn give_up_a_lost_world(
 /// Leaving the battle leaves the world; a world the game ran itself stops with it.
 pub fn leave_world(mut commands: Commands) {
     commands.remove_resource::<WorldClient>();
+    commands.remove_resource::<WorldPolitics>();
     commands.remove_resource::<MirroredBattle>();
 }
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::io;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
@@ -14,14 +15,16 @@ use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews,
 use rimefront_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
 use rimefront_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
 use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
-use rimefront_sim::sim::catalog::BuildingKind;
+use rimefront_sim::sim::alliances::AllianceOffers;
+use rimefront_sim::sim::catalog::{Alliance, BuildingKind, Diplomacy};
 use rimefront_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
 use rimefront_sim::sim::components::{Building, Harvester, Health, Unit};
 use rimefront_sim::sim::determinism::SimId;
 use rimefront_sim::sim::determinism::run_schedules_on_one_thread;
 use rimefront_sim::sim::economy::Economies;
+use rimefront_sim::sim::match_stats::MatchStats;
 use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
-use rimefront_sim::sim::notifications::{News, SideNews};
+use rimefront_sim::sim::notifications::{AwayLosses, AwayReport, News, SideNews};
 use rimefront_sim::sim::player_commands::{
     CommandQueue, GroundOrder, PlayerCommand, SimulationTick,
 };
@@ -139,7 +142,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 7;
+pub const WORLD_PROTOCOL: u32 = 8;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {
@@ -231,6 +234,8 @@ pub struct WorldHost {
     absence: AbsenceRules,
     /// The tick each side of a player who is not connected was left at.
     away_since: HashMap<Team, u64>,
+    /// What each away side had lost when its player left; not saved, so a restarted world has none.
+    losses_when_left: HashMap<Team, AwayLosses>,
     /// The generated site each newcomer's side was deployed on.
     sites: HashMap<Team, IVec2>,
     /// The computer sides that keep the world from standing empty, and the sites they hold.
@@ -314,6 +319,14 @@ impl WorldHost {
         host.computer_sides = hosting.computer_sides.iter().copied().collect();
         host.colors = hosting.colors.iter().copied().collect();
         host.deposits.clone_from(&hosting.deposits);
+        let world = host.app.world_mut();
+        let mut diplomacy = world.resource_mut::<Diplomacy>();
+        for camp in &hosting.alliances {
+            for &member in camp.iter().skip(1) {
+                diplomacy.join_camp_of(member, camp[0]);
+            }
+        }
+        world.insert_resource(AllianceOffers::of(&hosting.alliance_offers));
         for &team in host.sides_of_players.values() {
             host.away_since.entry(team).or_insert(saved.tick());
         }
@@ -388,7 +401,10 @@ impl WorldHost {
         let mut colors: Vec<(Team, SideColor)> =
             self.colors.iter().map(|(&t, &c)| (t, c)).collect();
         colors.sort_by_key(|(team, _)| *team);
+        let world = self.app.world();
         HostingRecord {
+            alliances: world.resource::<Diplomacy>().alliances(),
+            alliance_offers: world.resource::<AllianceOffers>().pairs(),
             deposits: self.deposits.clone(),
             colors,
             computer_sides,
@@ -461,6 +477,7 @@ impl WorldHost {
             entries: 0,
             absence: AbsenceRules::default(),
             away_since: HashMap::new(),
+            losses_when_left: HashMap::new(),
             sites: HashMap::new(),
             effects: WorldEffects::default(),
             mined: MinedCrystal::default(),
@@ -528,11 +545,14 @@ impl WorldHost {
 
     fn show_views(&mut self) {
         let effects = std::mem::take(&mut self.unshown_effects);
+        let mut players: Vec<Team> = self.sides_of_players.values().copied().collect();
+        players.sort();
         let news = WorldNews {
             tick: self.tick(),
             effects: &effects,
             mined: &self.mined,
             colors: &self.colors,
+            players: &players,
         };
         let snapshot = WorldSnapshot::of(self.app.world_mut());
         let world = self.app.world();
@@ -580,13 +600,21 @@ impl WorldHost {
         let shelter_after = ticks_in(self.absence.shelter_after);
         let mut shelter = *self.app.world().resource::<Shelter>();
         let mut newly_sheltered = Vec::new();
-        for &team in self.sides_of_players.values() {
+        let sides: Vec<Team> = self.sides_of_players.values().copied().collect();
+        for team in sides {
             if present.contains(&team) {
-                self.away_since.remove(&team);
+                if let Some(since) = self.away_since.remove(&team) {
+                    self.welcome_back(team, now - since);
+                }
                 shelter.0.remove(team);
                 continue;
             }
-            let since = *self.away_since.entry(team).or_insert(now);
+            let losses = self.losses_of(team);
+            if let Entry::Vacant(left) = self.away_since.entry(team) {
+                left.insert(now);
+                self.losses_when_left.insert(team, losses);
+            }
+            let since = self.away_since[&team];
             if now - since >= shelter_after && !shelter.covers(team) {
                 shelter.0.insert(team);
                 newly_sheltered.push(team);
@@ -595,6 +623,33 @@ impl WorldHost {
         self.app.insert_resource(shelter);
         for team in newly_sheltered {
             self.send_units_home(team);
+        }
+    }
+
+    /// A player back after long enough away to have been sheltered is told how long it was and what their
+    /// side lost meanwhile, if the world kept count.
+    fn welcome_back(&mut self, team: Team, ticks_away: u64) {
+        let before = self.losses_when_left.remove(&team);
+        if ticks_away < ticks_in(self.absence.shelter_after) {
+            return;
+        }
+        let now = self.losses_of(team);
+        let losses = before.map(|before| AwayLosses {
+            structures: now.structures.saturating_sub(before.structures),
+            units: now.units.saturating_sub(before.units),
+        });
+        let minutes = (ticks_away as f64 * SIMULATION_TICK.as_secs_f64() / 60.0) as u32;
+        self.app.world_mut().write_message(News::to(
+            team,
+            SideNews::WelcomeBack(AwayReport { minutes, losses }),
+        ));
+    }
+
+    fn losses_of(&self, team: Team) -> AwayLosses {
+        let tally = self.app.world().resource::<MatchStats>().of(team);
+        AwayLosses {
+            structures: tally.structures_lost,
+            units: tally.units_lost,
         }
     }
 
@@ -670,6 +725,7 @@ impl WorldHost {
     fn retire(&mut self, team: Team) {
         self.sides_of_players.retain(|_, &mut side| side != team);
         self.away_since.remove(&team);
+        self.losses_when_left.remove(&team);
         self.colors.remove(&team);
         if let Some(site) = self.sites.remove(&team) {
             free_starting_site(self.app.world_mut(), site);
@@ -945,6 +1001,7 @@ pub fn world_level(map_seed: u64) -> LevelDefinition {
         map_seed,
         landscape: Landscape::Wilds,
         objective: Objective::World,
+        alliance: Alliance::FreeForAll,
         ..LevelDefinition::default()
     }
 }
@@ -1528,6 +1585,92 @@ mod tests {
         assert!(
             !sheltered(&mut host),
             "still sheltered after the player came back"
+        );
+    }
+
+    fn offer_alliance(host: &mut WorldHost, player: &LocalConnection, to: Team) {
+        player.send(&Message::Orders {
+            commands: vec![PlayerCommand::OfferAlliance { to }],
+        });
+        for _ in 0..TICKS_PER_VIEW {
+            host.step(SIMULATION_TICK);
+        }
+    }
+
+    #[test]
+    fn two_players_who_offer_each_other_an_alliance_become_allies_until_one_leaves() {
+        let mut host = WorldHost::new(29);
+        let (mut first, first_team) = enter(&mut host);
+        let (second, second_team) = enter(&mut host);
+        let hostile = |host: &mut WorldHost| {
+            host.world()
+                .resource::<Diplomacy>()
+                .hostile(first_team, second_team)
+        };
+        let mut mirror = WorldMirror::default();
+        run(&mut host, 1, &mut mirror, &mut first);
+        assert!(hostile(&mut host), "players start as enemies");
+        assert!(mirror.players.contains(&second_team));
+
+        offer_alliance(&mut host, &first, second_team);
+        assert!(hostile(&mut host), "one offer made allies");
+        offer_alliance(&mut host, &second, first_team);
+        assert!(!hostile(&mut host), "both offers made no alliance");
+        follow(&mut mirror, &mut first);
+        assert_eq!(mirror.allies, [second_team]);
+        assert!(mirror.told.contains(&SideNews::AllianceFormed(second_team)));
+
+        let directory = scratch_directory("allied_world");
+        host.keep_in(WorldStore::at(&directory), Duration::from_secs(60))
+            .unwrap();
+        let saved = WorldStore::at(&directory).load().unwrap().unwrap();
+        let mut resumed = WorldHost::resume(&saved);
+        assert!(
+            !hostile(&mut resumed),
+            "the alliance did not outlast a restart"
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
+
+        second.send(&Message::Orders {
+            commands: vec![PlayerCommand::LeaveAlliance],
+        });
+        run(&mut host, 1, &mut mirror, &mut first);
+        assert!(hostile(&mut host), "leaving kept the alliance");
+        assert!(mirror.allies.is_empty());
+        assert!(mirror.told.contains(&SideNews::AllianceLeft(second_team)));
+    }
+
+    #[test]
+    fn a_player_back_after_a_while_away_is_told_what_their_side_lost() {
+        let mut host = WorldHost::new(29);
+        host.set_absence_rules(AbsenceRules {
+            shelter_after: Duration::from_secs(2),
+            ..AbsenceRules::default()
+        });
+        let key = PlayerKey::new_random();
+        let (visit, team) = enter_as(&mut host, &key);
+        drop(visit);
+        host.step(SIMULATION_TICK);
+        let world = host.world();
+        let (tank, _) = own_unit(world, team, UnitKind::Tank);
+        world.get_mut::<Health>(tank).unwrap().current = 0.0;
+        for _ in 0..3 * 20 {
+            host.step(SIMULATION_TICK);
+        }
+        let (mut back, _) = enter_as(&mut host, &key);
+        let mut mirror = WorldMirror::default();
+        run(&mut host, 1, &mut mirror, &mut back);
+        let report = mirror.told.iter().find_map(|news| match news {
+            SideNews::WelcomeBack(report) => Some(*report),
+            _ => None,
+        });
+        let report = report.expect("the player was not welcomed back");
+        assert_eq!(
+            report.losses,
+            Some(AwayLosses {
+                structures: 0,
+                units: 1
+            })
         );
     }
 

@@ -368,6 +368,8 @@ pub struct WorldNews<'a> {
     pub effects: &'a [Effect],
     pub mined: &'a MinedCrystal,
     pub colors: &'a HashMap<Team, SideColor>,
+    /// The sides players hold, lowest first.
+    pub players: &'a [Team],
 }
 
 /// What changed in a player's view of a world since the last one they were sent.
@@ -393,6 +395,10 @@ pub struct ViewChange {
     pub colors: Vec<(Team, SideColor)>,
     /// Every side sheltered while its player is away, when that changed.
     pub sheltered: Option<Vec<Team>>,
+    /// The player's allies, when they changed.
+    pub allies: Option<Vec<Team>>,
+    /// The sides players hold, when they changed: the ones an alliance can be offered to.
+    pub players: Option<Vec<Team>>,
 }
 
 impl ViewChange {
@@ -407,6 +413,8 @@ impl ViewChange {
             && self.crystal.is_empty()
             && self.colors.is_empty()
             && self.sheltered.is_none()
+            && self.allies.is_none()
+            && self.players.is_none()
     }
 }
 
@@ -546,6 +554,8 @@ pub struct SentView {
     crystal: HashMap<IVec2, u32>,
     colors: HashMap<Team, SideColor>,
     sheltered: Option<Vec<Team>>,
+    allies: Option<Vec<Team>>,
+    players: Option<Vec<Team>>,
 }
 
 impl SentView {
@@ -606,6 +616,11 @@ impl SentView {
             crystal: self.crystal_changes(&chunks, news.mined),
             colors: self.color_changes(news.colors),
             sheltered: self.shelter_change(world),
+            allies: changed(
+                &mut self.allies,
+                world.resource::<Diplomacy>().allies_of(viewer),
+            ),
+            players: changed(&mut self.players, news.players.to_vec()),
         };
         (!change.is_empty()).then_some(change)
     }
@@ -673,6 +688,14 @@ impl SentView {
     }
 }
 
+/// `now`, when it differs from what was sent before, which it then becomes.
+fn changed(sent: &mut Option<Vec<Team>>, now: Vec<Team>) -> Option<Vec<Team>> {
+    (sent.as_ref() != Some(&now)).then(|| {
+        *sent = Some(now.clone());
+        now
+    })
+}
+
 /// A player's copy of the part of a world they see, kept up to date from the views they are sent.
 #[derive(Default, Debug)]
 pub struct WorldMirror {
@@ -686,6 +709,8 @@ pub struct WorldMirror {
     pub told: Vec<SideNews>,
     pub colors: HashMap<Team, SideColor>,
     pub sheltered: Vec<Team>,
+    pub allies: Vec<Team>,
+    pub players: Vec<Team>,
 }
 
 impl WorldMirror {
@@ -718,6 +743,12 @@ impl WorldMirror {
         if let Some(sheltered) = &change.sheltered {
             self.sheltered.clone_from(sheltered);
         }
+        if let Some(allies) = &change.allies {
+            self.allies.clone_from(allies);
+        }
+        if let Some(players) = &change.players {
+            self.players.clone_from(players);
+        }
         self.told
             .extend(change.effects.iter().filter_map(|effect| match effect {
                 Effect::Told { news, .. } => Some(*news),
@@ -734,6 +765,7 @@ mod tests {
     use crate::world_host::{PlayerKey, WORLD_PROTOCOL};
     use rimefront_sim::sim::components::Stance;
     use rimefront_sim::sim::notifications::SideNews;
+    use rimefront_sim::sim::notifications::{AwayLosses, AwayReport};
     use rimefront_sim::sim::player_commands::{GroundOrder, PlayerCommand};
     use rimefront_sim::sim::research::Upgrade;
 
@@ -802,10 +834,23 @@ mod tests {
                     ),
                     at: None,
                 },
+                Effect::Told {
+                    team: Team::Azure,
+                    news: SideNews::WelcomeBack(AwayReport {
+                        minutes: 1_234,
+                        losses: Some(AwayLosses {
+                            structures: 2,
+                            units: 300,
+                        }),
+                    }),
+                    at: None,
+                },
             ],
             crystal: vec![(IVec2::new(3, -4), 1_500)],
             colors: vec![(Team::from_index(9), SideColor([1, 128, 255]))],
             sheltered: Some(vec![Team::from_index(4), Team::from_index(200)]),
+            allies: Some(vec![Team::from_index(7)]),
+            players: Some(vec![Team::from_index(4), Team::from_index(7)]),
         };
         vec![
             Message::EnterWorld {
@@ -834,6 +879,10 @@ mod tests {
                         units: vec![id],
                         stance: Stance::ALL[Stance::ALL.len() - 1],
                     },
+                    PlayerCommand::OfferAlliance {
+                        to: Team::from_index(7),
+                    },
+                    PlayerCommand::LeaveAlliance,
                 ],
             },
             Message::WorldView(Box::new(change)),

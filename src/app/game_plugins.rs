@@ -158,6 +158,7 @@ impl Plugin for BattleViewPlugin {
                     menu::toggle_menu,
                     menu::pause_while_menu_open,
                     savegame::quick_save_keys,
+                    menu::follow_world_politics,
                     menu::rebuild_menu_page.in_set(menu::MenuPageRebuild),
                     menu::refresh_menu,
                     sidebar::toggle_controls_help,

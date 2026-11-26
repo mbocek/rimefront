@@ -412,6 +412,17 @@ Taken on 2026-11-26:
   host and every player work the season out from the world's clock, so the protocol and the saved world
   carry nothing new. Snow and mud slow units on the host as in a battle, and the scenery, ground and sky
   turn while playing. A world's water never freezes: units could be standing on it when it thaws.
+- **Players make alliances themselves.** A world is a free-for-all (it used to inherit a level's default
+  camps, which made the second, third and fourth level sides allies). In the pause menu's *Game* page a
+  player offers another player an alliance; once both have offered, they are allies (`sim::alliances`,
+  `PlayerCommand::OfferAlliance`), and *Leave alliance* ends it for both. Allies see what each other sees
+  and do not fight. Alliances and unanswered offers are saved with the world (layout 7, which still reads
+  the worlds of layout 6 that release 2.0.0 saved), and each player is sent their allies and the sides
+  players hold (protocol 8).
+- **A player back after being away is told what happened**: how long they were gone and how many structures
+  and units their side lost meanwhile (`SideNews::WelcomeBack`), once they were away long enough to be
+  sheltered. The count starts when they leave and is not saved, so after a server restart they are told
+  only how long they were away.
 
 ### Measured: a world with many players
 

@@ -1,5 +1,6 @@
 pub mod abilities;
 pub mod ai;
+pub mod alliances;
 pub mod army_mix;
 pub mod cadence;
 pub mod catalog;

@@ -12,7 +12,6 @@ use crate::view::terrain_material::{
     Ice, TerrainSurface, WaterMaterial, WaterSurface, water_material,
 };
 use crate::world::map::{CELL_SIZE, CHUNK_CELLS, GameMap, map_bounds};
-use crate::world::season::Season;
 use crate::world::terrain::WATER_LEVEL;
 use crate::world::terrain::{FAR_RING_WIDTH, GroundLayers, LandscapeContext, OUTLANDS_WIDTH};
 use crate::world::wilds::WorldWidened;
@@ -346,7 +345,7 @@ pub fn spawn_terrain_visuals(
         &mut images,
         &mut water_materials,
         &fog,
-        level.0.season == Season::Winter,
+        level.0.water_frozen(),
     );
 }
 
@@ -404,7 +403,7 @@ pub fn follow_widened_ground(
         &mut images,
         &mut water_materials,
         &fog,
-        level.0.season == Season::Winter,
+        level.0.water_frozen(),
     );
 }
 

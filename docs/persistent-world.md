@@ -406,6 +406,13 @@ Taken on 2026-11-25, from the measurement below:
 - **A base starts to decay after three days away** and is gone two days later (`AbsenceRules`), long enough
   for a weekend away.
 
+Taken on 2026-11-26:
+
+- **A world goes round the year**, one season a day of world time, from summer (`Season::of_world_at`). The
+  host and every player work the season out from the world's clock, so the protocol and the saved world
+  carry nothing new. Snow and mud slow units on the host as in a battle, and the scenery, ground and sky
+  turn while playing. A world's water never freezes: units could be standing on it when it thaws.
+
 ### Measured: a world with many players
 
 `tests/world_bench.rs` lets players enter a world, each bringing a computer neighbour where none is near,

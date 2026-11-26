@@ -9,7 +9,6 @@ use crate::sim::sim_math;
 use crate::sim::sorties::Sortie;
 use crate::sim::spatial_index::SpatialIndex;
 use crate::world::map::{CELL_SIZE, GameMap, cell_center, in_far_half, world_to_cell};
-use crate::world::season::Season;
 use crate::world::terrain::WATER_LEVEL;
 
 const WAYPOINT_REACHED_DISTANCE: f32 = 0.2;
@@ -112,7 +111,7 @@ pub fn settle_on_terrain(
     )>,
 ) {
     let landscape = level.0.landscape;
-    let frozen = level.0.season == Season::Winter;
+    let frozen = level.0.water_frozen();
     let ground_height = |x: f32, z: f32| {
         let height = landscape.height(x, z);
         if frozen {

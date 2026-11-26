@@ -255,6 +255,25 @@ pub fn dress_flat_scenery(
     }
 }
 
+/// Undresses the merged scenery when the season turns, as a world's does, so it is dressed again in the new one.
+pub fn follow_the_season(
+    mut commands: Commands,
+    level: Option<Res<ActiveLevel>>,
+    mut dressed_for: Local<Option<Season>>,
+    dressed: Query<Entity, (With<FlatScenery>, With<Mesh3d>)>,
+) {
+    let season = level.map_or(Season::Summer, |level| level.0.season);
+    let previous = dressed_for.replace(season);
+    if previous.is_none_or(|previous| previous == season) {
+        return;
+    }
+    for entity in &dressed {
+        commands
+            .entity(entity)
+            .remove::<(Mesh3d, MeshMaterial3d<MovingMaterial>)>();
+    }
+}
+
 /// Turns the wind in every plant's material on or off with the graphics setting.
 pub fn follow_wind_setting(
     settings: Res<GameSettings>,

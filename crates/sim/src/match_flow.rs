@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::levels::{ActiveLevel, BaseSite, ForceSetup};
+use crate::levels::{ActiveLevel, BaseSite, ForceSetup, Objective};
 use crate::sim::ai::{AiCommander, AiCommanders, find_building_site};
 use crate::sim::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::combat::Targets;
@@ -16,6 +16,7 @@ use crate::sim::sides::admit_side;
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::sim::veterancy::LastHits;
 use crate::world::map::{GameMap, cell_center, in_far_half, level_bounds};
+use crate::world::season::Season;
 use crate::world::sites::claim_starting_site;
 
 #[derive(States, Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -61,6 +62,17 @@ pub struct RestoringSave;
 #[derive(Resource, Default)]
 pub struct MatchClock {
     pub elapsed_secs: f32,
+}
+
+/// A persistent world's season follows its clock.
+pub fn turn_the_world_seasons(clock: Res<MatchClock>, mut level: ResMut<ActiveLevel>) {
+    if level.0.objective != Objective::World {
+        return;
+    }
+    let season = Season::of_world_at(clock.elapsed_secs);
+    if level.0.season != season {
+        level.0.season = season;
+    }
 }
 
 pub fn reset_match_state(mut commands: Commands, level: Res<ActiveLevel>) {
@@ -273,5 +285,34 @@ pub fn deploy_level_forces(
     deploy_force(&mut commands, &mut map, Team::Azure, &level.player);
     for (team, enemy) in level.opponents() {
         deploy_force(&mut commands, &mut map, team, &enemy.force);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::ecs::system::RunSystemOnce;
+
+    use super::*;
+    use crate::levels::LevelDefinition;
+
+    fn season_after(objective: Objective, secs: f32) -> LevelDefinition {
+        let mut world = World::new();
+        world.insert_resource(ActiveLevel(LevelDefinition {
+            objective,
+            ..LevelDefinition::default()
+        }));
+        world.insert_resource(MatchClock { elapsed_secs: secs });
+        world.run_system_once(turn_the_world_seasons).unwrap();
+        world.resource::<ActiveLevel>().0.clone()
+    }
+
+    #[test]
+    fn a_world_reaches_winter_on_its_third_day_without_freezing_its_water() {
+        let winter_day = 2.5 * 24.0 * 3600.0;
+        let world = season_after(Objective::World, winter_day);
+        assert_eq!(world.season, Season::Winter);
+        assert!(!world.water_frozen());
+        let battle = season_after(Objective::DestroyAllEnemies, winter_day);
+        assert_eq!(battle.season, Season::Summer);
     }
 }

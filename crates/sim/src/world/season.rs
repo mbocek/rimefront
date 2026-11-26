@@ -76,6 +76,13 @@ impl Season {
         self as usize
     }
 
+    /// A persistent world goes round the year one season a day of its own time, starting in summer.
+    pub fn of_world_at(world_secs: f32) -> Season {
+        const WORLD_SEASON_SECS: f32 = 24.0 * 3600.0;
+        let seasons_gone = (world_secs / WORLD_SEASON_SECS) as usize;
+        Season::ALL[seasons_gone % Season::ALL.len()]
+    }
+
     /// Multiplies the grass texture of the terrain.
     pub fn grass_tint(self) -> Vec4 {
         match self {
@@ -183,6 +190,16 @@ mod tests {
     const ROCK: [f32; 4] = [0.3, 0.3, 0.32, 1.0];
     const SIDEWAYS: [f32; 3] = [1.0, 0.0, 0.0];
     const UP: [f32; 3] = [0.0, 1.0, 0.0];
+
+    #[test]
+    fn a_world_turns_one_season_a_day() {
+        let day = 24.0 * 3600.0;
+        assert_eq!(Season::of_world_at(0.0), Season::Summer);
+        assert_eq!(Season::of_world_at(day * 1.5), Season::Autumn);
+        assert_eq!(Season::of_world_at(day * 2.5), Season::Winter);
+        assert_eq!(Season::of_world_at(day * 3.5), Season::Spring);
+        assert_eq!(Season::of_world_at(day * 4.5), Season::Summer);
+    }
 
     #[test]
     fn summer_keeps_every_colour() {

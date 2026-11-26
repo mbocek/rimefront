@@ -37,6 +37,7 @@ use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
 use crate::view::side_tint::SideColors;
 use crate::world::map::{CrystalVisual, GameMap, crystal_scale, map_bounds, spawn_crystal_visual};
+use crate::world::season::Season;
 use crate::world::wilds::{crystal_look, widen_world};
 
 /// How long a world the game runs itself sleeps between steps; short enough to answer at once.
@@ -382,8 +383,12 @@ pub fn follow_world(world: &mut World) {
     glide(world);
     let world_tick = world_tick_now(world, local_tick);
     show_support_recharge(world, side, world_tick);
-    world.resource_mut::<MatchClock>().elapsed_secs =
-        world_tick as f32 * SIMULATION_TICK.as_secs_f32();
+    let world_secs = world_tick as f32 * SIMULATION_TICK.as_secs_f32();
+    world.resource_mut::<MatchClock>().elapsed_secs = world_secs;
+    let season = Season::of_world_at(world_secs);
+    if world.resource::<ActiveLevel>().0.season != season {
+        world.resource_mut::<ActiveLevel>().0.season = season;
+    }
     see_whether_the_side_fell(world, side);
 }
 

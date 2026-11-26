@@ -86,6 +86,7 @@ impl Plugin for BattleViewPlugin {
                 Update,
                 (
                     flat_scenery::merge_scenery_models,
+                    flat_scenery::follow_the_season,
                     flat_scenery::dress_flat_scenery,
                     flat_scenery::follow_wind_setting,
                     (sky::follow_the_weather, sky::announce_weather).chain(),

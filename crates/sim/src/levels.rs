@@ -340,6 +340,12 @@ impl Default for LevelDefinition {
 }
 
 impl LevelDefinition {
+    /// Winter freezes a battle's water; a world's seasons pass while units stand on it, so its water never
+    /// freezes and no one is left on thawing ice.
+    pub fn water_frozen(&self) -> bool {
+        self.season == Season::Winter && self.objective != Objective::World
+    }
+
     /// Sets the map size and landscape shape that every map query on this thread uses.
     pub fn shape_the_world(&self) {
         set_map_size(self.map_size);

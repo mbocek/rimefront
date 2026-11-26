@@ -221,7 +221,12 @@ impl Plugin for SimulationPlugin {
                         combat::chase_targets,
                         unit_orders::carry_out_orders,
                         (sorties::fly_home_to_rearm, sorties::climb_and_descend).chain(),
-                        (ground::update_ground, movement::follow_paths).chain(),
+                        (
+                            match_flow::turn_the_world_seasons,
+                            ground::update_ground,
+                            movement::follow_paths,
+                        )
+                            .chain(),
                         sorties::circle_while_waiting,
                         movement::separate_units,
                         movement::settle_on_terrain,

@@ -14,7 +14,6 @@ use crate::sim::sim_math;
 use crate::world::chunked_grid::ChunkedGrid;
 use crate::world::map_regions::Regions;
 use crate::world::scenery::{self, SceneryLayout};
-use crate::world::season::Season;
 use crate::world::terrain::{Landscape, approximate_ground};
 use crate::world::wilds;
 
@@ -750,7 +749,7 @@ pub fn generate_map(mut commands: Commands, level: Res<ActiveLevel>) {
     } else {
         wilds::generate_wilds(&mut commands, &mut map, &mut scenery, level.0.map_seed)
     };
-    if level.0.season == Season::Winter {
+    if level.0.water_frozen() {
         map.freeze_water(landscape);
     }
     commands.insert_resource(map);

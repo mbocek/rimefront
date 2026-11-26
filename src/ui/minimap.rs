@@ -16,7 +16,6 @@ use crate::view::fog_view::Discovered;
 use crate::view::local_view::LocalView;
 use crate::view::side_tint::SideColors;
 use crate::world::map::{CELL_SIZE, GameMap, footprint_cells, map_bounds};
-use crate::world::season::Season;
 use crate::world::terrain::GroundLayers;
 use crate::world::wilds::WorldWidened;
 
@@ -123,11 +122,7 @@ pub fn terrain_pixels(map: &GameMap, level: &LevelDefinition) -> Vec<u8> {
     let landscape = level.landscape;
     let ground = GroundLayers::new(landscape);
     let grass = level.season.minimap_grass();
-    let water = if level.season == Season::Winter {
-        ICE
-    } else {
-        WATER
-    };
+    let water = if level.water_frozen() { ICE } else { WATER };
     let map_corner = map_bounds().world_min();
     let metres_per_pixel = CELL_SIZE / pixels_per_cell();
     let size = resolution();

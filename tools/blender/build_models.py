@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rimefront_models import (antiquity, buildings, decorations, gunpowder, nature, ore, soldier, units, upgrades,  # noqa: E402
+from rimefront_models import (antiquity, buildings, decorations, gunpowder, industrial, nature, ore, soldier, units, upgrades,  # noqa: E402
                               vegetation)
 from rimefront_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # noqa: E402
 from rimefront_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
@@ -98,6 +98,25 @@ TEAM_MODELS = {
     "factory_gunpowder": (gunpowder.build_factory_gunpowder, BUILDING_TRIANGLE_BUDGET),
     "tech_center_gunpowder": (gunpowder.build_tech_center_gunpowder, BUILDING_TRIANGLE_BUDGET),
     "repair_bay_gunpowder": (gunpowder.build_repair_bay_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "fusilier": (industrial.build_fusilier, UNIT_TRIANGLE_BUDGET),
+    "mortar_team": (industrial.build_mortar_team, UNIT_TRIANGLE_BUDGET),
+    "orderly": (industrial.build_orderly, UNIT_TRIANGLE_BUDGET),
+    "pioneer": (industrial.build_pioneer, UNIT_TRIANGLE_BUDGET),
+    "armoured_car": (industrial.build_armoured_car, UNIT_TRIANGLE_BUDGET),
+    "landship": (industrial.build_landship, UNIT_TRIANGLE_BUDGET),
+    "siege_gun": (industrial.build_siege_gun, UNIT_TRIANGLE_BUDGET),
+    "lorry": (industrial.build_lorry, UNIT_TRIANGLE_BUDGET),
+    "steam_harvester": (industrial.build_steam_harvester, UNIT_TRIANGLE_BUDGET),
+    "biplane": (industrial.build_biplane, UNIT_TRIANGLE_BUDGET),
+    "biplane_bomber": (industrial.build_biplane_bomber, UNIT_TRIANGLE_BUDGET),
+    "pillbox": (industrial.build_pillbox, BUILDING_TRIANGLE_BUDGET),
+    "command_center_industrial": (industrial.build_command_center_industrial, BUILDING_TRIANGLE_BUDGET),
+    "power_plant_industrial": (industrial.build_power_plant_industrial, BUILDING_TRIANGLE_BUDGET),
+    "refinery_industrial": (industrial.build_refinery_industrial, BUILDING_TRIANGLE_BUDGET),
+    "barracks_industrial": (industrial.build_barracks_industrial, BUILDING_TRIANGLE_BUDGET),
+    "factory_industrial": (industrial.build_factory_industrial, BUILDING_TRIANGLE_BUDGET),
+    "tech_center_industrial": (industrial.build_tech_center_industrial, BUILDING_TRIANGLE_BUDGET),
+    "repair_bay_industrial": (industrial.build_repair_bay_industrial, BUILDING_TRIANGLE_BUDGET),
 }
 ICON_ONLY_MODELS = {
     "upgrade_armour": upgrades.build_armour_upgrade,
@@ -132,7 +151,7 @@ NEUTRAL_MODELS = {
     "bush_round": (vegetation.build_bush_round, 2_000),
     "bush_flowering": (vegetation.build_bush_flowering, 2_000),
 }
-MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower", "field_gun", "cannon_tower"}
+MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower", "field_gun", "cannon_tower", "armoured_car", "siege_gun", "pillbox"}
 INFANTRY_NODES = ("Rig", "Body", "hips", "chest", "head", "rifle", "hand.L", "hand.R")
 INFANTRY_CLIPS = {"Idle": None, "Walk": None, "KneelFire": None, "Death": None}
 REQUIRED_NODES = {
@@ -152,6 +171,11 @@ REQUIRED_NODES = {
     "bombardier": INFANTRY_NODES,
     "surgeon": INFANTRY_NODES,
     "sapper": INFANTRY_NODES,
+    "fusilier": INFANTRY_NODES,
+    "mortar_team": INFANTRY_NODES,
+    "orderly": INFANTRY_NODES,
+    "pioneer": INFANTRY_NODES,
+    "steam_harvester": ("OreLoad", "CollectorDrum"),
     "ore_cart": ("OreLoad", "CollectorDrum"),
     "ore_wagon": ("OreLoad", "CollectorDrum"),
     "gunship": ("Rotor", "TailRotor"),
@@ -177,6 +201,12 @@ REQUIRED_ANIMATIONS = {
     "bombardier": INFANTRY_CLIPS,
     "surgeon": INFANTRY_CLIPS,
     "sapper": INFANTRY_CLIPS,
+    "fusilier": INFANTRY_CLIPS,
+    "mortar_team": INFANTRY_CLIPS,
+    "orderly": INFANTRY_CLIPS,
+    "pioneer": INFANTRY_CLIPS,
+    "steam_harvester": {"Drive": None, "Work": "CollectorDrum"},
+    "siege_gun": {"Drive": None, "Fire": "Barrel"},
     "ore_cart": {"Drive": None, "Work": "CollectorDrum"},
     "ore_wagon": {"Drive": None, "Work": "CollectorDrum"},
     "field_gun": {"Drive": None, "Fire": "Barrel"},

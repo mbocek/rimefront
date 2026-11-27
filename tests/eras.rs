@@ -546,3 +546,74 @@ fn a_gunpowder_battle_between_computers_is_fought_to_the_end() {
         assert!(eras.iter().all(|&era| era == Era::Gunpowder), "{eras:?}");
     }
 }
+
+fn industrial_battle(enemy_ai: bool, starting_forces: bool) -> Battle {
+    let level = SkirmishOptions {
+        era: Era::Industrial,
+        ..default()
+    }
+    .to_level();
+    Battle::new(BattleSetup {
+        enemy_ai,
+        starting_forces,
+        level: Some(level),
+    })
+}
+
+#[test]
+fn the_industrial_age_takes_to_the_air_and_builds_flak_and_walls() {
+    let mut battle = industrial_battle(false, true);
+    let eras = eras_of(&mut battle, Team::Azure);
+    assert!(eras.iter().all(|&era| era == Era::Industrial), "{eras:?}");
+    let production = battle.world().resource::<Production>();
+    for allowed in [
+        BuildItem::Structure(BuildingKind::Helipad),
+        BuildItem::Structure(BuildingKind::FlakCannon),
+        BuildItem::Structure(BuildingKind::Wall),
+        BuildItem::Structure(BuildingKind::Pillbox),
+        BuildItem::Unit(UnitKind::Biplane),
+        BuildItem::Unit(UnitKind::BiplaneBomber),
+    ] {
+        assert!(production.allows(Team::Azure, allowed), "{allowed:?}");
+    }
+    for forbidden in [
+        BuildItem::Structure(BuildingKind::Palisade),
+        BuildItem::Structure(BuildingKind::GunTurret),
+        BuildItem::Unit(UnitKind::Fighter),
+    ] {
+        assert!(!production.allows(Team::Azure, forbidden), "{forbidden:?}");
+    }
+    assert!(UnitKind::Biplane.lands_on_pad());
+    assert!(UnitKind::BiplaneBomber.rearms_at_pad());
+}
+
+#[test]
+fn every_age_on_the_way_promotes_into_the_next() {
+    let ages = [Era::Antiquity, Era::Gunpowder, Era::Industrial, Era::Modern];
+    assert_eq!(Era::playable().collect::<Vec<_>>(), ages);
+    let mut infantry = UnitKind::Spearman;
+    for &era in &ages[1..] {
+        infantry = infantry.promoted_into(era).expect("infantry in every age");
+        assert_eq!(infantry.era(), era);
+    }
+    assert_eq!(infantry, UnitKind::Rifleman);
+    assert_eq!(
+        BuildingKind::CannonTower.promoted_into(Era::Industrial),
+        Some(BuildingKind::Pillbox)
+    );
+    assert_eq!(
+        BuildingKind::Palisade.promoted_into(Era::Industrial),
+        Some(BuildingKind::Wall)
+    );
+    assert_eq!(BuildingKind::Wall.promoted_into(Era::Modern), None);
+}
+
+#[test]
+fn an_industrial_battle_between_computers_is_fought_to_the_end() {
+    let mut battle = industrial_battle(true, true);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    let over = battle.run_until(60.0 * 60.0, |battle| {
+        battle.outcome() != GameOutcome::Ongoing || both_sides_exhausted(battle)
+    });
+    assert!(over.is_some(), "an hour passed and both sides still fight");
+}

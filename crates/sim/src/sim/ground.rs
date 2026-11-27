@@ -36,7 +36,11 @@ impl RunningGear {
             | UnitKind::Surgeon
             | UnitKind::Sapper
             | UnitKind::Dragoon
-            | UnitKind::Cuirassier => RunningGear::Feet,
+            | UnitKind::Cuirassier
+            | UnitKind::Fusilier
+            | UnitKind::MortarTeam
+            | UnitKind::Orderly
+            | UnitKind::Pioneer => RunningGear::Feet,
             UnitKind::Scout
             | UnitKind::MissileTruck
             | UnitKind::RepairTruck
@@ -47,14 +51,23 @@ impl RunningGear {
             | UnitKind::Wagon
             | UnitKind::OreCart
             | UnitKind::FieldGun
-            | UnitKind::OreWagon => RunningGear::Wheels,
+            | UnitKind::OreWagon
+            | UnitKind::ArmouredCar
+            | UnitKind::SiegeGun
+            | UnitKind::Lorry
+            | UnitKind::SteamHarvester => RunningGear::Wheels,
+            UnitKind::Landship => RunningGear::Tracks,
             UnitKind::Tank
             | UnitKind::Bulwark
             | UnitKind::Artillery
             | UnitKind::Harvester
             | UnitKind::FlakTrack
             | UnitKind::StealthTank => RunningGear::Tracks,
-            UnitKind::Gunship | UnitKind::Bomber | UnitKind::Fighter => RunningGear::Wings,
+            UnitKind::Gunship
+            | UnitKind::Bomber
+            | UnitKind::Fighter
+            | UnitKind::Biplane
+            | UnitKind::BiplaneBomber => RunningGear::Wings,
         }
     }
 

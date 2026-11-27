@@ -80,7 +80,11 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
         | UnitKind::Musketeer
         | UnitKind::Bombardier
         | UnitKind::Surgeon
-        | UnitKind::Sapper => 2.4,
+        | UnitKind::Sapper
+        | UnitKind::Fusilier
+        | UnitKind::MortarTeam
+        | UnitKind::Orderly
+        | UnitKind::Pioneer => 2.4,
         UnitKind::Horseman => 6.2,
         UnitKind::Chariot => 4.6,
         UnitKind::Catapult => 2.0,
@@ -90,6 +94,11 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
         UnitKind::Cuirassier => 4.8,
         UnitKind::FieldGun => 2.4,
         UnitKind::OreWagon => 3.0,
+        UnitKind::ArmouredCar => 6.0,
+        UnitKind::Landship => 2.0,
+        UnitKind::SiegeGun => 2.2,
+        UnitKind::Lorry => 5.0,
+        UnitKind::SteamHarvester => 2.4,
         UnitKind::Bulwark => 2.2,
         UnitKind::Gunship => 6.5,
         UnitKind::FlakTrack => 3.2,
@@ -99,6 +108,8 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
         UnitKind::RaiderBike => 6.0,
         UnitKind::Bomber => 9.0,
         UnitKind::Fighter => 11.0,
+        UnitKind::Biplane => 9.0,
+        UnitKind::BiplaneBomber => 7.5,
         UnitKind::TroopCarrier => 4.2,
     }
 }
@@ -387,6 +398,8 @@ const TAIL_ROTOR_SPEEDUP: f32 = 1.6;
 #[derive(Component)]
 pub struct Rotors {
     main: (Entity, Quat),
+    /// A helicopter's rotor turns about the vertical, a biplane's propeller about the length of the plane.
+    main_axis: Vec3,
     tail: Option<(Entity, Quat)>,
     angle: f32,
 }
@@ -402,9 +415,13 @@ pub fn link_rotor_nodes(
             crate::view::assets::named_node(entity, wanted, &children, &nodes)
                 .map(|(node, transform)| (node, transform.rotation))
         };
-        if let Some(main) = find("Rotor") {
+        let main = find("Rotor")
+            .map(|rotor| (rotor, Vec3::Y))
+            .or_else(|| find("Propeller").map(|propeller| (propeller, Vec3::X)));
+        if let Some((main, main_axis)) = main {
             commands.entity(entity).insert(Rotors {
                 main,
+                main_axis,
                 tail: find("TailRotor"),
                 angle: 0.0,
             });
@@ -423,7 +440,7 @@ pub fn spin_rotors(
             % std::f32::consts::TAU;
         let (main, main_rest) = rotors.main;
         if let Ok(mut transform) = nodes.get_mut(main) {
-            transform.rotation = main_rest * Quat::from_rotation_y(rotors.angle);
+            transform.rotation = main_rest * Quat::from_axis_angle(rotors.main_axis, rotors.angle);
         }
         if let Some((tail, tail_rest)) = rotors.tail
             && let Ok(mut transform) = nodes.get_mut(tail)

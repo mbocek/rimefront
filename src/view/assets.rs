@@ -35,7 +35,7 @@ const WALL_LINK_MODEL: &str = "wall_link";
 const PALISADE_LINK_MODEL: &str = "palisade_link";
 
 /// Structures that every era builds wear the look of the age; the modern one is their own model.
-const ERA_LOOKS: [(BuildingKind, Era, &str); 14] = [
+const ERA_LOOKS: [(BuildingKind, Era, &str); 21] = [
     (
         BuildingKind::CommandCenter,
         Era::Antiquity,
@@ -81,6 +81,37 @@ const ERA_LOOKS: [(BuildingKind, Era, &str); 14] = [
         BuildingKind::RepairBay,
         Era::Gunpowder,
         "repair_bay_gunpowder",
+    ),
+    (
+        BuildingKind::CommandCenter,
+        Era::Industrial,
+        "command_center_industrial",
+    ),
+    (
+        BuildingKind::PowerPlant,
+        Era::Industrial,
+        "power_plant_industrial",
+    ),
+    (
+        BuildingKind::Refinery,
+        Era::Industrial,
+        "refinery_industrial",
+    ),
+    (
+        BuildingKind::Barracks,
+        Era::Industrial,
+        "barracks_industrial",
+    ),
+    (BuildingKind::Factory, Era::Industrial, "factory_industrial"),
+    (
+        BuildingKind::TechCenter,
+        Era::Industrial,
+        "tech_center_industrial",
+    ),
+    (
+        BuildingKind::RepairBay,
+        Era::Industrial,
+        "repair_bay_industrial",
     ),
 ];
 

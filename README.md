@@ -50,7 +50,7 @@ make help          # every target
 | --- | --- |
 | [Controls](docs/controls.md) | mouse, keyboard and rebindable keys |
 | [Rules](docs/rules.md) | factions, units, structures, research, economy, veterancy |
-| [Ages](docs/eras.md) | antiquity, the age of gunpowder and the modern age, lines of units, promotion when the age turns, ages of a world |
+| [Ages](docs/eras.md) | four ages from antiquity through gunpowder and industry to the modern one, lines of units, promotion when the age turns, ages of a world |
 | [Missions and custom levels](docs/levels.md) | campaign, random battles, battle editor, level file format |
 | [Settings, saves and updates](docs/settings.md) | where settings and saves live, performance notes, update check |
 | [Sound and music](docs/audio.md) | effects, recorded gunfire, music, positional sound, voice reports |

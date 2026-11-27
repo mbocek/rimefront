@@ -91,6 +91,16 @@ it is fast and beats bombardiers. Hard beats Normal 17:5 and 18:6 (from either b
 the ore wagons pays (a probe of four matches showed the beaten Normal side with one ore wagon). A match takes
 8-11 minutes.
 
+## The industrial age
+
+`--era industrial`, 24 matches per pairing: fusiliers beat landships in numbers (+63) and lose to mortars and
+armoured cars, mortars break fusiliers (+68), the armoured car hunts infantry and mortars (+46, +65), the
+landship beats cars, mortars and siege guns, and the siege gun shells everything on the ground but the
+landship. Biplanes only fight aircraft; the bomber is the counter to the landship and siege gun and loses to
+biplanes and flak. **The difficulties are out of order in this age**: Hard against Normal comes out even over
+both base sites (15:7 as challenger, 7:16 as defender) and Brutal loses to Hard 8:14, while Easy wins none of
+24. Fewer bombs, weaker mortars and splitting waves or not did not change it; it is left open for play.
+
 ## Commander personalities
 
 Each personality plays Normal against the Balanced commander on Normal, with fog of war, 40 matches per

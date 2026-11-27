@@ -426,6 +426,17 @@ pub enum UnitKind {
     Cuirassier,
     FieldGun,
     OreWagon,
+    Fusilier,
+    MortarTeam,
+    Orderly,
+    Pioneer,
+    ArmouredCar,
+    Landship,
+    SiegeGun,
+    Lorry,
+    SteamHarvester,
+    Biplane,
+    BiplaneBomber,
 }
 
 pub struct UnitSpec {
@@ -456,7 +467,7 @@ pub struct UnitSpec {
 }
 
 impl UnitKind {
-    pub const INFANTRY: [UnitKind; 15] = [
+    pub const INFANTRY: [UnitKind; 19] = [
         UnitKind::Spearman,
         UnitKind::Archer,
         UnitKind::Healer,
@@ -465,6 +476,10 @@ impl UnitKind {
         UnitKind::Bombardier,
         UnitKind::Surgeon,
         UnitKind::Sapper,
+        UnitKind::Fusilier,
+        UnitKind::MortarTeam,
+        UnitKind::Orderly,
+        UnitKind::Pioneer,
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Grenadier,
@@ -473,7 +488,7 @@ impl UnitKind {
         UnitKind::Medic,
         UnitKind::Engineer,
     ];
-    pub const VEHICLES: [UnitKind; 23] = [
+    pub const VEHICLES: [UnitKind; 30] = [
         UnitKind::Horseman,
         UnitKind::Chariot,
         UnitKind::Catapult,
@@ -483,6 +498,13 @@ impl UnitKind {
         UnitKind::Cuirassier,
         UnitKind::FieldGun,
         UnitKind::OreWagon,
+        UnitKind::ArmouredCar,
+        UnitKind::Landship,
+        UnitKind::SiegeGun,
+        UnitKind::Lorry,
+        UnitKind::SteamHarvester,
+        UnitKind::Biplane,
+        UnitKind::BiplaneBomber,
         UnitKind::Scout,
         UnitKind::TroopCarrier,
         UnitKind::RaiderBike,
@@ -499,7 +521,7 @@ impl UnitKind {
         UnitKind::Harvester,
     ];
     /// New kinds go at the end: replays store a unit's look as its place in this list.
-    pub const ALL: [UnitKind; 38] = [
+    pub const ALL: [UnitKind; 49] = [
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Medic,
@@ -538,6 +560,17 @@ impl UnitKind {
         UnitKind::Cuirassier,
         UnitKind::FieldGun,
         UnitKind::OreWagon,
+        UnitKind::Fusilier,
+        UnitKind::MortarTeam,
+        UnitKind::Orderly,
+        UnitKind::Pioneer,
+        UnitKind::ArmouredCar,
+        UnitKind::Landship,
+        UnitKind::SiegeGun,
+        UnitKind::Lorry,
+        UnitKind::SteamHarvester,
+        UnitKind::Biplane,
+        UnitKind::BiplaneBomber,
     ];
 
     pub fn flies(self) -> bool {
@@ -584,22 +617,33 @@ impl UnitKind {
             UnitKind::Cuirassier => &CUIRASSIER,
             UnitKind::FieldGun => &FIELD_GUN,
             UnitKind::OreWagon => &ORE_WAGON,
+            UnitKind::Fusilier => &FUSILIER,
+            UnitKind::MortarTeam => &MORTAR_TEAM,
+            UnitKind::Orderly => &ORDERLY,
+            UnitKind::Pioneer => &PIONEER,
+            UnitKind::ArmouredCar => &ARMOURED_CAR,
+            UnitKind::Landship => &LANDSHIP,
+            UnitKind::SiegeGun => &SIEGE_GUN,
+            UnitKind::Lorry => &LORRY,
+            UnitKind::SteamHarvester => &STEAM_HARVESTER,
+            UnitKind::Biplane => &BIPLANE,
+            UnitKind::BiplaneBomber => &BIPLANE_BOMBER,
         }
     }
 
     /// Aircraft that strike once and fly back to a Helipad to rearm before the next run.
     pub fn rearms_at_pad(self) -> bool {
-        self == UnitKind::Bomber
+        self.line() == UnitLine::Bomber
     }
 
     /// Aircraft that land on their Helipad when idle there instead of hovering, as only a helicopter can.
     pub fn lands_on_pad(self) -> bool {
-        matches!(self, UnitKind::Bomber | UnitKind::Fighter)
+        matches!(self.line(), UnitLine::Bomber | UnitLine::Fighter)
     }
 
     /// Units that blend into the ground after keeping still for a while.
     pub fn hides_when_still(self) -> bool {
-        matches!(self, UnitKind::Sniper | UnitKind::StealthTank)
+        matches!(self.line(), UnitLine::Marksman | UnitLine::Stealth)
     }
 }
 
@@ -623,6 +667,7 @@ pub enum BuildingKind {
     Watchtower,
     Palisade,
     CannonTower,
+    Pillbox,
 }
 
 pub struct BuildingSpec {
@@ -645,7 +690,7 @@ pub struct BuildingSpec {
 }
 
 impl BuildingKind {
-    pub const CONSTRUCTIBLE: [BuildingKind; 14] = [
+    pub const CONSTRUCTIBLE: [BuildingKind; 15] = [
         BuildingKind::PowerPlant,
         BuildingKind::Refinery,
         BuildingKind::Barracks,
@@ -660,6 +705,7 @@ impl BuildingKind {
         BuildingKind::Watchtower,
         BuildingKind::Palisade,
         BuildingKind::CannonTower,
+        BuildingKind::Pillbox,
     ];
 
     /// Stand unclaimed on the map until an engineer takes one; nobody builds them.
@@ -702,6 +748,7 @@ impl BuildingKind {
             BuildingKind::FieldHospital => &FIELD_HOSPITAL,
             BuildingKind::Watchtower => &WATCHTOWER,
             BuildingKind::CannonTower => &CANNON_TOWER,
+            BuildingKind::Pillbox => &PILLBOX,
             BuildingKind::Palisade => &PALISADE,
         }
     }
@@ -1543,7 +1590,7 @@ const GUN_TURRET: BuildingSpec = BuildingSpec {
 };
 
 const WALL: BuildingSpec = BuildingSpec {
-    era: Eras::Only(Era::Modern),
+    era: Eras::Span(Era::Industrial, Era::Modern),
     line: Some(DefenceLine::Wall),
     name: "Wall",
     role: "Concrete barrier. Drag to lay a line; each segment is paid as it is placed.",
@@ -1577,7 +1624,7 @@ const HELIPAD: BuildingSpec = BuildingSpec {
 };
 
 const FLAK_CANNON: BuildingSpec = BuildingSpec {
-    era: Eras::Only(Era::Modern),
+    era: Eras::Span(Era::Industrial, Era::Modern),
     line: Some(DefenceLine::AntiAir),
     name: "Flak Cannon",
     role: "Anti-aircraft gun pit. Cannot shoot at ground targets.",
@@ -2288,6 +2335,377 @@ const CANNON_TOWER: BuildingSpec = BuildingSpec {
     prerequisites: &[BuildingKind::Barracks],
     weapon: Some(TOWER_CANNON),
     sight: 17.0,
+    faction: None,
+};
+
+const BOLT_RIFLE: WeaponSpec = WeaponSpec {
+    range: 8.5,
+    damage: 12.0,
+    reload_secs: 1.2,
+    projectile_speed: 60.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.25,
+    versus_structure: 0.2,
+    versus_aircraft: 0.2,
+    report: Sound::RifleShot,
+};
+
+const LIGHT_MORTAR: WeaponSpec = WeaponSpec {
+    range: 11.0,
+    damage: 24.0,
+    reload_secs: 2.8,
+    projectile_speed: 14.0,
+    splash_radius: 1.6,
+    style: ProjectileStyle::ArtilleryShell,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.3,
+    versus_structure: 0.8,
+    versus_aircraft: 0.0,
+    report: Sound::GrenadeLaunch,
+};
+
+const CAR_MACHINE_GUN: WeaponSpec = WeaponSpec {
+    range: 8.0,
+    damage: 7.0,
+    reload_secs: 0.35,
+    projectile_speed: 60.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.2,
+    versus_structure: 0.1,
+    versus_aircraft: 0.3,
+    report: Sound::MachineGunShot,
+};
+
+const LANDSHIP_GUNS: WeaponSpec = WeaponSpec {
+    range: 9.0,
+    damage: 30.0,
+    reload_secs: 1.6,
+    projectile_speed: 35.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Shell,
+    versus_infantry: 0.8,
+    versus_vehicle: 1.0,
+    versus_structure: 0.9,
+    versus_aircraft: 0.0,
+    report: Sound::CannonShot,
+};
+
+const SIEGE_SHELL: WeaponSpec = WeaponSpec {
+    range: 19.0,
+    damage: 85.0,
+    reload_secs: 4.5,
+    projectile_speed: 18.0,
+    splash_radius: 2.0,
+    style: ProjectileStyle::ArtilleryShell,
+    versus_infantry: 0.5,
+    versus_vehicle: 0.7,
+    versus_structure: 1.3,
+    versus_aircraft: 0.0,
+    report: Sound::HowitzerShot,
+};
+
+const BIPLANE_GUNS: WeaponSpec = WeaponSpec {
+    range: 8.0,
+    damage: 12.0,
+    reload_secs: 0.4,
+    projectile_speed: 60.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 0.0,
+    versus_vehicle: 0.0,
+    versus_structure: 0.0,
+    versus_aircraft: 1.0,
+    report: Sound::MachineGunShot,
+};
+
+const BIPLANE_BOMBS: WeaponSpec = WeaponSpec {
+    range: 3.0,
+    damage: 110.0,
+    reload_secs: 16.0,
+    projectile_speed: 14.0,
+    splash_radius: 2.8,
+    style: ProjectileStyle::Shell,
+    versus_infantry: 0.8,
+    versus_vehicle: 1.0,
+    versus_structure: 1.4,
+    versus_aircraft: 0.0,
+    report: Sound::CannonShot,
+};
+
+const PILLBOX_GUN: WeaponSpec = WeaponSpec {
+    range: 10.0,
+    damage: 9.0,
+    reload_secs: 0.3,
+    projectile_speed: 60.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.25,
+    versus_structure: 0.1,
+    versus_aircraft: 0.0,
+    report: Sound::MachineGunShot,
+};
+
+const FUSILIER: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Infantry,
+    name: "Fusilier",
+    role: "Infantry with a bolt-action rifle. Cheap and steady.",
+    model_id: "fusilier",
+    cost: 110,
+    build_secs: 5.0,
+    max_health: 75.0,
+    speed: 2.5,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(BOLT_RIFLE),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const MORTAR_TEAM: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Ranged,
+    name: "Mortar Team",
+    role: "Lobs mortar bombs over cover. Breaks massed infantry, weak against cars.",
+    model_id: "mortar_team",
+    cost: 220,
+    build_secs: 7.0,
+    max_health: 60.0,
+    speed: 2.3,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(LIGHT_MORTAR),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 13.0,
+};
+
+const ORDERLY: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Healer,
+    name: "Orderly",
+    role: "Unarmed. Treats wounded infantry nearby and follows the squad.",
+    model_id: "orderly",
+    cost: 180,
+    build_secs: 6.0,
+    max_health: 55.0,
+    speed: 2.5,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 9.0,
+    sight: 12.0,
+};
+
+const PIONEER: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Builder,
+    name: "Pioneer",
+    role: "Unarmed. Right-click an enemy structure to take it over, or a damaged own one to mend it.",
+    model_id: "pioneer",
+    cost: 480,
+    build_secs: 9.0,
+    max_health: 55.0,
+    speed: 2.6,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const ARMOURED_CAR: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Fast,
+    name: "Armoured Car",
+    role: "A fast car with a machine gun turret. Hunts infantry and mortars.",
+    model_id: "armoured_car",
+    cost: 500,
+    build_secs: 9.0,
+    max_health: 260.0,
+    speed: 6.0,
+    turn_rate: 5.0,
+    radius: 1.0,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(CAR_MACHINE_GUN),
+    has_turret: true,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 18.0,
+};
+
+const LANDSHIP: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Main,
+    name: "Landship",
+    role: "A rhomboid tank with guns in its sponsons. Slow, crosses anything, hard to stop.",
+    model_id: "landship",
+    cost: 800,
+    build_secs: 14.0,
+    max_health: 620.0,
+    speed: 2.3,
+    turn_rate: 2.5,
+    radius: 1.4,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(LANDSHIP_GUNS),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 14.0,
+};
+
+const SIEGE_GUN: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Siege,
+    name: "Siege Gun",
+    role: "A heavy gun on steel wheels. Shells structures and troops from far behind the line.",
+    model_id: "siege_gun",
+    cost: 950,
+    build_secs: 17.0,
+    max_health: 260.0,
+    speed: 2.2,
+    turn_rate: 3.0,
+    radius: 1.1,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(SIEGE_SHELL),
+    has_turret: true,
+    producer: BuildingKind::Factory,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const LORRY: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Transport,
+    name: "Lorry",
+    role: "A canvas-backed lorry for five infantry, who shoot from under its tilt. Unarmed itself.",
+    model_id: "lorry",
+    cost: 500,
+    build_secs: 9.0,
+    max_health: 340.0,
+    speed: 5.0,
+    turn_rate: 4.0,
+    radius: 1.0,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 14.0,
+};
+
+const STEAM_HARVESTER: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Harvester,
+    name: "Steam Harvester",
+    role: "A traction engine that rakes up crystals and hauls them to the works. Unarmed.",
+    model_id: "steam_harvester",
+    cost: 1000,
+    build_secs: 15.0,
+    max_health: 650.0,
+    speed: 2.4,
+    turn_rate: 3.0,
+    radius: 1.1,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 10.0,
+};
+
+const BIPLANE: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Fighter,
+    name: "Biplane",
+    role: "A fighter of wood and canvas. Only shoots aircraft; returns to its Helipad to rearm.",
+    model_id: "biplane",
+    cost: 700,
+    build_secs: 12.0,
+    max_health: 170.0,
+    speed: 9.0,
+    turn_rate: 4.0,
+    radius: 1.2,
+    armor: ArmorClass::Aircraft,
+    weapon: Some(BIPLANE_GUNS),
+    has_turret: false,
+    producer: BuildingKind::Helipad,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 20.0,
+};
+
+const BIPLANE_BOMBER: UnitSpec = UnitSpec {
+    era: Era::Industrial,
+    line: UnitLine::Bomber,
+    name: "Biplane Bomber",
+    role: "Flies one bombing run against ground targets, then returns to its Helipad to rearm.",
+    model_id: "biplane_bomber",
+    cost: 1100,
+    build_secs: 18.0,
+    max_health: 230.0,
+    speed: 7.5,
+    turn_rate: 2.5,
+    radius: 1.6,
+    armor: ArmorClass::Aircraft,
+    weapon: Some(BIPLANE_BOMBS),
+    has_turret: false,
+    producer: BuildingKind::Helipad,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 16.0,
+};
+
+const PILLBOX: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Industrial),
+    line: Some(DefenceLine::Tower),
+    name: "Pillbox",
+    role: "A concrete machine gun nest. Mows down infantry on the approaches.",
+    model_id: "pillbox",
+    footprint: IVec2::new(1, 1),
+    cost: 700,
+    build_secs: 10.0,
+    max_health: 800.0,
+    power: -10,
+    prerequisites: &[BuildingKind::Barracks],
+    weapon: Some(PILLBOX_GUN),
+    sight: 16.0,
     faction: None,
 };
 

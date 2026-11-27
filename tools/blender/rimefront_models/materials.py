@@ -122,6 +122,9 @@ PALETTE = {
     "Whitewash": Surface((0.84, 0.82, 0.76), roughness=0.9),
     "Brick": Surface((0.55, 0.24, 0.17), roughness=0.9),
     "Slate": Surface((0.24, 0.26, 0.30), roughness=0.8),
+    "Khaki": Surface((0.46, 0.42, 0.28), roughness=0.9),
+    "Olive": Surface((0.30, 0.33, 0.21), roughness=0.7),
+    "Corrugated": Surface((0.46, 0.48, 0.49), metallic=0.6, roughness=0.5),
 }
 
 

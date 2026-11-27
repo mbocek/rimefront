@@ -221,7 +221,7 @@ pub const LONGEST_NICKNAME: usize = 16;
 pub fn kept_nickname(typed: &str) -> Option<String> {
     let cleaned: String = typed
         .chars()
-        .filter(|character| !character.is_control())
+        .filter(|&character| !character.is_control() && !reorders_or_hides(character))
         .collect();
     let kept: String = cleaned.trim().chars().take(LONGEST_NICKNAME).collect();
     let kept = kept.trim_end().to_string();
@@ -233,6 +233,14 @@ const PROJECT_HELD_TO_WIN: Duration = Duration::from_secs(12 * 3600);
 /// A player who was in the world this recently counts towards the size alliances may grow to.
 const ACTIVE_WITHIN: Duration = Duration::from_secs(7 * 24 * 3600);
 const PLACES_IN_THE_HALL: usize = 3;
+
+/// Zero-width and direction-changing characters, which could hide or reorder a name in the hall of fame.
+fn reorders_or_hides(character: char) -> bool {
+    matches!(
+        character,
+        '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{206F}' | '\u{FEFF}'
+    )
+}
 
 /// A side that arrives this far into an age has its first promotion for free when the age turns.
 const LATE_IN_AN_AGE: f64 = 0.75;
@@ -272,6 +280,8 @@ pub struct WorldHost {
     late_in_the_age: BTreeSet<Team>,
     /// What the player of each side is called, as they last entered.
     nicknames: BTreeMap<Team, String>,
+    /// How many sides joined each camp, by its lowest side, through offers let through this step.
+    joining_this_step: BTreeMap<Team, usize>,
     /// The tick each side's Project has stood since.
     projects_standing_since: BTreeMap<Team, u64>,
     /// The longest any Project of each side stood, in ticks, counting the one standing only once it falls.
@@ -296,6 +306,7 @@ pub struct WorldHost {
 /// Where a world is saved, how often, and when it last was.
 struct KeptStore {
     store: WorldStore,
+    every: Duration,
     every_ticks: u64,
     last_saved_tick: u64,
 }
@@ -389,6 +400,7 @@ impl WorldHost {
     pub fn keep_in(&mut self, store: WorldStore, every: Duration) -> io::Result<SaveReport> {
         self.store = Some(KeptStore {
             store,
+            every,
             every_ticks: ticks_in(every).max(1),
             last_saved_tick: self.tick(),
         });
@@ -540,6 +552,7 @@ impl WorldHost {
             losses_when_left: HashMap::new(),
             late_in_the_age: BTreeSet::new(),
             nicknames: BTreeMap::new(),
+            joining_this_step: BTreeMap::new(),
             projects_standing_since: BTreeMap::new(),
             projects_held_longest: BTreeMap::new(),
             promoted_while_away: HashMap::new(),
@@ -579,6 +592,7 @@ impl WorldHost {
     }
 
     pub fn step(&mut self, elapsed: Duration) {
+        self.joining_this_step.clear();
         self.receive();
         self.shelter_sides_of_absent_players();
         let before = self.tick();
@@ -812,6 +826,8 @@ impl WorldHost {
         self.losses_when_left.remove(&team);
         self.late_in_the_age.remove(&team);
         self.nicknames.remove(&team);
+        self.projects_standing_since.remove(&team);
+        self.projects_held_longest.remove(&team);
         self.promoted_while_away.remove(&team);
         self.colors.remove(&team);
         if let Some(site) = self.sites.remove(&team) {
@@ -952,20 +968,40 @@ impl WorldHost {
         let PlayerCommand::OfferAlliance { to } = *command else {
             return true;
         };
+        let world = self.app.world();
+        let diplomacy = world.resource::<Diplomacy>();
+        if !diplomacy.hostile(team, to) {
+            return true;
+        }
         let refusal = if self.era() == Era::FINAL {
             Some(SideNews::AlliancesClosed)
         } else {
-            let most = self.largest_alliance();
-            let diplomacy = self.app.world().resource::<Diplomacy>();
-            let camp_size = |side: Team| {
-                diplomacy
-                    .alliances()
-                    .into_iter()
+            let alliances = diplomacy.alliances();
+            let camp = |side: Team| {
+                alliances
+                    .iter()
                     .find(|camp| camp.contains(&side))
-                    .map_or(1, |camp| camp.len())
+                    .cloned()
+                    .unwrap_or_else(|| vec![side])
             };
-            let grown = camp_size(team).max(camp_size(to)) + 1;
-            (grown > most).then_some(SideNews::AllianceTooLarge(most as u32))
+            let accepting = world
+                .resource::<AllianceOffers>()
+                .pairs()
+                .contains(&(to, team));
+            // Accepting joins the side to the camp of the one who offered; an offer, once accepted, the other
+            // way round. Acceptances let through earlier in this step have not run yet.
+            let grows = camp(if accepting { to } else { team });
+            let anchor = grows.iter().copied().min().unwrap_or(team);
+            let joining = self.joining_this_step.get(&anchor).copied().unwrap_or(0);
+            let most = self.largest_alliance();
+            if grows.len() + joining + 1 > most {
+                Some(SideNews::AllianceTooLarge(most as u32))
+            } else {
+                if accepting {
+                    *self.joining_this_step.entry(anchor).or_default() += 1;
+                }
+                None
+            }
         };
         let Some(news) = refusal else {
             return true;
@@ -1000,6 +1036,12 @@ impl WorldHost {
             .iter(world)
             .filter(|(building, _)| building.kind == BuildingKind::Project)
             .map(|(_, &team)| team)
+            .collect();
+        // A sheltered side cannot be attacked, so its Project is not held against anyone while it rests.
+        let shelter = *world.resource::<Shelter>();
+        let standing: BTreeSet<Team> = standing
+            .into_iter()
+            .filter(|&team| !shelter.covers(team))
             .collect();
         for &team in &standing {
             self.projects_standing_since.entry(team).or_insert(now);
@@ -1111,19 +1153,22 @@ impl WorldHost {
         let next_seed = level.map_seed + 1;
         let ages = level.ages.map(AgeSchedule::restarted);
         let store = self.store.take();
-        if let Some(kept) = &store
-            && let Err(error) = hall_of_fame::add(kept.store.directory(), entry)
-        {
-            warn!("could not write the hall of fame: {error}");
-        }
         let absence = self.absence;
         *self = Self::with_ages(next_seed, ages);
         self.absence = absence;
-        if let Some(kept) = store {
-            let every = SIMULATION_TICK * kept.every_ticks as u32;
-            if let Err(error) = self.keep_in(kept.store, every) {
-                warn!("could not save the new world: {error}");
+        let Some(kept) = store else {
+            return;
+        };
+        let directory = kept.store.directory().to_path_buf();
+        // The entry goes in once the next world is saved: a crash before then resumes the ended world,
+        // which ends again and writes it then, never twice.
+        match self.keep_in(kept.store, kept.every) {
+            Ok(_) => {
+                if let Err(error) = hall_of_fame::add(&directory, entry) {
+                    warn!("could not write the hall of fame: {error}");
+                }
             }
+            Err(error) => warn!("could not save the new world: {error}"),
         }
     }
 
@@ -1794,6 +1839,7 @@ mod tests {
         assert_eq!(kept_nickname("  Kowalski  "), Some("Kowalski".into()));
         assert_eq!(kept_nickname("a\u{7}b\nc"), Some("abc".into()));
         assert_eq!(kept_nickname("   "), None);
+        assert_eq!(kept_nickname("ab\u{202E}cd\u{200B}"), Some("abcd".into()));
         assert_eq!(
             kept_nickname("Žluťoučký kůň pěl ódy").map(|name| name.chars().count()),
             Some(LONGEST_NICKNAME)
@@ -2314,6 +2360,7 @@ mod tests {
         assert_eq!(hall[0].places[0][0].name, "Player 0");
         assert_eq!(host.world().resource::<ActiveLevel>().0.map_seed, 30);
         assert!(host.tick() < 20, "the next world starts anew");
+        host.save().unwrap();
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
@@ -2340,6 +2387,35 @@ mod tests {
             .collect();
         let name = |team: Team| format!("Player {}", team.index());
         assert_eq!(places, [name(first), name(second)]);
+        host.save().unwrap();
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn a_project_does_not_count_while_its_side_rests_away() {
+        let directory = scratch_directory("finale_away");
+        let mut host = finale_world(&directory);
+        host.set_absence_rules(AbsenceRules {
+            shelter_after: Duration::from_secs(1),
+            ..AbsenceRules::default()
+        });
+        let key = PlayerKey::new_random();
+        let (visit, team) = enter_as(&mut host, &key);
+        raise_a_project(&mut host, team);
+        drop(visit);
+        for _ in 0..3 * TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES {
+            host.step(SIMULATION_TICK);
+        }
+        let now = host.tick();
+        jump_to(&mut host, now + ticks_in(PROJECT_HELD_TO_WIN) + 100);
+        look_at_the_projects(&mut host);
+        assert_eq!(
+            host.world().resource::<ActiveLevel>().0.map_seed,
+            29,
+            "won by resting away"
+        );
+        assert!(hall_of_fame::read(&directory).unwrap().is_empty());
+        host.save().unwrap();
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
@@ -2353,21 +2429,22 @@ mod tests {
         offer_alliance(&mut host, &watching, two);
         run(&mut host, 1, &mut mirror, &mut watching);
         assert!(mirror.told.contains(&SideNews::AlliancesClosed));
+        host.save().unwrap();
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
     #[test]
     fn an_alliance_grows_no_larger_than_a_third_of_the_players() {
         let mut host = WorldHost::new(29);
-        let (one, a) = enter(&mut host);
+        let (mut one, a) = enter(&mut host);
         let (two, b) = enter(&mut host);
-        let (mut three, _) = enter(&mut host);
+        let (_three, c) = enter(&mut host);
         offer_alliance(&mut host, &one, b);
         offer_alliance(&mut host, &two, a);
         assert!(!host.world().resource::<Diplomacy>().hostile(a, b));
         let mut mirror = WorldMirror::default();
-        offer_alliance(&mut host, &three, a);
-        run(&mut host, 1, &mut mirror, &mut three);
+        offer_alliance(&mut host, &one, c);
+        run(&mut host, 1, &mut mirror, &mut one);
         assert!(mirror.told.contains(&SideNews::AllianceTooLarge(2)));
     }
 

@@ -38,11 +38,15 @@ pub fn type_on_network_page(
     mut draft_fields: Query<&mut Text, With<ChatDraftText>>,
 ) {
     let on_network_page = menu.is_some_and(|menu| menu.selection == Selection::Network);
-    if !on_network_page {
+    let chatting = lobby.has_partner();
+    if !on_network_page || chatting {
+        *naming = false;
+    }
+    let fields_shown = !lobby.is_busy();
+    if !on_network_page || (!fields_shown && !chatting) {
         typed.clear();
         return;
     }
-    let chatting = lobby.has_partner();
     for key in typed.read().filter(|key| key.state.is_pressed()) {
         if !chatting && *naming {
             type_nickname(&mut settings.nickname, &key.logical_key, &mut naming);

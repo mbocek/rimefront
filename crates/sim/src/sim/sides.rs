@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::sim::abilities::Mine;
 use crate::sim::ai::AiCommanders;
 use crate::sim::cadence::SimulationCadences;
-use crate::sim::catalog::Team;
+use crate::sim::catalog::{Diplomacy, Team};
 use crate::sim::components::{Building, Unit};
 use crate::sim::economy::Economies;
 use crate::sim::intel::Intel;
@@ -100,6 +100,10 @@ pub fn retire_side(world: &mut World, team: Team) {
         .forget(team);
     world.resource_mut::<Intel>().forget(team);
     world.resource_mut::<Shelter>().0.remove(team);
+    world.resource_mut::<Diplomacy>().leave_camp(team);
+    if let Some(mut offers) = world.get_resource_mut::<crate::sim::alliances::AllianceOffers>() {
+        offers.forget(team);
+    }
     world
         .resource_mut::<AiCommanders>()
         .0

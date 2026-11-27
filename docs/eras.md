@@ -149,7 +149,9 @@ The future is a world's final age, its finale. It lasts at least `--finale-days`
 share in it. When the finale runs out without a winner, the side whose Project stood longest wins, and when no
 Project was ever finished, the one whose Project came furthest in its build queue. Second and third place are
 decided the same way, a camp of allies counting its best member; sides that never built anything of a Project
-have no place.
+have no place. Projects are looked at every second, so two that stood equally long tie, and the lower side number
+goes first. A Project counts only while its side's player is there: a sheltered side cannot be attacked, so
+its Project does not stand against anyone while it rests.
 
 Alliances are bounded: one may hold a third of the players who were in the world during the last week, and
 never fewer than two. Once the finale begins no new alliance is formed (`SideNews::AlliancesClosed`), though

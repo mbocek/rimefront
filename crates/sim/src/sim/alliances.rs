@@ -10,6 +10,11 @@ use crate::sim::notifications::{News, SideNews};
 pub struct AllianceOffers(BTreeSet<(Team, Team)>);
 
 impl AllianceOffers {
+    /// Drops every offer made by or to a side that is gone, so its number starts clean when given out again.
+    pub fn forget(&mut self, team: Team) {
+        self.0.retain(|&(from, to)| from != team && to != team);
+    }
+
     pub fn of(pairs: &[(Team, Team)]) -> Self {
         Self(pairs.iter().copied().collect())
     }

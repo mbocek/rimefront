@@ -271,7 +271,7 @@ fn write_save(
         let file = match before.get(chunk) {
             Some((same, file)) if *same == hash => file.clone(),
             _ => {
-                let file = format!("{}_{}_{tick}.bin", chunk.x, chunk.y);
+                let file = format!("{}_{}_{}_{tick}.bin", chunk.x, chunk.y, record.map_seed);
                 std::fs::write(chunks_directory.join(&file), &bytes)?;
                 report.chunks_written += 1;
                 report.bytes_written += bytes.len();

@@ -37,10 +37,10 @@ impl Era {
         }
     }
 
-    /// The age called `name` in English, in any case, as command lines give it.
     /// The age a world ends in: its finale.
     pub const FINAL: Era = Era::Future;
 
+    /// The age called `name` in English, in any case, as command lines give it.
     pub fn named(name: &str) -> Option<Era> {
         Era::ALL
             .into_iter()

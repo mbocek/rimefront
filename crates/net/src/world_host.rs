@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::{BTreeSet, HashMap};
 use std::io;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
@@ -13,22 +13,26 @@ use crate::network::{Arrival, Link, Message};
 use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews, WorldSnapshot};
 use rimefront_sim::levels::{ActiveLevel, Difficulty, LevelDefinition, Objective};
-use rimefront_sim::match_flow::{GameState, HostedWorld, RestoringSave, deploy_newcomer};
+use rimefront_sim::match_flow::{
+    GameState, HostedWorld, RestoringSave, deploy_newcomer, forbidden_items,
+};
 use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
 use rimefront_sim::sim::alliances::AllianceOffers;
-use rimefront_sim::sim::catalog::{Alliance, BuildingKind, Diplomacy};
+use rimefront_sim::sim::catalog::{Alliance, BuildingKind, Diplomacy, UnitKind};
 use rimefront_sim::sim::catalog::{SIDE_PALETTE, SideColor, Team};
 use rimefront_sim::sim::components::{Building, Harvester, Health, Unit};
 use rimefront_sim::sim::determinism::SimId;
 use rimefront_sim::sim::determinism::run_schedules_on_one_thread;
 use rimefront_sim::sim::economy::Economies;
+use rimefront_sim::sim::eras::{AgeSchedule, Era};
 use rimefront_sim::sim::match_stats::MatchStats;
 use rimefront_sim::sim::neutral_sites::{footprint_is_free, spawn_unclaimed_site};
 use rimefront_sim::sim::notifications::{AwayLosses, AwayReport, News, SideNews};
 use rimefront_sim::sim::player_commands::{
     CommandQueue, GroundOrder, PlayerCommand, SimulationTick,
 };
-use rimefront_sim::sim::production::UnitLimit;
+use rimefront_sim::sim::production::{Production, UnitLimit};
+use rimefront_sim::sim::promotion::{AgeTurned, make_successor, promotions_wanted};
 use rimefront_sim::sim::sides::{Shelter, retire_side, side_stands};
 use rimefront_sim::world::deposits::lay_new_deposit;
 use rimefront_sim::world::map::{GameMap, base_sites, map_bounds};
@@ -208,6 +212,8 @@ const TICKS_BETWEEN_COMPUTER_NEIGHBOURS: u64 = 5 * 60 * 20;
 /// again past the second.
 const STRUCTURES_FOR_A_HARD_NEIGHBOUR: usize = 8;
 const STRUCTURES_FOR_A_BRUTAL_NEIGHBOUR: usize = 20;
+/// A side that arrives this far into an age has its first promotion for free when the age turns.
+const LATE_IN_AN_AGE: f64 = 0.75;
 
 fn ticks_in(duration: Duration) -> u64 {
     (duration.as_secs_f64() / SIMULATION_TICK.as_secs_f64()).round() as u64
@@ -236,6 +242,10 @@ pub struct WorldHost {
     away_since: HashMap<Team, u64>,
     /// What each away side had lost when its player left; not saved, so a restarted world has none.
     losses_when_left: HashMap<Team, AwayLosses>,
+    /// Sides that arrived late in the age, promoted for free when it turns.
+    late_in_the_age: BTreeSet<Team>,
+    /// What the world promoted of each away side when the age turned, to tell its player on return; not saved.
+    promoted_while_away: HashMap<Team, (u32, u32)>,
     /// The generated site each newcomer's side was deployed on.
     sites: HashMap<Team, IVec2>,
     /// The computer sides that keep the world from standing empty, and the sites they hold.
@@ -260,7 +270,12 @@ struct KeptStore {
 
 impl WorldHost {
     pub fn new(map_seed: u64) -> Self {
-        let mut host = Self::hosting(Self::started(map_seed, false));
+        Self::with_ages(map_seed, None)
+    }
+
+    /// A new world whose ages turn on `ages`; without one it stays in the modern age.
+    pub fn with_ages(map_seed: u64, ages: Option<AgeSchedule>) -> Self {
+        let mut host = Self::hosting(Self::started(map_seed, ages, false));
         host.place_neutral_sites(squares_within(map_bounds()));
         host
     }
@@ -303,11 +318,12 @@ impl WorldHost {
 
     /// The world as it was saved, with its players' sides kept for them; nobody is connected yet.
     pub fn resume(saved: &SavedWorld) -> Self {
-        let mut app = Self::started(saved.map_seed(), true);
+        let mut app = Self::started(saved.map_seed(), saved.ages(), true);
         let world = app.world_mut();
         let mined = restore(world, saved);
         world.remove_resource::<RestoringSave>();
         world.resource_mut::<SimulationTick>().0 = saved.tick();
+        settle_the_age(world, saved.age_turned());
         let hosting = saved.hosting();
         world.resource_mut::<Shelter>().0 = hosting.sheltered.iter().copied().collect();
         let mut host = Self::hosting(app);
@@ -319,6 +335,7 @@ impl WorldHost {
         host.computer_sides = hosting.computer_sides.iter().copied().collect();
         host.colors = hosting.colors.iter().copied().collect();
         host.deposits.clone_from(&hosting.deposits);
+        host.late_in_the_age = hosting.late_in_the_age.iter().copied().collect();
         let world = host.app.world_mut();
         let mut diplomacy = world.resource_mut::<Diplomacy>();
         for camp in &hosting.alliances {
@@ -406,6 +423,7 @@ impl WorldHost {
             alliances: world.resource::<Diplomacy>().alliances(),
             alliance_offers: world.resource::<AllianceOffers>().pairs(),
             deposits: self.deposits.clone(),
+            late_in_the_age: self.late_in_the_age.iter().copied().collect(),
             colors,
             computer_sides,
             level_side_taken: self.level_side_taken,
@@ -422,8 +440,8 @@ impl WorldHost {
 
     /// The simulation of a world grown from `map_seed`, started; without the level's forces when a save
     /// is to take their place.
-    fn started(map_seed: u64, restoring: bool) -> App {
-        let level = world_level(map_seed);
+    fn started(map_seed: u64, ages: Option<AgeSchedule>, restoring: bool) -> App {
+        let level = world_level(map_seed, ages);
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::ZERO))
@@ -478,6 +496,8 @@ impl WorldHost {
             absence: AbsenceRules::default(),
             away_since: HashMap::new(),
             losses_when_left: HashMap::new(),
+            late_in_the_age: BTreeSet::new(),
+            promoted_while_away: HashMap::new(),
             sites: HashMap::new(),
             effects: WorldEffects::default(),
             mined: MinedCrystal::default(),
@@ -517,9 +537,13 @@ impl WorldHost {
         self.receive();
         self.shelter_sides_of_absent_players();
         let before = self.tick();
+        let era_before = self.era();
         self.app
             .insert_resource(TimeUpdateStrategy::ManualDuration(elapsed));
         self.app.update();
+        if self.era() != era_before {
+            self.promote_sides_the_age_left_behind();
+        }
         let ticks_gone_by = self.tick() - before;
         self.wear_down_long_absent_sides(ticks_gone_by);
         let looks = |tick: u64| tick / TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES;
@@ -627,9 +651,18 @@ impl WorldHost {
     }
 
     /// A player back after long enough away to have been sheltered is told how long it was and what their
-    /// side lost meanwhile, if the world kept count.
+    /// side lost meanwhile, if the world kept count, and what the world promoted for them.
     fn welcome_back(&mut self, team: Team, ticks_away: u64) {
         let before = self.losses_when_left.remove(&team);
+        if let Some((promoted, unpromoted)) = self.promoted_while_away.remove(&team) {
+            self.app.world_mut().write_message(News::to(
+                team,
+                SideNews::PromotedWithTheAge {
+                    promoted,
+                    unpromoted,
+                },
+            ));
+        }
         if ticks_away < ticks_in(self.absence.shelter_after) {
             return;
         }
@@ -726,6 +759,8 @@ impl WorldHost {
         self.sides_of_players.retain(|_, &mut side| side != team);
         self.away_since.remove(&team);
         self.losses_when_left.remove(&team);
+        self.late_in_the_age.remove(&team);
+        self.promoted_while_away.remove(&team);
         self.colors.remove(&team);
         if let Some(site) = self.sites.remove(&team) {
             free_starting_site(self.app.world_mut(), site);
@@ -782,11 +817,12 @@ impl WorldHost {
                 player.entry = self.entries;
                 player.team = Some(team);
                 self.paint(team, color);
-                let map_seed = self.app.world().resource::<ActiveLevel>().0.map_seed;
+                let level = &self.app.world().resource::<ActiveLevel>().0;
                 player.connection.send(&Message::Entered {
                     team,
                     tick: self.tick(),
-                    map_seed,
+                    map_seed: level.map_seed,
+                    ages: level.ages,
                 });
             }
             (Message::Orders { commands }, Some(team)) => {
@@ -830,6 +866,14 @@ impl WorldHost {
 
     /// The first player takes the level's own side; everyone after a generated site of their own.
     fn side_for_newcomer(&mut self) -> Option<Team> {
+        let team = self.deploy_newcomer()?;
+        if self.late_in_the_age() {
+            self.late_in_the_age.insert(team);
+        }
+        Some(team)
+    }
+
+    fn deploy_newcomer(&mut self) -> Option<Team> {
         if !self.level_side_taken {
             self.level_side_taken = true;
             return Some(Team::Azure);
@@ -839,6 +883,101 @@ impl WorldHost {
         self.sites.insert(team, site);
         self.give_a_computer_neighbour(site, Difficulty::Normal);
         Some(team)
+    }
+
+    fn era(&self) -> Era {
+        self.app.world().resource::<ActiveLevel>().0.era
+    }
+
+    /// Whether the age has run `LATE_IN_AN_AGE` of its course, with another age to come.
+    fn late_in_the_age(&self) -> bool {
+        let Some(schedule) = self.app.world().resource::<ActiveLevel>().0.ages else {
+            return false;
+        };
+        let now = self.tick();
+        let Some(turn) = schedule.next_turn_after(now) else {
+            return false;
+        };
+        let started = schedule.age_started_at(now);
+        (now - started) as f64 >= LATE_IN_AN_AGE * (turn - started) as f64
+    }
+
+    /// When the age turns, a side that arrived late in the old one is promoted whole for free, and the side
+    /// of a player who is away as far as its credits go, defences first, then its dearest units.
+    fn promote_sides_the_age_left_behind(&mut self) {
+        let late = std::mem::take(&mut self.late_in_the_age);
+        for &team in &late {
+            let (promoted, _) = self.promote_side(team, false);
+            self.app.world_mut().write_message(News::to(
+                team,
+                SideNews::PromotedWithTheAge {
+                    promoted,
+                    unpromoted: 0,
+                },
+            ));
+        }
+        let mut away: Vec<Team> = self
+            .away_since
+            .keys()
+            .copied()
+            .filter(|team| !late.contains(team))
+            .collect();
+        away.sort();
+        for team in away {
+            let (promoted, unpromoted) = self.promote_side(team, true);
+            let tally = self.promoted_while_away.entry(team).or_default();
+            tally.0 += promoted;
+            tally.1 += unpromoted;
+        }
+    }
+
+    /// Promotes what `team` has of an older age where it stands, paying from its credits as far as they go
+    /// when `paying`; how many were promoted and how many were too dear.
+    fn promote_side(&mut self, team: Team, paying: bool) -> (u32, u32) {
+        let world = self.app.world_mut();
+        let era = world.resource::<ActiveLevel>().0.era;
+        let units: Vec<(SimId, UnitKind, Team, Vec3)> = world
+            .query::<(&SimId, &Unit, &Team, &Transform)>()
+            .iter(world)
+            .map(|(&id, unit, &owner, transform)| (id, unit.0, owner, transform.translation))
+            .collect();
+        let structures: Vec<(SimId, Building, Team)> = world
+            .query::<(&SimId, &Building, &Team)>()
+            .iter(world)
+            .map(|(&id, building, &owner)| {
+                let building = Building {
+                    kind: building.kind,
+                    origin: building.origin,
+                };
+                (id, building, owner)
+            })
+            .collect();
+        let wanted = promotions_wanted(
+            team,
+            era,
+            units,
+            structures
+                .iter()
+                .map(|(id, building, owner)| (*id, building, owner)),
+            false,
+        );
+        let (mut promoted, mut unpromoted) = (0, 0);
+        for item in wanted {
+            let price = if paying { item.cost() } else { 0 };
+            let mut economies = world.resource_mut::<Economies>();
+            let credits = &mut economies.of_mut(team).credits;
+            if *credits < price {
+                unpromoted += 1;
+                continue;
+            }
+            *credits -= price;
+            if make_successor(world, team, item) {
+                promoted += 1;
+            } else {
+                world.resource_mut::<Economies>().of_mut(team).credits += price;
+            }
+        }
+        (promoted, unpromoted)
     }
 
     /// A newcomer with no computer side near finds one on the free site nearest them.
@@ -994,16 +1133,37 @@ impl WorldHost {
     }
 }
 
-/// The level a world grows from: a wilds landscape around the usual four bases.
-pub fn world_level(map_seed: u64) -> LevelDefinition {
+/// The level a world grows from: a wilds landscape around the usual four bases, in its first age.
+pub fn world_level(map_seed: u64, ages: Option<AgeSchedule>) -> LevelDefinition {
     LevelDefinition {
         name: "World".into(),
         map_seed,
         landscape: Landscape::Wilds,
         objective: Objective::World,
         alliance: Alliance::FreeForAll,
+        era: ages.map_or(Era::Modern, |ages| ages.first),
+        ages,
         ..LevelDefinition::default()
     }
+}
+
+/// A resumed world starts in the age its saved tick falls in, without turning it again: nothing is
+/// refunded and nobody is told, and structures are spared only for what was left of the calm.
+fn settle_the_age(world: &mut World, age_turned: Option<u64>) {
+    let level = world.resource::<ActiveLevel>().0.clone();
+    let Some(schedule) = level.ages else {
+        return;
+    };
+    let tick = world.resource::<SimulationTick>().0;
+    let level = LevelDefinition {
+        era: schedule.era_at(tick),
+        ..level
+    };
+    let mut production = world.resource_mut::<Production>();
+    production.set_era(level.era);
+    production.forbid_to_every_side(forbidden_items(&level));
+    world.resource_mut::<ActiveLevel>().0 = level;
+    world.resource_mut::<AgeTurned>().0 = age_turned;
 }
 
 #[cfg(test)]
@@ -1217,6 +1377,195 @@ mod tests {
             host.step(SIMULATION_TICK);
             follow(mirror, player);
         }
+    }
+
+    const HOUR_OF_TICKS: u64 = 3600 * 20;
+
+    /// Ages of an hour that turn at one o'clock: the first turns an hour into the world.
+    fn ages_of_an_hour() -> AgeSchedule {
+        AgeSchedule {
+            first: Era::Antiquity,
+            era_hours: 1,
+            finale_hours: 1,
+            turn_hour: 1,
+        }
+    }
+
+    fn jump_to(host: &mut WorldHost, tick: u64) {
+        host.world().resource_mut::<SimulationTick>().0 = tick;
+    }
+
+    fn ages_of_units(host: &mut WorldHost, team: Team) -> Vec<Era> {
+        let world = host.world();
+        let mut ages: Vec<Era> = world
+            .query::<(&Unit, &Team)>()
+            .iter(world)
+            .filter(|(_, owner)| **owner == team)
+            .map(|(unit, _)| unit.0.era())
+            .collect();
+        ages.sort();
+        ages.dedup();
+        ages
+    }
+
+    fn credits_of(host: &mut WorldHost, team: Team) -> i32 {
+        host.world().resource::<Economies>().of(team).credits
+    }
+
+    fn set_credits(host: &mut WorldHost, team: Team, credits: i32) {
+        host.world()
+            .resource_mut::<Economies>()
+            .of_mut(team)
+            .credits = credits;
+    }
+
+    fn promotions_told(mirror: &WorldMirror) -> Option<(u32, u32)> {
+        mirror.told.iter().find_map(|news| match *news {
+            SideNews::PromotedWithTheAge {
+                promoted,
+                unpromoted,
+            } => Some((promoted, unpromoted)),
+            _ => None,
+        })
+    }
+
+    /// What a returning player is told from the moment they enter.
+    fn welcomed_back(host: &mut WorldHost, key: &PlayerKey) -> WorldMirror {
+        let (mut back, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        back.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
+            player: key.clone(),
+            color: None,
+        });
+        let mut mirror = WorldMirror::default();
+        run(host, 1, &mut mirror, &mut back);
+        mirror
+    }
+
+    #[test]
+    fn a_world_starts_in_its_first_age_and_tells_its_players_when_the_ages_turn() {
+        let mut host = WorldHost::with_ages(29, Some(ages_of_an_hour()));
+        let (mut player, world_end) = local_connection();
+        host.connect(Box::new(world_end));
+        player.send(&Message::EnterWorld {
+            version: env!("CARGO_PKG_VERSION").into(),
+            protocol: WORLD_PROTOCOL,
+            player: PlayerKey::new_random(),
+            color: None,
+        });
+        host.step(SIMULATION_TICK);
+        let ages = player
+            .drain()
+            .into_iter()
+            .find_map(|arrival| match arrival {
+                Arrival::Message(Message::Entered { ages, .. }) => Some(ages),
+                _ => None,
+            });
+        assert_eq!(ages, Some(Some(ages_of_an_hour())));
+        assert_eq!(ages_of_units(&mut host, Team::Azure), vec![Era::Antiquity]);
+        jump_to(&mut host, HOUR_OF_TICKS - 20);
+        let mut mirror = WorldMirror::default();
+        run(&mut host, 2, &mut mirror, &mut player);
+        assert_eq!(host.era(), Era::Modern);
+        assert!(mirror.told.contains(&SideNews::AgeTurned(Era::Modern)));
+        let world = host.world();
+        assert!(
+            world
+                .resource::<Production>()
+                .allows(Team::Azure, BuildItem::Unit(UnitKind::Rifleman))
+        );
+    }
+
+    #[test]
+    fn when_the_age_turns_the_world_promotes_late_comers_for_free_and_absent_sides_as_they_can_pay()
+    {
+        let mut host = WorldHost::with_ages(29, Some(ages_of_an_hour()));
+        let rich_key = PlayerKey::new_random();
+        let poor_key = PlayerKey::new_random();
+        let (rich_visit, rich) = enter_as(&mut host, &rich_key);
+        let (poor_visit, poor) = enter_as(&mut host, &poor_key);
+        drop((rich_visit, poor_visit));
+        jump_to(&mut host, HOUR_OF_TICKS * 8 / 10);
+        let (mut late_player, late) = enter(&mut host);
+        let mut late_mirror = WorldMirror::default();
+        set_credits(&mut host, rich, 100_000);
+        set_credits(&mut host, poor, 0);
+        let late_credits = credits_of(&mut host, late);
+        jump_to(&mut host, HOUR_OF_TICKS - 20);
+        run(&mut host, 3, &mut late_mirror, &mut late_player);
+        assert_eq!(host.era(), Era::Modern);
+
+        assert_eq!(ages_of_units(&mut host, late), vec![Era::Modern]);
+        assert!(
+            credits_of(&mut host, late) >= late_credits,
+            "a late comer paid"
+        );
+        let (promoted, unpromoted) =
+            promotions_told(&late_mirror).expect("the late comer was told");
+        assert!(promoted > 0);
+        assert_eq!(unpromoted, 0);
+
+        assert_eq!(ages_of_units(&mut host, rich), vec![Era::Modern]);
+        assert!(
+            credits_of(&mut host, rich) < 100_000,
+            "the rich side paid nothing"
+        );
+        assert_eq!(ages_of_units(&mut host, poor), vec![Era::Antiquity]);
+        assert_eq!(credits_of(&mut host, poor), 0);
+
+        let (promoted, unpromoted) =
+            promotions_told(&welcomed_back(&mut host, &rich_key)).expect("the rich side was told");
+        assert!(promoted > 0);
+        assert_eq!(unpromoted, 0);
+        let (promoted, unpromoted) =
+            promotions_told(&welcomed_back(&mut host, &poor_key)).expect("the poor side was told");
+        assert_eq!(promoted, 0);
+        assert!(unpromoted > 0);
+    }
+
+    #[test]
+    fn a_resumed_world_is_in_the_age_of_its_tick_without_turning_it_again() {
+        let directory = scratch_directory("ages");
+        let mut host = WorldHost::with_ages(29, Some(ages_of_an_hour()));
+        let (_first, first) = enter(&mut host);
+        jump_to(&mut host, HOUR_OF_TICKS * 9 / 10);
+        let (_late, late) = enter(&mut host);
+        host.keep_in(WorldStore::at(&directory), Duration::from_secs(3600))
+            .unwrap();
+        let saved = WorldStore::at(&directory).load().unwrap().unwrap();
+        assert_eq!(saved.ages(), Some(ages_of_an_hour()));
+        assert_eq!(saved.hosting().late_in_the_age, vec![late]);
+
+        jump_to(&mut host, HOUR_OF_TICKS);
+        host.step(SIMULATION_TICK);
+        let turned = host.world().resource::<AgeTurned>().0;
+        assert!(turned.is_some());
+        for _ in 0..20 {
+            host.step(SIMULATION_TICK);
+        }
+        host.save().unwrap();
+        let saved = WorldStore::at(&directory).load().unwrap().unwrap();
+        assert_eq!(saved.age_turned(), turned);
+        let mut resumed = WorldHost::resume(&saved);
+        assert_eq!(resumed.era(), Era::Modern);
+        resumed.step(SIMULATION_TICK);
+        let world = resumed.world();
+        assert_eq!(world.resource::<Production>().era(), Era::Modern);
+        assert_eq!(
+            world.resource::<AgeTurned>().0,
+            turned,
+            "the age turned again"
+        );
+        assert!(
+            world
+                .resource::<Production>()
+                .allows(first, BuildItem::Unit(UnitKind::Rifleman))
+        );
+        let (_newcomer, newcomer) = enter(&mut resumed);
+        assert_eq!(ages_of_units(&mut resumed, newcomer), vec![Era::Modern]);
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     #[test]

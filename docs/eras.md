@@ -78,7 +78,50 @@ captured battle to that age two seconds in and promotes everything the player ow
 Computer sides promote too, every five seconds: defences first, then their dearest units near home, while they
 keep 500 credits for new units and have at most two promotions waiting in a lane.
 
-Nothing in a skirmish turns the age yet; persistent worlds will, on a schedule.
+Nothing in a skirmish turns the age; a persistent world does, on a schedule.
+
+## Ages of a world
+
+A world goes through the ages on a schedule (`AgeSchedule` in `eras.rs`, `LevelDefinition::ages`): it starts
+in the first age, and each age lasts at least `--era-days` (the final one `--finale-days`) and turns at the
+next `--era-hour` of a world day after that, so its players know the evening it ends on. Only ages with an army
+count, so for now a world goes from antiquity to the modern age and stays there. The schedule is worked out
+from the world's tick, never its `f32` clock, which stops advancing after twelve days of world time; the
+seasons of a world are counted from the tick too now. A world grown by the server takes the flags
+([server.md](server.md)); a world the game runs alone has the defaults, a week an age from antiquity, turning
+at eight in the evening. A world saved before it had ages stays in the modern age without a schedule.
+
+The world sends its schedule to every player as they enter (`Message::Entered`), and the game works the age out
+from the world's tick as it does the season: the build menu, the models and the countdown below the objective
+(the next age and the time left, in yellow in the last day) follow it, while the world alone turns the age and
+refunds what was queued.
+
+When the age turns:
+
+- **A side that arrived late in the age** (in its last quarter, `LATE_IN_AN_AGE` in `world_host.rs`) has
+  everything it owns at the turn promoted for free, wherever it stands, and is told how much.
+- **The side of a player who is away** is promoted as far as its credits go, in the order computer sides use
+  (defences, then the dearest units), wherever its units stand, without keeping anything back and never into
+  debt. The player is told on return what was promoted and what was too dear (`SideNews::PromotedWithTheAge`);
+  that tally is not saved, so after a restart they are not told.
+- Players present promote their sides themselves during the calm; computer sides as above.
+
+Measured with `rimefront-world-soak --days 1 --era-hours 2 --chance 4242` (20 players coming and going, Apple
+M5 Pro, release build), the age turning at hour 20 promoted every side at once without a slow tick:
+
+| World hour | Age | Tick, average | Tick, slowest | Units | Structures |
+| --- | --- | --- | --- | --- | --- |
+| 19-20 | antiquity | 2.31 ms | 22.4 ms | 284 | 280 |
+| 20-21 (turns) | modern | 1.93 ms | 9.6 ms | 243 | 191 |
+| 21-22 | modern | 1.44 ms | 20.3 ms | 236 | 185 |
+
+The first nine hours of antiquity took 0.39-0.78 ms a tick, as modern worlds did; the slower hours after them
+came with more sides and a wider world, not with the age. The soak writes the age into its last column.
+
+A resumed world starts in the age of its saved tick without turning it again, with what was left of the calm
+(the tick it turned on is saved), and the sides due a free promotion are saved too (layout 8, see
+[compatibility.md](compatibility.md)).
+
 
 ## Looks
 

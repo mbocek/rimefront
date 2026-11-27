@@ -27,11 +27,13 @@ use crate::sim::components::{Building, Health};
 use crate::sim::cues::{BlastCue, SoundCue};
 use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
+use crate::sim::eras::AgeSchedule;
 use crate::sim::intel::Intel;
 use crate::sim::neutral_sites::spawn_unclaimed_site;
 use crate::sim::notifications::{News, SideNews};
 use crate::sim::outcome::GameOutcome;
 use crate::sim::player_commands::{CommandQueue, LocalTeam, SimulationTick};
+use crate::sim::production::Production;
 use crate::sim::sides::{Shelter, Sides, side_stands};
 use crate::sim::spawn::{spawn_building, spawn_unit};
 use crate::view::effects::ShotFlight;
@@ -72,6 +74,9 @@ pub struct WorldClient {
     world_thread: Option<JoinHandle<()>>,
     /// Whether anything of the player's side was shown standing yet.
     side_was_shown: bool,
+    /// When the world's ages turn, and its tick when the player entered.
+    ages: Option<AgeSchedule>,
+    entered_at_tick: u64,
 }
 
 impl WorldClient {
@@ -98,6 +103,8 @@ impl WorldClient {
             refusal: None,
             world_thread: None,
             side_was_shown: false,
+            ages: None,
+            entered_at_tick: 0,
         }
     }
 
@@ -106,7 +113,7 @@ impl WorldClient {
     pub fn alone(map_seed: u64) -> Self {
         let (player, world_end) = local_connection();
         let thread = std::thread::spawn(move || {
-            let mut host = WorldHost::new(map_seed);
+            let mut host = WorldHost::with_ages(map_seed, Some(AgeSchedule::default()));
             host.connect(Box::new(world_end));
             run_until_left(&mut host);
         });
@@ -122,7 +129,7 @@ impl WorldClient {
             let mut store = WorldStore::at(&directory);
             let mut host = match store.load() {
                 Ok(Some(saved)) => WorldHost::resume(&saved),
-                Ok(None) => WorldHost::new(map_seed),
+                Ok(None) => WorldHost::with_ages(map_seed, Some(AgeSchedule::default())),
                 Err(error) => {
                     warn!(
                         "could not read the world in {}: {error}",
@@ -195,8 +202,15 @@ impl WorldClient {
         let mut entered = None;
         for arrival in arrivals {
             match arrival {
-                Arrival::Message(Message::Entered { team, map_seed, .. }) => {
+                Arrival::Message(Message::Entered {
+                    team,
+                    map_seed,
+                    tick,
+                    ages,
+                }) => {
                     self.team = Some(team);
+                    self.ages = ages;
+                    self.entered_at_tick = tick;
                     entered = Some(map_seed);
                 }
                 Arrival::Message(Message::WorldView(change)) => self.waiting.push(*change),
@@ -315,7 +329,11 @@ pub fn enter_world(
     }
     commands.insert_resource(MirroredBattle);
     commands.insert_resource(LocalTeam(team));
-    commands.insert_resource(ActiveLevel(world_level(map_seed)));
+    let mut level = world_level(map_seed, client.ages);
+    if let Some(ages) = client.ages {
+        level.era = ages.era_at(client.entered_at_tick);
+    }
+    commands.insert_resource(ActiveLevel(level));
     commands.insert_resource(WorldPolitics::default());
     next_state.set(GameState::Playing);
 }
@@ -423,7 +441,22 @@ pub fn follow_world(world: &mut World) {
     if world.resource::<ActiveLevel>().0.season != season {
         world.resource_mut::<ActiveLevel>().0.season = season;
     }
+    follow_the_ages(world, world_tick);
     see_whether_the_side_fell(world, side);
+}
+
+/// The world turns the age itself, refunds and all; here the battle only takes it on, so that the build menu,
+/// the models and the countdown follow without the age turning a second time.
+fn follow_the_ages(world: &mut World, world_tick: u64) {
+    let Some(ages) = world.resource::<WorldClient>().ages else {
+        return;
+    };
+    let era = ages.era_at(world_tick);
+    if world.resource::<ActiveLevel>().0.era == era {
+        return;
+    }
+    world.resource_mut::<ActiveLevel>().0.era = era;
+    world.resource_mut::<Production>().set_era(era);
 }
 
 fn world_tick_now(world: &World, local_tick: u64) -> u64 {

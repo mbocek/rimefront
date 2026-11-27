@@ -66,11 +66,13 @@ pub struct MatchClock {
 }
 
 /// A persistent world's season follows its clock.
-pub fn turn_the_world_seasons(clock: Res<MatchClock>, mut level: ResMut<ActiveLevel>) {
+/// Counted from the tick, since the `f32` match clock stops advancing after twelve days.
+pub fn turn_the_world_seasons(tick: Res<SimulationTick>, mut level: ResMut<ActiveLevel>) {
     if level.0.objective != Objective::World {
         return;
     }
-    let season = Season::of_world_at(clock.elapsed_secs);
+    let world_secs = tick.0 as f32 * crate::SIMULATION_TICK.as_secs_f32();
+    let season = Season::of_world_at(world_secs);
     if level.0.season != season {
         level.0.season = season;
     }
@@ -326,7 +328,8 @@ mod tests {
             objective,
             ..LevelDefinition::default()
         }));
-        world.insert_resource(MatchClock { elapsed_secs: secs });
+        let tick = (secs / crate::SIMULATION_TICK.as_secs_f32()) as u64;
+        world.insert_resource(SimulationTick(tick));
         world.run_system_once(turn_the_world_seasons).unwrap();
         world.resource::<ActiveLevel>().0.clone()
     }

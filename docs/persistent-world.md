@@ -409,7 +409,8 @@ Taken on 2026-11-25, from the measurement below:
 Taken on 2026-11-26:
 
 - **A world goes round the year**, one season a day of world time, from summer (`Season::of_world_at`). The
-  host and every player work the season out from the world's clock, so the protocol and the saved world
+  host and every player work the season out from the world's tick (the `f32` clock stops advancing after
+  twelve days), so the protocol and the saved world
   carry nothing new. Snow and mud slow units on the host as in a battle, and the scenery, ground and sky
   turn while playing. A world's water never freezes: units could be standing on it when it thaws.
 - **Players make alliances themselves.** A world is a free-for-all (it used to inherit a level's default
@@ -423,6 +424,13 @@ Taken on 2026-11-26:
   and units their side lost meanwhile (`SideNews::WelcomeBack`), once they were away long enough to be
   sheltered. The count starts when they leave and is not saved, so after a server restart they are told
   only how long they were away.
+
+Taken on 2026-11-27 ([eras.md](eras.md#ages-of-a-world), from
+[brainstorm-vekysveta-2026-11-26.md](../brainstorm-vekysveta-2026-11-26.md)):
+
+- **A world goes through the ages**, from antiquity on, an age of a week by default turning at eight in the
+  evening; every player is in the world's current age, a newcomer too. A side that arrives in the last quarter
+  of an age has its first promotion for free, and an absent player's side is promoted from its own credits.
 
 ### Measured: a world with many players
 

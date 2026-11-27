@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{Alliance, BuildingKind, Faction, Team, UnitKind};
-use crate::sim::eras::Era;
+use crate::sim::eras::{AgeSchedule, Era};
 use crate::world::map::{MapSize, base_sites};
 use crate::world::season::Season;
 use crate::world::terrain::Landscape;
@@ -305,6 +305,9 @@ pub struct LevelDefinition {
     pub neutral_sites: bool,
     /// The age whose army every side fields; the units and structures listed above stand for their lines.
     pub era: Era,
+    /// A persistent world's ages turn on this schedule; `None` keeps `era` for good.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ages: Option<AgeSchedule>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
@@ -339,6 +342,7 @@ impl Default for LevelDefinition {
             events: Vec::new(),
             neutral_sites: false,
             era: Era::Modern,
+            ages: None,
         }
     }
 }
@@ -667,6 +671,7 @@ impl SkirmishOptions {
             terrain_seed: None,
             events: Vec::new(),
             era: self.era,
+            ages: None,
         }
     }
 }

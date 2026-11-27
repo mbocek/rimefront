@@ -256,7 +256,11 @@ impl Plugin for BattleViewPlugin {
                             sidebar::refresh_notifications,
                         )
                             .chain(),
-                        (sidebar::refresh_objective, sidebar::refresh_match_time),
+                        (
+                            sidebar::refresh_objective,
+                            sidebar::refresh_match_time,
+                            sidebar::refresh_age_countdown,
+                        ),
                         (
                             terrain_chunks::stream_terrain,
                             scenery_view::stream_scenery,

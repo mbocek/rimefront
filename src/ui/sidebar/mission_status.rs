@@ -9,6 +9,13 @@ pub struct ObjectiveText;
 #[derive(Component)]
 pub struct MatchTimeText;
 
+/// How long until a world's age turns; empty outside a world with ages.
+#[derive(Component)]
+pub struct AgeCountdownText;
+
+/// In its last day an age's countdown turns into a warning.
+const AGE_ENDING_SECS: u64 = 24 * 3600;
+
 pub(super) fn spawn_objective(sidebar: &mut ChildSpawnerCommands, fonts: &UiFonts) {
     sidebar
         .spawn((
@@ -33,7 +40,47 @@ pub(super) fn spawn_objective(sidebar: &mut ChildSpawnerCommands, fonts: &UiFont
                     header.spawn((MatchTimeText, fonts.heading("0:00", 12.0, TEXT_DIM)));
                 });
             panel.spawn((ObjectiveText, fonts.text("", 14.0, TEXT_MAIN)));
+            panel.spawn((AgeCountdownText, fonts.text("", 12.0, TEXT_DIM)));
         });
+}
+
+pub fn refresh_age_countdown(
+    clock: Res<MatchClock>,
+    level: Res<ActiveLevel>,
+    mut lines: Query<(&mut Text, &mut TextColor), With<AgeCountdownText>>,
+) {
+    let tick = (clock.elapsed_secs / crate::SIMULATION_TICK.as_secs_f32()) as u64;
+    let countdown = level.0.ages.and_then(|ages| {
+        let turn = ages.next_turn_after(tick)?;
+        let next = level.0.era.next_playable()?;
+        let secs_left = (turn - tick) * crate::SIMULATION_TICK.as_millis() as u64 / 1000;
+        Some((next, secs_left))
+    });
+    let (shown, color) = match countdown {
+        None => (String::new(), TEXT_DIM),
+        Some((next, secs_left)) => (
+            tr_fmt("{} in {}", &[&next.label(), &time_left(secs_left)]),
+            if secs_left < AGE_ENDING_SECS {
+                WARNING
+            } else {
+                TEXT_DIM
+            },
+        ),
+    };
+    for (mut text, mut text_color) in &mut lines {
+        if text.0 != shown {
+            text.0 = shown.clone();
+        }
+        text_color.set_if_neq(TextColor(color));
+    }
+}
+
+fn time_left(secs: u64) -> String {
+    let (days, hours, minutes) = (secs / 86_400, secs / 3600 % 24, secs / 60 % 60);
+    match days {
+        0 => format!("{hours}:{minutes:02}:{:02}", secs % 60),
+        _ => tr_fmt("{} d {}:{}", &[&days, &hours, &format!("{minutes:02}")]),
+    }
 }
 
 pub(super) fn spawn_notification_feed(commands: &mut Commands, fonts: &UiFonts) {

@@ -631,6 +631,7 @@ mod tests {
                 team: later,
                 tick: 9,
                 map_seed: 29,
+                ages: None,
             },
             Message::WorldView(Box::new(ViewChange {
                 tick: 5,

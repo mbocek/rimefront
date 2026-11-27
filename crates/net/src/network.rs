@@ -15,6 +15,7 @@ use rimefront_sim::levels::LevelDefinition;
 use rimefront_sim::sim::ai::AiCommanders;
 use rimefront_sim::sim::catalog::{SideColor, Team};
 use rimefront_sim::sim::determinism::simulation_checksum;
+use rimefront_sim::sim::eras::AgeSchedule;
 use rimefront_sim::sim::notifications::Notifications;
 use rimefront_sim::sim::player_commands::{
     CommandQueue, CommandTiming, LocalTeam, PlayerCommand, ScheduledCommand, SimulationTick,
@@ -112,11 +113,13 @@ pub enum Message {
         #[serde(default)]
         color: Option<SideColor>,
     },
-    /// From a world: the side the player commands there, and the world's tick when they entered.
+    /// From a world: the side the player commands there, the world's tick when they entered, and when its
+    /// ages turn.
     Entered {
         team: Team,
         tick: u64,
         map_seed: u64,
+        ages: Option<AgeSchedule>,
     },
     /// From a world: what changed in what its player sees.
     WorldView(Box<ViewChange>),

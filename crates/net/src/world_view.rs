@@ -764,6 +764,7 @@ mod tests {
     use crate::network::Message;
     use crate::world_host::{PlayerKey, WORLD_PROTOCOL};
     use rimefront_sim::sim::components::Stance;
+    use rimefront_sim::sim::eras::{AgeSchedule, Era};
     use rimefront_sim::sim::notifications::SideNews;
     use rimefront_sim::sim::notifications::{AwayLosses, AwayReport};
     use rimefront_sim::sim::player_commands::{GroundOrder, PlayerCommand};
@@ -845,6 +846,14 @@ mod tests {
                     }),
                     at: None,
                 },
+                Effect::Told {
+                    team: Team::Azure,
+                    news: SideNews::PromotedWithTheAge {
+                        promoted: 12,
+                        unpromoted: 3,
+                    },
+                    at: None,
+                },
             ],
             crystal: vec![(IVec2::new(3, -4), 1_500)],
             colors: vec![(Team::from_index(9), SideColor([1, 128, 255]))],
@@ -863,6 +872,7 @@ mod tests {
                 team: Team::from_index(4),
                 tick: 99,
                 map_seed: u64::MAX,
+                ages: Some(AgeSchedule::in_days(Era::Antiquity, 7, 3, 20)),
             },
             Message::Orders {
                 commands: vec![

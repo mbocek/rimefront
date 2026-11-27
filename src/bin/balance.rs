@@ -52,10 +52,7 @@ fn era_of_arguments() -> Era {
     let Some(named) = named else {
         return Era::Modern;
     };
-    Era::ALL
-        .into_iter()
-        .find(|era| format!("{era:?}").eq_ignore_ascii_case(&named))
-        .unwrap_or_else(|| panic!("unknown age {named}"))
+    Era::named(&named).unwrap_or_else(|| panic!("unknown age {named}"))
 }
 
 const DUEL_BUDGET: i32 = 3000;

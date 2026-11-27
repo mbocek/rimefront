@@ -715,5 +715,9 @@
   "Promoted to {}": "Povýšeno na {}",
   "Promote into the new age": "Povýšit do nové éry",
   "New age": "Nová éra",
-  "{} promotes the selection near its producer": "{} povýší výběr poblíž jeho výrobny"
+  "{} promotes the selection near its producer": "{} povýší výběr poblíž jeho výrobny",
+  "{} of your units and defences were promoted into the new age": "{} tvých jednotek a obran bylo povýšeno do nové éry",
+  "{} of your units and defences were promoted into the new age, {} more were too dear": "{} tvých jednotek a obran bylo povýšeno do nové éry, na dalších {} nezbyly peníze",
+  "{} in {}": "{} za {}",
+  "{} d {}:{}": "{} d {}:{}"
 }

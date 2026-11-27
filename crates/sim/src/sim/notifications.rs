@@ -92,6 +92,12 @@ pub enum SideNews {
     WelcomeBack(AwayReport),
     /// A new age has begun: its army is built from now on, and the old one can be promoted.
     AgeTurned(Era),
+    /// What a world promoted of the side by itself when the age turned: everything for free for a side that
+    /// arrived late in the age, or what its credits paid for while its player was away.
+    PromotedWithTheAge {
+        promoted: u32,
+        unpromoted: u32,
+    },
 }
 
 /// How long a player was away from a world and what their side lost meanwhile; the losses are `None` when the
@@ -163,6 +169,20 @@ impl SideNews {
             SideNews::AllianceFormed(team) => tr_fmt("Allied with {}", &[&team.name()]),
             SideNews::AllianceLeft(team) => tr_fmt("No longer allied with {}", &[&team.name()]),
             SideNews::WelcomeBack(report) => report.message(),
+            SideNews::PromotedWithTheAge {
+                promoted,
+                unpromoted: 0,
+            } => tr_fmt(
+                "{} of your units and defences were promoted into the new age",
+                &[&promoted],
+            ),
+            SideNews::PromotedWithTheAge {
+                promoted,
+                unpromoted,
+            } => tr_fmt(
+                "{} of your units and defences were promoted into the new age, {} more were too dear",
+                &[&promoted, &unpromoted],
+            ),
             SideNews::AgeTurned(era) => tr_fmt(
                 "A new age begins: {}. Promote your army and defences",
                 &[&era.label()],
@@ -186,6 +206,7 @@ impl SideNews {
                 Sound::UnitPromoted
             }
             SideNews::AgeTurned(_) => Sound::BaseAlert,
+            SideNews::PromotedWithTheAge { .. } => Sound::UnitPromoted,
             SideNews::Promoted(..) => Sound::UnitPromoted,
             SideNews::Captured(_) => Sound::StructureCaptured,
             SideNews::CapturedByEnemy(_) => Sound::StructureLost,

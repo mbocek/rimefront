@@ -195,6 +195,7 @@ impl Plugin for SimulationPlugin {
                         (
                             match_flow::advance_match_clock,
                             level_events::run_level_events,
+                            promotion::follow_the_age_schedule,
                             promotion::turn_the_age,
                         )
                             .chain(),

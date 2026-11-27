@@ -1,7 +1,7 @@
 //! A persistent world run as fast as it goes, with computer-driven players who enter and leave it, to find
 //! what grows or slows over days of world time:
 //! `rimefront-world-soak [--players 20] [--days 10] [--chance N] [--seed MAP_SEED] [--difficulty normal]
-//! [--dir DIR] [--out soak.csv]`. `--chance` picks the map, when the players come and go, and how hard and
+//! [--dir DIR] [--out soak.csv] [--era-hours 168] [--first-era antiquity]`. `--chance` picks the map, when the players come and go, and how hard and
 //! in what manner each one plays; without it a run picks its own and prints it, so a run can be repeated.
 //! Writes a line of measurements for every hour of world time; see docs/persistent-world.md.
 
@@ -21,10 +21,12 @@ use rimefront_net::world_host::{
 };
 use rimefront_net::world_store::WorldStore;
 use rimefront_sim::SIMULATION_TICK;
+use rimefront_sim::levels::ActiveLevel;
 use rimefront_sim::levels::{Difficulty, Personality};
 use rimefront_sim::sim::ai::{AiCommander, AiCommanders};
 use rimefront_sim::sim::catalog::{BuildingKind, Team};
 use rimefront_sim::sim::components::{Building, Unit};
+use rimefront_sim::sim::eras::{AgeSchedule, Era};
 use rimefront_sim::sim::sides::side_stands;
 use rimefront_sim::world::map::{CrystalVisual, map_bounds, world_to_cell};
 
@@ -232,7 +234,7 @@ impl HourOfWorld {
 
 const CSV_HEADER: &str = "world_hours,wall_secs,tick_avg_ms,tick_max_ms,ticks_over_20ms,ticks_over_50ms,\
 units,structures,entities,sides_standing,players_online,player_falls,world_cells,crystal_cells,\
-bytes_per_player_s,save_avg_ms,save_max_ms,saved_kb,store_mb,peak_rss_mb";
+bytes_per_player_s,save_avg_ms,save_max_ms,saved_kb,store_mb,peak_rss_mb,era";
 
 struct WorldCensus {
     units: usize,
@@ -316,7 +318,17 @@ fn main() -> std::io::Result<()> {
     if directory.exists() {
         std::fs::remove_dir_all(&directory)?;
     }
-    let mut host = WorldHost::new(seed);
+    let first = argument_after::<String>("--first-era")
+        .and_then(|name| Era::named(&name))
+        .unwrap_or(Era::Antiquity);
+    let era_hours = argument_after::<u32>("--era-hours").unwrap_or(7 * 24);
+    let ages = AgeSchedule {
+        first,
+        era_hours,
+        finale_hours: era_hours,
+        turn_hour: 20,
+    };
+    let mut host = WorldHost::with_ages(seed, Some(ages));
     host.keep_in(WorldStore::at(&directory), NEVER)?;
     let mut soak_players: Vec<SoakPlayer> = (0..players)
         .map(|_| SoakPlayer::new(&mut rng, difficulty))
@@ -380,7 +392,7 @@ fn main() -> std::io::Result<()> {
             let counted = census(&mut host);
             let bounds = map_bounds().size;
             let line = format!(
-                "{world_hours},{:.0},{:.3},{:.2},{},{},{},{},{},{},{online},{falls},{},{},{:.0},{:.2},{:.2},{:.0},{:.2},{:.0}",
+                "{world_hours},{:.0},{:.3},{:.2},{},{},{},{},{},{},{online},{falls},{},{},{:.0},{:.2},{:.2},{:.0},{:.2},{:.0},{:?}",
                 started.elapsed().as_secs_f64(),
                 millis(hour.stepping) / hour.ticks.max(1) as f64,
                 millis(hour.slowest),
@@ -398,6 +410,7 @@ fn main() -> std::io::Result<()> {
                 hour.bytes_saved as f64 / 1024.0,
                 directory_bytes(&directory) as f64 / (1024.0 * 1024.0),
                 peak_resident_megabytes(),
+                host.world().resource::<ActiveLevel>().0.era,
             );
             writeln!(csv, "{line}")?;
             csv.flush()?;

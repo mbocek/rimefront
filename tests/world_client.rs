@@ -7,9 +7,10 @@ use rimefront::app::match_flow::{GameState, MirroredBattle};
 use rimefront::net::network::LockstepPlugin;
 use rimefront::net::world_client::{OwnWorld, WorldClient, WorldClientPlugin};
 use rimefront::net::world_host::PlayerKey;
-use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
+use rimefront::sim::catalog::{BuildingKind, Team};
 use rimefront::sim::components::{Building, Unit};
 use rimefront::sim::determinism::{SimEntities, SimId, run_schedules_on_one_thread};
+use rimefront::sim::eras::UnitLine;
 use rimefront::sim::player_commands::{
     CommandQueue, GroundOrder, LocalTeam, PlayerCommand, SimulationTick,
 };
@@ -48,12 +49,12 @@ fn run_until(app: &mut App, mut done: impl FnMut(&mut World) -> bool) -> bool {
     false
 }
 
-fn own_tank(world: &mut World) -> Option<(Entity, SimId, Vec3)> {
+fn own_main_unit(world: &mut World) -> Option<(Entity, SimId, Vec3)> {
     let side = world.resource::<LocalTeam>().0;
     world
         .query::<(Entity, &SimId, &Unit, &Team, &Transform)>()
         .iter(world)
-        .find(|(_, _, unit, team, _)| **team == side && unit.0 == UnitKind::Tank)
+        .find(|(_, _, unit, team, _)| **team == side && unit.0.line() == UnitLine::Main)
         .map(|(entity, id, _, _, transform)| (entity, *id, transform.translation))
 }
 
@@ -63,7 +64,7 @@ fn the_game_plays_a_world_it_runs_itself() {
     let entered = run_until(&mut app, |world| {
         world.contains_resource::<MirroredBattle>()
             && *world.resource::<State<GameState>>().get() == GameState::Playing
-            && own_tank(world).is_some()
+            && own_main_unit(world).is_some()
     });
     assert!(entered, "the world never showed the player their forces");
     let world = app.world_mut();
@@ -77,7 +78,7 @@ fn the_game_plays_a_world_it_runs_itself() {
         .count();
     assert_eq!(command_centers, 1);
 
-    let (tank, id, start) = own_tank(world).unwrap();
+    let (tank, id, start) = own_main_unit(world).unwrap();
     assert_eq!(world.resource::<SimEntities>().get(id), Some(tank));
     let now = *world.resource::<SimulationTick>();
     world.resource_mut::<CommandQueue>().issue(
@@ -125,7 +126,7 @@ fn the_game_plays_a_world_it_runs_itself() {
 fn entered_with_forces(app: &mut App) -> bool {
     run_until(app, |world| {
         *world.resource::<State<GameState>>().get() == GameState::Playing
-            && own_tank(world).is_some()
+            && own_main_unit(world).is_some()
     })
 }
 
@@ -147,7 +148,7 @@ fn a_world_played_alone_is_there_the_next_time() {
         "the world never showed the player their forces"
     );
     let world = app.world_mut();
-    let (tank, id, start) = own_tank(world).unwrap();
+    let (tank, id, start) = own_main_unit(world).unwrap();
     let now = *world.resource::<SimulationTick>();
     let side = world.resource::<LocalTeam>().0;
     world.resource_mut::<CommandQueue>().issue(
@@ -182,7 +183,7 @@ fn a_world_played_alone_is_there_the_next_time() {
     );
     let world = app.world_mut();
     assert_eq!(world.resource::<LocalTeam>().0, side);
-    let (_, _, found_at) = own_tank(world).unwrap();
+    let (_, _, found_at) = own_main_unit(world).unwrap();
     assert!(
         found_at.distance(start) > 3.0 && found_at.distance(left_at) < 4.0,
         "the tank left at {left_at} is at {found_at}"

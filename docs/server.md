@@ -6,7 +6,11 @@ simulation. Hosting from the game on a local network works as before. With `--wo
 persistent world, entered at `ws://server:47300/world` from the game's network page (see
 [persistent-world.md](persistent-world.md)). With `--world-dir DIR` the world is saved in `DIR` every 30 seconds
 of world time (`--save-every SECS`) and resumed from there when the server starts again; `--world SEED` then
-only grows a world when `DIR` holds none. Ctrl-C or a termination signal (`SIGTERM`, as a service manager
+only grows a world when `DIR` holds none. A new world goes through the ages ([eras.md](eras.md#ages-of-a-world)):
+`--first-era antiquity` (the first age with an army, by default), `--era-days 7` and `--finale-days 3` for how long
+an age and the final one last at least, and `--era-hour 20` for the hour of the world day they turn at. These
+defaults suit friends; a public world wants ages of a month (`--era-days 28 --finale-days 7`). A resumed world
+keeps the schedule it was grown with. Ctrl-C or a termination signal (`SIGTERM`, as a service manager
 sends) saves the world before the server stops; a crash loses at most the time since the last save. A game
 of another version enters as long as it speaks the same world protocol; updating a server, and what may
 change between versions, is in [compatibility.md](compatibility.md).

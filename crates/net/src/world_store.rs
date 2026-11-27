@@ -16,9 +16,11 @@ use rimefront_sim::sim::catalog::{BuildingKind, SideColor, Team};
 use rimefront_sim::sim::components::{Building, Unit};
 use rimefront_sim::sim::determinism::SimId;
 use rimefront_sim::sim::economy::Economies;
+use rimefront_sim::sim::eras::AgeSchedule;
 use rimefront_sim::sim::intel::Intel;
 use rimefront_sim::sim::neutral_sites::{UnclaimedSite, spawn_unclaimed_site};
 use rimefront_sim::sim::production::{BuildItem, Lane, Production};
+use rimefront_sim::sim::promotion::AgeTurned;
 use rimefront_sim::sim::records::{
     SavableBuilding, SavableUnit, SavedBuilding, SavedUnit, respawn_building, respawn_unit,
 };
@@ -35,7 +37,7 @@ use rimefront_sim::world::wilds::{crystal_look, widen_world};
 /// The layout of a saved world: what its files hold and in what order. It is the first thing in the world
 /// file, so a world saved by another layout is recognised before anything else is read; raising it needs a
 /// way to read the layout before (docs/compatibility.md), and `fixtures/world_layout.txt` changes with it.
-const STORE_VERSION: u32 = 7;
+const STORE_VERSION: u32 = 8;
 const WORLD_FILE: &str = "world.bin";
 const CHUNKS_DIRECTORY: &str = "chunks";
 
@@ -72,6 +74,8 @@ pub struct HostingRecord {
     pub alliances: Vec<Vec<Team>>,
     /// Offers of alliance not answered yet, as (from, to).
     pub alliance_offers: Vec<(Team, Team)>,
+    /// Sides promoted for free when the age turns, since they arrived late in it.
+    pub late_in_the_age: Vec<Team>,
 }
 
 /// Everything of a world that is not kept by chunk, and the file of every chunk saved with it.
@@ -81,6 +85,9 @@ struct WorldRecord {
     map_seed: u64,
     tick: u64,
     match_secs: f32,
+    ages: Option<AgeSchedule>,
+    /// The tick the age last turned on, for the calm after it.
+    age_turned: Option<u64>,
     bounds: MapBounds,
     sides: Vec<SideRecord>,
     retired_sides: Vec<Team>,
@@ -120,6 +127,14 @@ impl SavedWorld {
 
     pub fn hosting(&self) -> &HostingRecord {
         &self.record.hosting
+    }
+
+    pub fn ages(&self) -> Option<AgeSchedule> {
+        self.record.ages
+    }
+
+    pub fn age_turned(&self) -> Option<u64> {
+        self.record.age_turned
     }
 }
 
@@ -288,6 +303,7 @@ fn read_world_record(bytes: &[u8]) -> io::Result<WorldRecord> {
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     match layout {
         STORE_VERSION => decode(bytes),
+        7 => decode::<layout_7::WorldRecord>(bytes).map(WorldRecord::from),
         6 => decode::<layout_6::WorldRecord>(bytes).map(WorldRecord::from),
         older if older < STORE_VERSION => Err(io::Error::other(format!(
             "the world was saved by layout {older}, which this server no longer reads (it reads \
@@ -297,6 +313,73 @@ fn read_world_record(bytes: &[u8]) -> io::Result<WorldRecord> {
             "the world was saved by layout {newer}, newer than this server's {STORE_VERSION}: run the \
              server that saved it, or a newer one"
         ))),
+    }
+}
+
+/// The world record as layout 7 (release 2.1.0) wrote it: a world without ages, in the modern one.
+mod layout_7 {
+    use super::*;
+
+    #[derive(Deserialize)]
+    pub(super) struct HostingRecord {
+        level_side_taken: bool,
+        players: Vec<(PlayerKey, Team)>,
+        sites: Vec<(Team, IVec2)>,
+        away_since: Vec<(Team, u64)>,
+        sheltered: Vec<Team>,
+        computer_sides: Vec<(Team, IVec2)>,
+        colors: Vec<(Team, SideColor)>,
+        deposits: Vec<IVec2>,
+        alliances: Vec<Vec<Team>>,
+        alliance_offers: Vec<(Team, Team)>,
+    }
+
+    #[derive(Deserialize)]
+    pub(super) struct WorldRecord {
+        version: u32,
+        map_seed: u64,
+        tick: u64,
+        match_secs: f32,
+        bounds: MapBounds,
+        sides: Vec<SideRecord>,
+        retired_sides: Vec<Team>,
+        starting_sites: Vec<IVec2>,
+        ai: AiCommanders,
+        hosting: HostingRecord,
+        chunks: Vec<(IVec2, String)>,
+    }
+
+    impl From<WorldRecord> for super::WorldRecord {
+        fn from(old: WorldRecord) -> Self {
+            let hosting = old.hosting;
+            Self {
+                version: old.version,
+                map_seed: old.map_seed,
+                tick: old.tick,
+                match_secs: old.match_secs,
+                ages: None,
+                age_turned: None,
+                bounds: old.bounds,
+                sides: old.sides,
+                retired_sides: old.retired_sides,
+                starting_sites: old.starting_sites,
+                ai: old.ai,
+                hosting: super::HostingRecord {
+                    level_side_taken: hosting.level_side_taken,
+                    players: hosting.players,
+                    sites: hosting.sites,
+                    away_since: hosting.away_since,
+                    sheltered: hosting.sheltered,
+                    computer_sides: hosting.computer_sides,
+                    colors: hosting.colors,
+                    deposits: hosting.deposits,
+                    alliances: hosting.alliances,
+                    alliance_offers: hosting.alliance_offers,
+                    late_in_the_age: Vec::new(),
+                },
+                chunks: old.chunks,
+            }
+        }
     }
 }
 
@@ -339,6 +422,8 @@ mod layout_6 {
                 map_seed: old.map_seed,
                 tick: old.tick,
                 match_secs: old.match_secs,
+                ages: None,
+                age_turned: None,
                 bounds: old.bounds,
                 sides: old.sides,
                 retired_sides: old.retired_sides,
@@ -355,6 +440,7 @@ mod layout_6 {
                     deposits: hosting.deposits,
                     alliances: Vec::new(),
                     alliance_offers: Vec::new(),
+                    late_in_the_age: Vec::new(),
                 },
                 chunks: old.chunks,
             }
@@ -472,6 +558,8 @@ fn world_record(world: &World, tick: u64, hosting: HostingRecord) -> WorldRecord
         map_seed: world.resource::<ActiveLevel>().0.map_seed,
         tick,
         match_secs: world.resource::<MatchClock>().elapsed_secs,
+        ages: world.resource::<ActiveLevel>().0.ages,
+        age_turned: world.resource::<AgeTurned>().0,
         bounds: map_bounds(),
         sides,
         retired_sides: world
@@ -623,8 +711,11 @@ fn restore_sides(world: &mut World, teams: &[Team], records: &[SideRecord]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rimefront_sim::sim::eras::Era;
 
     const LAYOUT_FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/world_layout.txt");
+    const LAYOUT_7_FIXTURE: &str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/world_layout_7.txt");
     const LAYOUT_6_FIXTURE: &str =
         concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/world_layout_6.txt");
 
@@ -642,12 +733,33 @@ mod tests {
         assert!(world.hosting.alliances.is_empty());
     }
 
+    #[test]
+    fn a_world_saved_by_release_2_1_still_opens_without_ages() {
+        let recorded = std::fs::read_to_string(LAYOUT_7_FIXTURE).unwrap();
+        let hex = recorded.lines().nth(1).unwrap();
+        let bytes: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).unwrap())
+            .collect();
+        let world = read_world_record(&bytes).unwrap();
+        assert_eq!(world.tick, 1_000_000);
+        assert_eq!(world.ages, None);
+        assert_eq!(world.age_turned, None);
+        assert_eq!(
+            world.hosting.alliances,
+            vec![vec![Team::from_index(4), Team::from_index(6)]]
+        );
+        assert!(world.hosting.late_in_the_age.is_empty());
+    }
+
     fn sample_world() -> WorldRecord {
         WorldRecord {
             version: STORE_VERSION,
             map_seed: 29,
             tick: 1_000_000,
             match_secs: 50_000.5,
+            ages: Some(AgeSchedule::in_days(Era::Antiquity, 7, 3, 20)),
+            age_turned: Some(999_000),
             bounds: MapBounds {
                 min: IVec2::new(-64, -64),
                 size: IVec2::new(192, 192),
@@ -681,6 +793,7 @@ mod tests {
                 deposits: vec![IVec2::new(-90, 70)],
                 alliances: vec![vec![Team::from_index(4), Team::from_index(6)]],
                 alliance_offers: vec![(Team::from_index(5), Team::from_index(4))],
+                late_in_the_age: vec![Team::from_index(7)],
             },
             chunks: vec![(IVec2::new(-1, 2), "-1_2_77.bin".into())],
         }

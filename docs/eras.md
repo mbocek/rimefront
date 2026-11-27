@@ -83,13 +83,16 @@ Nothing in a skirmish turns the age; a persistent world does, on a schedule.
 ## Ages of a world
 
 A world goes through the ages on a schedule (`AgeSchedule` in `eras.rs`, `LevelDefinition::ages`): it starts
-in the first age, and each age lasts at least `--era-days` (the final one `--finale-days`) and turns at the
-next `--era-hour` of a world day after that, so its players know the evening it ends on. Only ages with an army
-count, so for now a world goes from antiquity to the modern age and stays there. The schedule is worked out
-from the world's tick, never its `f32` clock, which stops advancing after twelve days of world time; the
-seasons of a world are counted from the tick too now. A world grown by the server takes the flags
-([server.md](server.md)); a world the game runs alone has the defaults, a week an age from antiquity, turning
-at eight in the evening. A world saved before it had ages stays in the modern age without a schedule.
+in the first age, and each age lasts at least `--era-days` and turns at the next `--era-hour` of the world's day
+after that. A world's day is counted from its first tick, not by the server's clock, and stands still while the
+server is down, so the hour drifts from the wall clock; the countdown in the game is what players go by. Only
+ages with an army count, and the last of them lasts for good; the final age and how a world ends come with the
+future's army. The schedule holds the age the world is in and the tick it began (`age`, `since`) and walks on
+from there, so an age given an army in a later release is taken up at the next turn and never puts a world
+back. It is worked out from the world's tick, never its `f32` clock, which stops advancing after twelve days of
+world time; the seasons of a world are counted from the tick too now. A world grown by the server takes the
+flags ([server.md](server.md)); a world the game runs alone has the defaults, a week an age from antiquity,
+turning at the twentieth hour. A world saved before it had ages stays in the modern age without a schedule.
 
 The world sends its schedule to every player as they enter (`Message::Entered`), and the game works the age out
 from the world's tick as it does the season: the build menu, the models and the countdown below the objective
@@ -104,7 +107,10 @@ When the age turns:
   (defences, then the dearest units), wherever its units stand, without keeping anything back and never into
   debt. The player is told on return what was promoted and what was too dear (`SideNews::PromotedWithTheAge`);
   that tally is not saved, so after a restart they are not told.
-- Players present promote their sides themselves during the calm; computer sides as above.
+- **The level's own side, while no player has taken it,** is promoted for free, so its first player starts in
+  the age like any newcomer.
+- Players present promote their sides themselves during the calm; computer sides as above. Nobody is told of
+  a promotion that promoted nothing.
 
 Measured with `rimefront-world-soak --days 1 --era-hours 2 --chance 4242` (20 players coming and going, Apple
 M5 Pro, release build), the age turning at hour 20 promoted every side at once without a slow tick:

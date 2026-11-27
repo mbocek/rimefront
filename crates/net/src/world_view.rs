@@ -872,7 +872,7 @@ mod tests {
                 team: Team::from_index(4),
                 tick: 99,
                 map_seed: u64::MAX,
-                ages: Some(AgeSchedule::in_days(Era::Antiquity, 7, 3, 20)),
+                ages: Some(AgeSchedule::starting_in(Era::Antiquity, 7, 20)),
             },
             Message::Orders {
                 commands: vec![

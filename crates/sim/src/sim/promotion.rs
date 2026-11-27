@@ -42,9 +42,10 @@ pub fn follow_the_age_schedule(tick: Res<SimulationTick>, mut level: ResMut<Acti
     let Some(schedule) = level.0.ages else {
         return;
     };
-    let era = schedule.era_at(tick.0);
-    if level.0.era != era {
-        level.0.era = era;
+    let now = schedule.advanced_to(tick.0);
+    if now != schedule {
+        level.0.ages = Some(now);
+        level.0.era = now.age;
     }
 }
 

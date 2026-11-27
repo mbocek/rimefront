@@ -323,9 +323,9 @@ fn main() -> std::io::Result<()> {
         .unwrap_or(Era::Antiquity);
     let era_hours = argument_after::<u32>("--era-hours").unwrap_or(7 * 24);
     let ages = AgeSchedule {
-        first,
+        age: first,
+        since: 0,
         era_hours,
-        finale_hours: era_hours,
         turn_hour: 20,
     };
     let mut host = WorldHost::with_ages(seed, Some(ages));

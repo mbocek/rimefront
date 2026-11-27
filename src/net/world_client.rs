@@ -9,7 +9,7 @@ use bevy::prelude::*;
 
 use crate::SIMULATION_TICK;
 use crate::app::i18n::tr_owned;
-use crate::app::match_flow::{GameState, MatchClock, MirroredBattle};
+use crate::app::match_flow::{GameState, MatchClock, MirroredBattle, forbidden_items};
 use crate::app::settings::game_data_directory;
 use crate::missions::levels::ActiveLevel;
 use crate::net::lobby::{DEFAULT_PORT, NetLobby};
@@ -456,7 +456,10 @@ fn follow_the_ages(world: &mut World, world_tick: u64) {
         return;
     }
     world.resource_mut::<ActiveLevel>().0.era = era;
-    world.resource_mut::<Production>().set_era(era);
+    let level = world.resource::<ActiveLevel>().0.clone();
+    let mut production = world.resource_mut::<Production>();
+    production.set_era(era);
+    production.forbid_to_every_side(forbidden_items(&level));
 }
 
 fn world_tick_now(world: &World, local_tick: u64) -> u64 {

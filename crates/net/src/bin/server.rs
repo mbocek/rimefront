@@ -1,6 +1,6 @@
 //! The dedicated network battle server:
 //! `rimefront-server [--port 47300] [--world SEED] [--world-dir DIR] [--save-every SECS] [--most-rooms N]
-//! [--room-patience MINUTES] [--era-days 7] [--finale-days 3] [--era-hour 20] [--first-era antiquity]`.
+//! [--room-patience MINUTES] [--era-days 7] [--era-hour 20] [--first-era antiquity]`.
 //! Players join
 //! `ws://host:port/room/NAME`, and with `--world` or `--world-dir` enter a persistent world at
 //! `ws://host:port/world`; with `--world-dir` the world is saved there and resumed from there. Ctrl-C or
@@ -40,12 +40,11 @@ fn age_schedule() -> std::io::Result<AgeSchedule> {
             .ok_or_else(|| {
                 std::io::Error::other(format!("no age called {name} has an army yet"))
             })?,
-        None => defaults.first,
+        None => defaults.age,
     };
-    Ok(AgeSchedule::in_days(
+    Ok(AgeSchedule::starting_in(
         first,
         argument_after("--era-days").unwrap_or(defaults.era_hours / 24),
-        argument_after("--finale-days").unwrap_or(defaults.finale_hours / 24),
         argument_after("--era-hour").unwrap_or(defaults.turn_hour),
     ))
 }
@@ -53,9 +52,11 @@ fn age_schedule() -> std::io::Result<AgeSchedule> {
 /// The world to run: the one saved in `--world-dir` if there is one, otherwise a new one from `--world`.
 fn world_to_run() -> std::io::Result<Option<WorldHost>> {
     let map_seed = argument_after::<u64>("--world");
-    let ages = Some(age_schedule()?);
     let Some(directory) = argument_after::<PathBuf>("--world-dir") else {
-        return Ok(map_seed.map(|seed| WorldHost::with_ages(seed, ages)));
+        let Some(seed) = map_seed else {
+            return Ok(None);
+        };
+        return Ok(Some(WorldHost::with_ages(seed, Some(age_schedule()?))));
     };
     let mut store = WorldStore::at(&directory);
     let mut host = match store.load()? {
@@ -81,7 +82,7 @@ fn world_to_run() -> std::io::Result<Option<WorldHost>> {
                     directory.display()
                 ))
             })?;
-            WorldHost::with_ages(map_seed, ages)
+            WorldHost::with_ages(map_seed, Some(age_schedule()?))
         }
     };
     let every = Duration::from_secs(argument_after("--save-every").unwrap_or(DEFAULT_SAVE_SECS));

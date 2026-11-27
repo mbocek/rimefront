@@ -60,35 +60,41 @@ const TICKS_PER_SEC: u64 = 1000 / crate::SIMULATION_TICK.as_millis() as u64;
 const TICKS_PER_HOUR: u64 = 3600 * TICKS_PER_SEC;
 const TICKS_PER_DAY: u64 = 24 * TICKS_PER_HOUR;
 
-/// When a persistent world's ages turn. An age lasts at least `era_hours` (the final one `finale_hours`) and
-/// turns at the next `turn_hour` of a world day after that, so its players know the evening it ends on. The
-/// world counts in ticks: its `f32` match clock stops advancing after twelve days.
+/// When a persistent world's ages turn: the age it is in and the tick that age began, from which each age
+/// lasts at least `era_hours` and turns at the next `turn_hour` of the world's day (counted from its first
+/// tick, so a server down for a while shifts it). It counts in ticks, since the `f32` match clock stops
+/// advancing after twelve days, and walks on from the age it holds, so an age given an army in a later
+/// release never puts a world back.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct AgeSchedule {
-    pub first: Era,
+    pub age: Era,
+    pub since: u64,
     pub era_hours: u32,
-    pub finale_hours: u32,
     pub turn_hour: u32,
 }
 
-/// Ages of a week, turning at eight in the evening: a world of friends sees them turn. A public world wants
-/// longer ones (docs/server.md).
+/// Ages of a week, turning at the twentieth hour of the world's day: a world of friends sees them turn. A
+/// public world wants longer ones (docs/server.md).
 impl Default for AgeSchedule {
     fn default() -> Self {
-        Self::in_days(Era::Antiquity, 7, 3, 20)
+        Self::starting_in(Era::Antiquity, 7, 20)
     }
 }
 
 impl AgeSchedule {
-    pub const FINAL_AGE: Era = Era::Future;
-
-    pub fn in_days(first: Era, era_days: u32, finale_days: u32, turn_hour: u32) -> Self {
+    pub fn starting_in(first: Era, era_days: u32, turn_hour: u32) -> Self {
         Self {
-            first,
-            era_hours: era_days * 24,
-            finale_hours: finale_days * 24,
+            age: first,
+            since: 0,
+            era_hours: era_days.clamp(1, 3650) * 24,
             turn_hour: turn_hour % 24,
         }
+    }
+
+    /// The schedule held from the age running at `tick` on.
+    pub fn advanced_to(self, tick: u64) -> Self {
+        let (age, since) = self.age_at(tick);
+        Self { age, since, ..self }
     }
 
     pub fn era_at(&self, tick: u64) -> Era {
@@ -98,7 +104,7 @@ impl AgeSchedule {
     /// The tick the age running at `tick` turns into the next one; `None` while there is no next one.
     pub fn next_turn_after(&self, tick: u64) -> Option<u64> {
         let (era, started) = self.age_at(tick);
-        era.next_playable().map(|_| self.turn_of(era, started))
+        era.next_playable().map(|_| self.turn_of(started))
     }
 
     /// The tick the age running at `tick` began.
@@ -107,10 +113,9 @@ impl AgeSchedule {
     }
 
     fn age_at(&self, tick: u64) -> (Era, u64) {
-        let mut era = self.first;
-        let mut started = 0;
+        let (mut era, mut started) = (self.age, self.since);
         while let Some(next) = era.next_playable() {
-            let turn = self.turn_of(era, started);
+            let turn = self.turn_of(started);
             if tick < turn {
                 break;
             }
@@ -119,12 +124,8 @@ impl AgeSchedule {
         (era, started)
     }
 
-    fn turn_of(&self, era: Era, started: u64) -> u64 {
-        let hours = match era {
-            AgeSchedule::FINAL_AGE => self.finale_hours,
-            _ => self.era_hours,
-        };
-        let earliest = started + u64::from(hours) * TICKS_PER_HOUR;
+    fn turn_of(&self, started: u64) -> u64 {
+        let earliest = started + u64::from(self.era_hours) * TICKS_PER_HOUR;
         let turn_in_day = u64::from(self.turn_hour) * TICKS_PER_HOUR;
         let day = earliest.saturating_sub(turn_in_day).div_ceil(TICKS_PER_DAY);
         (day * TICKS_PER_DAY + turn_in_day).max(started + 1)
@@ -290,28 +291,51 @@ mod tests {
     }
 
     #[test]
-    fn an_age_turns_at_the_evening_after_its_days_are_over() {
-        let schedule = AgeSchedule::in_days(Era::Antiquity, 7, 3, 20);
+    fn an_age_turns_at_the_turning_hour_after_its_days_are_over() {
+        let schedule = AgeSchedule::starting_in(Era::Antiquity, 7, 20);
         let turn = (7 * 24 + 20) * TICKS_PER_HOUR;
+        let next = Era::Antiquity.next_playable().unwrap();
         assert_eq!(schedule.era_at(0), Era::Antiquity);
         assert_eq!(schedule.era_at(turn - 1), Era::Antiquity);
-        assert_eq!(schedule.era_at(turn), Era::Modern);
+        assert_eq!(schedule.era_at(turn), next);
         assert_eq!(schedule.next_turn_after(0), Some(turn));
         assert_eq!(schedule.age_started_at(turn + 5), turn);
-        assert_eq!(
-            schedule.next_turn_after(turn),
-            None,
-            "no age after the modern one yet"
-        );
+        assert_eq!(schedule.advanced_to(turn + 5).age, next);
+        assert_eq!(schedule.advanced_to(turn + 5).since, turn);
+    }
+
+    #[test]
+    fn a_world_in_the_last_age_with_an_army_stays_there() {
+        let schedule = AgeSchedule {
+            age: Era::Modern,
+            since: 1_000,
+            ..AgeSchedule::default()
+        };
+        assert_eq!(schedule.next_turn_after(2_000), None);
         assert_eq!(schedule.era_at(u64::MAX / 2), Era::Modern);
+    }
+
+    #[test]
+    fn a_schedule_walks_on_from_its_age_and_never_back() {
+        let modern = AgeSchedule {
+            age: Era::Modern,
+            since: 5 * TICKS_PER_DAY,
+            ..AgeSchedule::default()
+        };
+        assert_eq!(
+            modern.era_at(0),
+            Era::Modern,
+            "before its age began it is still in it"
+        );
+        assert_eq!(modern.era_at(6 * TICKS_PER_DAY), Era::Modern);
     }
 
     #[test]
     fn an_age_shorter_than_a_day_still_waits_for_the_turning_hour() {
         let schedule = AgeSchedule {
-            first: Era::Antiquity,
+            age: Era::Antiquity,
+            since: 0,
             era_hours: 1,
-            finale_hours: 1,
             turn_hour: 1,
         };
         assert_eq!(schedule.next_turn_after(0), Some(TICKS_PER_HOUR));

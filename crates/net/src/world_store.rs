@@ -758,7 +758,7 @@ mod tests {
             map_seed: 29,
             tick: 1_000_000,
             match_secs: 50_000.5,
-            ages: Some(AgeSchedule::in_days(Era::Antiquity, 7, 3, 20)),
+            ages: Some(AgeSchedule::starting_in(Era::Antiquity, 7, 20)),
             age_turned: Some(999_000),
             bounds: MapBounds {
                 min: IVec2::new(-64, -64),

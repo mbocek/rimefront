@@ -428,8 +428,8 @@ Taken on 2026-11-26:
 Taken on 2026-11-27 ([eras.md](eras.md#ages-of-a-world), from
 [brainstorm-vekysveta-2026-11-26.md](../brainstorm-vekysveta-2026-11-26.md)):
 
-- **A world goes through the ages**, from antiquity on, an age of a week by default turning at eight in the
-  evening; every player is in the world's current age, a newcomer too. A side that arrives in the last quarter
+- **A world goes through the ages**, from antiquity on, an age of a week by default turning at the twentieth
+  hour of the world's day; every player is in the world's current age, a newcomer too. A side that arrives in the last quarter
   of an age has its first promotion for free, and an absent player's side is promoted from its own credits.
 
 ### Measured: a world with many players

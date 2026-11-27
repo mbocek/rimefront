@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rimefront_models import (antiquity, buildings, decorations, nature, ore, soldier, units, upgrades,  # noqa: E402
+from rimefront_models import (antiquity, buildings, decorations, gunpowder, nature, ore, soldier, units, upgrades,  # noqa: E402
                               vegetation)
 from rimefront_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # noqa: E402
 from rimefront_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
@@ -82,6 +82,22 @@ TEAM_MODELS = {
     "factory_antiquity": (antiquity.build_factory_antiquity, BUILDING_TRIANGLE_BUDGET),
     "tech_center_antiquity": (antiquity.build_tech_center_antiquity, BUILDING_TRIANGLE_BUDGET),
     "repair_bay_antiquity": (antiquity.build_repair_bay_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "musketeer": (gunpowder.build_musketeer, UNIT_TRIANGLE_BUDGET),
+    "bombardier": (gunpowder.build_bombardier, UNIT_TRIANGLE_BUDGET),
+    "surgeon": (gunpowder.build_surgeon, UNIT_TRIANGLE_BUDGET),
+    "sapper": (gunpowder.build_sapper, UNIT_TRIANGLE_BUDGET),
+    "dragoon": (gunpowder.build_dragoon, UNIT_TRIANGLE_BUDGET),
+    "cuirassier": (gunpowder.build_cuirassier, UNIT_TRIANGLE_BUDGET),
+    "field_gun": (gunpowder.build_field_gun, UNIT_TRIANGLE_BUDGET),
+    "ore_wagon": (gunpowder.build_ore_wagon, UNIT_TRIANGLE_BUDGET),
+    "cannon_tower": (gunpowder.build_cannon_tower, BUILDING_TRIANGLE_BUDGET),
+    "command_center_gunpowder": (gunpowder.build_command_center_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "power_plant_gunpowder": (gunpowder.build_power_plant_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "refinery_gunpowder": (gunpowder.build_refinery_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "barracks_gunpowder": (gunpowder.build_barracks_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "factory_gunpowder": (gunpowder.build_factory_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "tech_center_gunpowder": (gunpowder.build_tech_center_gunpowder, BUILDING_TRIANGLE_BUDGET),
+    "repair_bay_gunpowder": (gunpowder.build_repair_bay_gunpowder, BUILDING_TRIANGLE_BUDGET),
 }
 ICON_ONLY_MODELS = {
     "upgrade_armour": upgrades.build_armour_upgrade,
@@ -116,7 +132,7 @@ NEUTRAL_MODELS = {
     "bush_round": (vegetation.build_bush_round, 2_000),
     "bush_flowering": (vegetation.build_bush_flowering, 2_000),
 }
-MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower"}
+MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower", "field_gun", "cannon_tower"}
 INFANTRY_NODES = ("Rig", "Body", "hips", "chest", "head", "rifle", "hand.L", "hand.R")
 INFANTRY_CLIPS = {"Idle": None, "Walk": None, "KneelFire": None, "Death": None}
 REQUIRED_NODES = {
@@ -132,7 +148,12 @@ REQUIRED_NODES = {
     "archer": INFANTRY_NODES,
     "healer": INFANTRY_NODES,
     "builder": INFANTRY_NODES,
+    "musketeer": INFANTRY_NODES,
+    "bombardier": INFANTRY_NODES,
+    "surgeon": INFANTRY_NODES,
+    "sapper": INFANTRY_NODES,
     "ore_cart": ("OreLoad", "CollectorDrum"),
+    "ore_wagon": ("OreLoad", "CollectorDrum"),
     "gunship": ("Rotor", "TailRotor"),
     "bomber": ("LandingGearL", "LandingGearR", "LandingGearN"),
     "fighter": ("LandingGearL", "LandingGearR", "LandingGearN"),
@@ -152,7 +173,13 @@ REQUIRED_ANIMATIONS = {
     "archer": INFANTRY_CLIPS,
     "healer": INFANTRY_CLIPS,
     "builder": INFANTRY_CLIPS,
+    "musketeer": INFANTRY_CLIPS,
+    "bombardier": INFANTRY_CLIPS,
+    "surgeon": INFANTRY_CLIPS,
+    "sapper": INFANTRY_CLIPS,
     "ore_cart": {"Drive": None, "Work": "CollectorDrum"},
+    "ore_wagon": {"Drive": None, "Work": "CollectorDrum"},
+    "field_gun": {"Drive": None, "Fire": "Barrel"},
     "missile_truck": {"Drive": None, "Fire": "Barrel"},
     "rocket_bunker": {"Fire": "Barrel"},
     "bulwark": {"Drive": None, "Fire": "Barrel"},

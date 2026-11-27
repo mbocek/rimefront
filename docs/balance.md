@@ -81,6 +81,16 @@ stop horsemen (+59) and chariots (+64), horsemen ride down archers (+71) and cat
 spearmen, +84 against archers). With 24 matches per pairing Hard beats Normal 14:6 and 11:8 (from either base
 site), Brutal beats Hard 15:7, Easy wins 0 of 24 against Normal; a match takes 8-11 minutes.
 
+## The age of gunpowder
+
+`--era gunpowder`, 24 matches per pairing: musketeers stop cuirassiers (+58), cuirassiers ride down bombardiers
+(+18), dragoons (+38) and field guns (+43), bombardiers scatter musketeers (+53), and field guns shell musketeers
+(+50) and bombardiers (+73). The dragoon is the weakest in a stand-up fight, as the scout is in the modern age;
+it is fast and beats bombardiers. Hard beats Normal 17:5 and 18:6 (from either base site), Brutal beats Hard
+22:2, but Easy holds Normal 12:11: its smaller first wave of four comes early, and in this age an early raid on
+the ore wagons pays (a probe of four matches showed the beaten Normal side with one ore wagon). A match takes
+8-11 minutes.
+
 ## Commander personalities
 
 Each personality plays Normal against the Balanced commander on Normal, with fog of war, 40 matches per

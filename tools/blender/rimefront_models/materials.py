@@ -116,6 +116,12 @@ PALETTE = {
     "HorseCoat": Surface((0.38, 0.23, 0.12), roughness=0.8),
     "HorseMane": Surface((0.10, 0.07, 0.05), roughness=0.9),
     "OxCoat": Surface((0.52, 0.42, 0.30), roughness=0.85),
+    "Wool": Surface((0.16, 0.18, 0.26), roughness=0.9),
+    "Felt": Surface((0.07, 0.07, 0.08), roughness=0.9),
+    "Brass": Surface((0.78, 0.62, 0.26), metallic=0.85, roughness=0.35),
+    "Whitewash": Surface((0.84, 0.82, 0.76), roughness=0.9),
+    "Brick": Surface((0.55, 0.24, 0.17), roughness=0.9),
+    "Slate": Surface((0.24, 0.26, 0.30), roughness=0.8),
 }
 
 

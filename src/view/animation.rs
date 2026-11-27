@@ -76,12 +76,20 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
         | UnitKind::Spearman
         | UnitKind::Archer
         | UnitKind::Healer
-        | UnitKind::Builder => 2.4,
+        | UnitKind::Builder
+        | UnitKind::Musketeer
+        | UnitKind::Bombardier
+        | UnitKind::Surgeon
+        | UnitKind::Sapper => 2.4,
         UnitKind::Horseman => 6.2,
         UnitKind::Chariot => 4.6,
         UnitKind::Catapult => 2.0,
         UnitKind::Wagon => 4.0,
         UnitKind::OreCart => 2.7,
+        UnitKind::Dragoon => 5.6,
+        UnitKind::Cuirassier => 4.8,
+        UnitKind::FieldGun => 2.4,
+        UnitKind::OreWagon => 3.0,
         UnitKind::Bulwark => 2.2,
         UnitKind::Gunship => 6.5,
         UnitKind::FlakTrack => 3.2,

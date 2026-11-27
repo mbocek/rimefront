@@ -30,7 +30,13 @@ impl RunningGear {
             | UnitKind::Archer
             | UnitKind::Healer
             | UnitKind::Builder
-            | UnitKind::Horseman => RunningGear::Feet,
+            | UnitKind::Horseman
+            | UnitKind::Musketeer
+            | UnitKind::Bombardier
+            | UnitKind::Surgeon
+            | UnitKind::Sapper
+            | UnitKind::Dragoon
+            | UnitKind::Cuirassier => RunningGear::Feet,
             UnitKind::Scout
             | UnitKind::MissileTruck
             | UnitKind::RepairTruck
@@ -39,7 +45,9 @@ impl RunningGear {
             | UnitKind::Chariot
             | UnitKind::Catapult
             | UnitKind::Wagon
-            | UnitKind::OreCart => RunningGear::Wheels,
+            | UnitKind::OreCart
+            | UnitKind::FieldGun
+            | UnitKind::OreWagon => RunningGear::Wheels,
             UnitKind::Tank
             | UnitKind::Bulwark
             | UnitKind::Artillery

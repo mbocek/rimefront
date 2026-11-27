@@ -137,6 +137,8 @@ impl AgeSchedule {
 pub enum Eras {
     Only(Era),
     Since(Era),
+    /// From the first age to the last, both included.
+    Span(Era, Era),
 }
 
 impl Eras {
@@ -144,6 +146,7 @@ impl Eras {
         match self {
             Eras::Only(own) => own == era,
             Eras::Since(first) => era >= first,
+            Eras::Span(first, last) => (first..=last).contains(&era),
         }
     }
 }
@@ -246,10 +249,11 @@ impl BuildingKind {
 
     /// The defence a promotion into `era` makes of this one; only ever forward in time.
     pub fn promoted_into(self, era: Era) -> Option<BuildingKind> {
-        let Eras::Only(own) = self.eras() else {
-            return None;
+        let last = match self.eras() {
+            Eras::Only(own) | Eras::Span(_, own) => own,
+            Eras::Since(_) => return None,
         };
-        (era > own).then(|| self.in_era(era)).flatten()
+        (era > last).then(|| self.in_era(era)).flatten()
     }
 }
 

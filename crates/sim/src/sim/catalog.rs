@@ -418,6 +418,14 @@ pub enum UnitKind {
     Catapult,
     Wagon,
     OreCart,
+    Musketeer,
+    Bombardier,
+    Surgeon,
+    Sapper,
+    Dragoon,
+    Cuirassier,
+    FieldGun,
+    OreWagon,
 }
 
 pub struct UnitSpec {
@@ -448,11 +456,15 @@ pub struct UnitSpec {
 }
 
 impl UnitKind {
-    pub const INFANTRY: [UnitKind; 11] = [
+    pub const INFANTRY: [UnitKind; 15] = [
         UnitKind::Spearman,
         UnitKind::Archer,
         UnitKind::Healer,
         UnitKind::Builder,
+        UnitKind::Musketeer,
+        UnitKind::Bombardier,
+        UnitKind::Surgeon,
+        UnitKind::Sapper,
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Grenadier,
@@ -461,12 +473,16 @@ impl UnitKind {
         UnitKind::Medic,
         UnitKind::Engineer,
     ];
-    pub const VEHICLES: [UnitKind; 19] = [
+    pub const VEHICLES: [UnitKind; 23] = [
         UnitKind::Horseman,
         UnitKind::Chariot,
         UnitKind::Catapult,
         UnitKind::Wagon,
         UnitKind::OreCart,
+        UnitKind::Dragoon,
+        UnitKind::Cuirassier,
+        UnitKind::FieldGun,
+        UnitKind::OreWagon,
         UnitKind::Scout,
         UnitKind::TroopCarrier,
         UnitKind::RaiderBike,
@@ -483,7 +499,7 @@ impl UnitKind {
         UnitKind::Harvester,
     ];
     /// New kinds go at the end: replays store a unit's look as its place in this list.
-    pub const ALL: [UnitKind; 30] = [
+    pub const ALL: [UnitKind; 38] = [
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Medic,
@@ -514,6 +530,14 @@ impl UnitKind {
         UnitKind::Catapult,
         UnitKind::Wagon,
         UnitKind::OreCart,
+        UnitKind::Musketeer,
+        UnitKind::Bombardier,
+        UnitKind::Surgeon,
+        UnitKind::Sapper,
+        UnitKind::Dragoon,
+        UnitKind::Cuirassier,
+        UnitKind::FieldGun,
+        UnitKind::OreWagon,
     ];
 
     pub fn flies(self) -> bool {
@@ -552,6 +576,14 @@ impl UnitKind {
             UnitKind::Catapult => &CATAPULT,
             UnitKind::Wagon => &WAGON,
             UnitKind::OreCart => &ORE_CART,
+            UnitKind::Musketeer => &MUSKETEER,
+            UnitKind::Bombardier => &BOMBARDIER,
+            UnitKind::Surgeon => &SURGEON,
+            UnitKind::Sapper => &SAPPER,
+            UnitKind::Dragoon => &DRAGOON,
+            UnitKind::Cuirassier => &CUIRASSIER,
+            UnitKind::FieldGun => &FIELD_GUN,
+            UnitKind::OreWagon => &ORE_WAGON,
         }
     }
 
@@ -590,6 +622,7 @@ pub enum BuildingKind {
     FieldHospital,
     Watchtower,
     Palisade,
+    CannonTower,
 }
 
 pub struct BuildingSpec {
@@ -612,7 +645,7 @@ pub struct BuildingSpec {
 }
 
 impl BuildingKind {
-    pub const CONSTRUCTIBLE: [BuildingKind; 13] = [
+    pub const CONSTRUCTIBLE: [BuildingKind; 14] = [
         BuildingKind::PowerPlant,
         BuildingKind::Refinery,
         BuildingKind::Barracks,
@@ -626,6 +659,7 @@ impl BuildingKind {
         BuildingKind::Wall,
         BuildingKind::Watchtower,
         BuildingKind::Palisade,
+        BuildingKind::CannonTower,
     ];
 
     /// Stand unclaimed on the map until an engineer takes one; nobody builds them.
@@ -667,6 +701,7 @@ impl BuildingKind {
             BuildingKind::ObservationPost => &OBSERVATION_POST,
             BuildingKind::FieldHospital => &FIELD_HOSPITAL,
             BuildingKind::Watchtower => &WATCHTOWER,
+            BuildingKind::CannonTower => &CANNON_TOWER,
             BuildingKind::Palisade => &PALISADE,
         }
     }
@@ -1963,7 +1998,7 @@ const WATCHTOWER: BuildingSpec = BuildingSpec {
 };
 
 const PALISADE: BuildingSpec = BuildingSpec {
-    era: Eras::Only(Era::Antiquity),
+    era: Eras::Span(Era::Antiquity, Era::Gunpowder),
     line: Some(DefenceLine::Wall),
     name: "Palisade",
     role: "Sharpened stakes. Drag to lay a line; each stretch is paid as it is placed.",
@@ -1976,6 +2011,283 @@ const PALISADE: BuildingSpec = BuildingSpec {
     prerequisites: &[BuildingKind::Barracks],
     weapon: None,
     sight: 4.0,
+    faction: None,
+};
+
+const MUSKET: WeaponSpec = WeaponSpec {
+    range: 8.0,
+    damage: 16.0,
+    reload_secs: 2.0,
+    projectile_speed: 45.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.55,
+    versus_structure: 0.2,
+    versus_aircraft: 0.0,
+    report: Sound::MusketShot,
+};
+
+const HAND_GRENADES: WeaponSpec = WeaponSpec {
+    range: 7.0,
+    damage: 30.0,
+    reload_secs: 2.6,
+    projectile_speed: 12.0,
+    splash_radius: 1.8,
+    style: ProjectileStyle::ArtilleryShell,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.4,
+    versus_structure: 0.8,
+    versus_aircraft: 0.0,
+    report: Sound::GrenadeLaunch,
+};
+
+const CARBINE: WeaponSpec = WeaponSpec {
+    range: 7.5,
+    damage: 18.0,
+    reload_secs: 1.4,
+    projectile_speed: 45.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.6,
+    versus_structure: 0.2,
+    versus_aircraft: 0.0,
+    report: Sound::MusketShot,
+};
+
+const HEAVY_SABRE: WeaponSpec = WeaponSpec {
+    range: 1.9,
+    damage: 26.0,
+    reload_secs: 1.0,
+    projectile_speed: 40.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Strike,
+    versus_infantry: 0.9,
+    versus_vehicle: 0.9,
+    versus_structure: 0.2,
+    versus_aircraft: 0.0,
+    report: Sound::BladeStrike,
+};
+
+const FIELD_GUN_SHOT: WeaponSpec = WeaponSpec {
+    range: 17.0,
+    damage: 75.0,
+    reload_secs: 4.5,
+    projectile_speed: 20.0,
+    splash_radius: 1.8,
+    style: ProjectileStyle::ArtilleryShell,
+    versus_infantry: 0.6,
+    versus_vehicle: 0.9,
+    versus_structure: 1.3,
+    versus_aircraft: 0.0,
+    report: Sound::CannonShot,
+};
+
+const TOWER_CANNON: WeaponSpec = WeaponSpec {
+    range: 12.0,
+    damage: 40.0,
+    reload_secs: 2.2,
+    projectile_speed: 30.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Shell,
+    versus_infantry: 0.7,
+    versus_vehicle: 1.0,
+    versus_structure: 0.4,
+    versus_aircraft: 0.0,
+    report: Sound::CannonShot,
+};
+
+const MUSKETEER: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Infantry,
+    name: "Musketeer",
+    role: "Infantry with musket and bayonet. Fires slow, heavy volleys.",
+    model_id: "musketeer",
+    cost: 120,
+    build_secs: 5.5,
+    max_health: 70.0,
+    speed: 2.3,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(MUSKET),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const BOMBARDIER: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Ranged,
+    name: "Bombardier",
+    role: "Throws grenades over the line. Scatters massed infantry, weak against riders.",
+    model_id: "bombardier",
+    cost: 200,
+    build_secs: 7.0,
+    max_health: 60.0,
+    speed: 2.3,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(HAND_GRENADES),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 13.0,
+};
+
+const SURGEON: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Healer,
+    name: "Field Surgeon",
+    role: "Unarmed. Treats wounded infantry nearby and follows the squad.",
+    model_id: "surgeon",
+    cost: 180,
+    build_secs: 6.0,
+    max_health: 55.0,
+    speed: 2.4,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 8.0,
+    sight: 12.0,
+};
+
+const SAPPER: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Builder,
+    name: "Sapper",
+    role: "Unarmed. Right-click an enemy structure to take it over, or a damaged own one to mend it.",
+    model_id: "sapper",
+    cost: 450,
+    build_secs: 9.0,
+    max_health: 55.0,
+    speed: 2.5,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const DRAGOON: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Fast,
+    name: "Dragoon",
+    role: "Mounted infantry with a carbine. Fast, hunts gunners and skirmishers.",
+    model_id: "dragoon",
+    cost: 350,
+    build_secs: 8.0,
+    max_health: 220.0,
+    speed: 5.6,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(CARBINE),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 18.0,
+};
+
+const CUIRASSIER: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Main,
+    name: "Cuirassier",
+    role: "Armoured heavy cavalry. Charges home with the sabre; muskets in a line hurt it.",
+    model_id: "cuirassier",
+    cost: 650,
+    build_secs: 13.0,
+    max_health: 400.0,
+    speed: 4.8,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(HEAVY_SABRE),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 15.0,
+};
+
+const FIELD_GUN: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Siege,
+    name: "Field Gun",
+    role: "A bronze cannon on a carriage. Batters structures and massed troops from afar.",
+    model_id: "field_gun",
+    cost: 800,
+    build_secs: 16.0,
+    max_health: 220.0,
+    speed: 2.4,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(FIELD_GUN_SHOT),
+    has_turret: true,
+    producer: BuildingKind::Factory,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const ORE_WAGON: UnitSpec = UnitSpec {
+    era: Era::Gunpowder,
+    line: UnitLine::Harvester,
+    name: "Ore Wagon",
+    role: "Horse-drawn wagon that gathers crystals and hauls them to the foundry. Unarmed.",
+    model_id: "ore_wagon",
+    cost: 900,
+    build_secs: 14.0,
+    max_health: 560.0,
+    speed: 3.0,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 10.0,
+};
+
+const CANNON_TOWER: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Gunpowder),
+    line: Some(DefenceLine::Tower),
+    name: "Cannon Tower",
+    role: "Stone tower with a gun on its top. Covers the approaches to the base.",
+    model_id: "cannon_tower",
+    footprint: IVec2::new(1, 1),
+    cost: 650,
+    build_secs: 10.0,
+    max_health: 650.0,
+    power: -10,
+    prerequisites: &[BuildingKind::Barracks],
+    weapon: Some(TOWER_CANNON),
+    sight: 17.0,
     faction: None,
 };
 

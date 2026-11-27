@@ -1483,11 +1483,10 @@ mod tests {
         assert_eq!(host.era(), next);
         assert!(mirror.told.contains(&SideNews::AgeTurned(next)));
         let world = host.world();
-        assert!(
-            world
-                .resource::<Production>()
-                .allows(Team::Azure, BuildItem::Unit(UnitKind::Rifleman))
-        );
+        assert!(world.resource::<Production>().allows(
+            Team::Azure,
+            BuildItem::Unit(UnitKind::Rifleman.in_era(next).unwrap())
+        ));
     }
 
     #[test]
@@ -1594,9 +1593,14 @@ mod tests {
             "the age turned again"
         );
         assert!(
-            world
-                .resource::<Production>()
-                .allows(first, BuildItem::Unit(UnitKind::Rifleman))
+            world.resource::<Production>().allows(
+                first,
+                BuildItem::Unit(
+                    UnitKind::Rifleman
+                        .in_era(Era::Antiquity.next_playable().unwrap())
+                        .unwrap()
+                )
+            )
         );
         let (_newcomer, newcomer) = enter(&mut resumed);
         assert_eq!(

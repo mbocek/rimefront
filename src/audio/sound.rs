@@ -50,6 +50,7 @@ fn files(sound: Sound) -> &'static [&'static str] {
         Sound::BowShot => &["bow_shot_1", "bow_shot_2"],
         Sound::CatapultThrow => &["catapult_throw"],
         Sound::BladeStrike => &["blade_strike_1", "blade_strike_2"],
+        Sound::MusketShot => &["musket_shot_1", "musket_shot_2"],
     }
 }
 
@@ -70,6 +71,7 @@ fn distant_files(sound: Sound) -> &'static [&'static str] {
         Sound::FlameBurst => &["flame_burst_far"],
         Sound::GrenadeLaunch => &["grenade_launch_1_far"],
         Sound::CatapultThrow => &["catapult_throw_far"],
+        Sound::MusketShot => &["musket_shot_1_far"],
         _ => &[],
     }
 }
@@ -81,7 +83,7 @@ fn carry(sound: Sound) -> f32 {
         Sound::BowShot => 0.4,
         Sound::CatapultThrow => 1.2,
         Sound::FlameBurst | Sound::GrenadeLaunch => 0.4,
-        Sound::RifleShot | Sound::MachineGunShot => 0.6,
+        Sound::RifleShot | Sound::MachineGunShot | Sound::MusketShot => 0.6,
         Sound::FlakShot | Sound::MissileLaunch | Sound::SniperShot => 1.0,
         Sound::CannonShot => 1.2,
         Sound::HeavyCannonShot | Sound::ShellExplosion => 1.6,
@@ -99,7 +101,8 @@ fn fury_raised_by(sound: Sound) -> f32 {
         | Sound::FlameBurst
         | Sound::GrenadeLaunch
         | Sound::BowShot
-        | Sound::BladeStrike => 0.04,
+        | Sound::BladeStrike
+        | Sound::MusketShot => 0.04,
         Sound::CatapultThrow => 0.1,
         Sound::SniperShot | Sound::FlakShot | Sound::MissileLaunch => 0.07,
         Sound::CannonShot | Sound::HeavyCannonShot | Sound::HowitzerShot => 0.1,
@@ -116,7 +119,8 @@ fn burst_limit(sound: Sound) -> usize {
         | Sound::MachineGunShot
         | Sound::BulletImpact
         | Sound::BowShot
-        | Sound::BladeStrike => 3,
+        | Sound::BladeStrike
+        | Sound::MusketShot => 3,
         Sound::CannonShot
         | Sound::HeavyCannonShot
         | Sound::ShellExplosion
@@ -130,7 +134,11 @@ fn burst_limit(sound: Sound) -> usize {
 
 fn base_volume(sound: Sound) -> f32 {
     match sound {
-        Sound::RifleShot | Sound::MachineGunShot | Sound::BowShot | Sound::BladeStrike => 0.7,
+        Sound::RifleShot
+        | Sound::MachineGunShot
+        | Sound::BowShot
+        | Sound::BladeStrike
+        | Sound::MusketShot => 0.7,
         Sound::CannonShot | Sound::HeavyCannonShot | Sound::HowitzerShot => 0.5,
         Sound::BulletImpact => 0.35,
         Sound::UiClick | Sound::UnitAcknowledge => 0.5,

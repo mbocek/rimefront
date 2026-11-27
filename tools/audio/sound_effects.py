@@ -75,6 +75,14 @@ def machine_gun_shot(variant):
                          last=0.22, reflection_level=0.35, tail_seconds=0.7, tail_wet=0.14)
 
 
+def musket_shot(variant):
+    """A flintlock: a shotgun slowed into a rounder boom, black powder rolling away in a long echo."""
+    rng = random.Random(1180 + variant)
+    boom = biquad(recording("shotgun", (0.72, 0.66)[variant]), "lowpass", 2600.0)
+    return outdoor_shot(soft_clip(boom, SMALL_ARMS_DRIVE), rng, 1.3, reflections=6, first=0.05, last=0.5,
+                        reflection_level=0.45, tail_seconds=1.3, tail_wet=0.2)
+
+
 def grenade_launch(variant):
     """A grenade launcher's hollow thump: a shotgun slowed and muffled, without a supersonic crack."""
     rng = random.Random(1170 + variant)
@@ -536,6 +544,8 @@ SOUND_EFFECTS = {
     "sfx/catapult_throw": catapult_throw,
     "sfx/blade_strike_1": lambda: blade_strike(0),
     "sfx/blade_strike_2": lambda: blade_strike(1),
+    "sfx/musket_shot_1": lambda: musket_shot(0),
+    "sfx/musket_shot_2": lambda: musket_shot(1),
 }
 
 # Every weapon and blast also has a version heard from far away; the game picks it for sounds off screen.
@@ -543,7 +553,7 @@ HEARD_FROM_AFAR = [
     "rifle_shot_1", "rifle_shot_2", "mg_shot_1", "sniper_shot", "flak_shot", "grenade_launch_1",
     "cannon_shot_1", "cannon_shot_2",
     "heavy_cannon_shot", "howitzer_shot", "missile_launch", "flame_burst", "explosion_1", "explosion_2",
-    "explosion_3", "explosion_large", "building_collapse", "catapult_throw",
+    "explosion_3", "explosion_large", "building_collapse", "catapult_throw", "musket_shot_1",
 ]
 SOUND_EFFECTS.update({
     f"sfx/{name}_far": distant_version(SOUND_EFFECTS[f"sfx/{name}"]) for name in HEARD_FROM_AFAR

@@ -719,5 +719,21 @@
   "{} of your units and defences were promoted into the new age": "{} tvých jednotek a obran bylo povýšeno do nové éry",
   "{} of your units and defences were promoted into the new age, {} more were too dear": "{} tvých jednotek a obran bylo povýšeno do nové éry, na dalších {} nezbyly peníze",
   "{} in {}": "{} za {}",
-  "{} d {}:{}": "{} d {}:{}"
+  "{} d {}:{}": "{} d {}:{}",
+  "Musketeer": "Mušketýr",
+  "Infantry with musket and bayonet. Fires slow, heavy volleys.": "Pěšák s mušketou a bajonetem. Pálí pomalé, těžké salvy.",
+  "Bombardier": "Granátník",
+  "Throws grenades over the line. Scatters massed infantry, weak against riders.": "Hází granáty přes linii. Rozhání sevřenou pěchotu, proti jezdcům slabý.",
+  "Field Surgeon": "Felčar",
+  "Sapper": "Zákopník",
+  "Dragoon": "Dragoun",
+  "Mounted infantry with a carbine. Fast, hunts gunners and skirmishers.": "Jízdní pěchota s karabinou. Rychlý, loví dělostřelce a granátníky.",
+  "Cuirassier": "Kyrysník",
+  "Armoured heavy cavalry. Charges home with the sabre; muskets in a line hurt it.": "Obrněná těžká jízda. Útočí šavlí, linie mušket ji ale bolí.",
+  "Field Gun": "Polní dělo",
+  "A bronze cannon on a carriage. Batters structures and massed troops from afar.": "Bronzové dělo na lafetě. Z dálky drtí stavby i sevřené oddíly.",
+  "Ore Wagon": "Rudný povoz",
+  "Horse-drawn wagon that gathers crystals and hauls them to the foundry. Unarmed.": "Koňský povoz, který sbírá krystaly a vozí je do slévárny. Neozbrojený.",
+  "Cannon Tower": "Dělová věž",
+  "Stone tower with a gun on its top. Covers the approaches to the base.": "Kamenná věž s dělem na vrcholu. Kryje přístupy k základně."
 }

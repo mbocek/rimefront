@@ -111,7 +111,7 @@ const BUILDING_LOOKS_START: u8 = 100;
 const UNCLAIMED_CODE: u8 = u8::MAX;
 
 /// Append only: a replay stores a structure's look as its place here.
-const BUILDING_LOOKS: [BuildingKind; 17] = [
+const BUILDING_LOOKS: [BuildingKind; 18] = [
     BuildingKind::CommandCenter,
     BuildingKind::PowerPlant,
     BuildingKind::Refinery,
@@ -129,6 +129,7 @@ const BUILDING_LOOKS: [BuildingKind; 17] = [
     BuildingKind::FieldHospital,
     BuildingKind::Watchtower,
     BuildingKind::Palisade,
+    BuildingKind::CannonTower,
 ];
 
 fn all_buildings() -> impl Iterator<Item = BuildingKind> {

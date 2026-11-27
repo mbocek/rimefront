@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use common::{Battle, BattleSetup};
 use rimefront::missions::levels::{ActiveLevel, BaseSite, Difficulty, SkirmishOptions};
 use rimefront::sim::catalog::{BuildingKind, Team, UnitKind};
-use rimefront::sim::components::{Building, Health, Unit};
+use rimefront::sim::components::{Building, Health, Order, Orders, Unit};
 use rimefront::sim::determinism::SimId;
 use rimefront::sim::eras::Era;
 use rimefront::sim::outcome::GameOutcome;
@@ -395,9 +395,154 @@ fn an_ancient_battle_between_computers_is_fought_to_the_end() {
     }
 }
 
-/// Both sides out of units and too poor for an ore cart: the mutual exhaustion docs/balance.md describes.
+/// Both sides out of units and too poor for a harvester of their age: the mutual exhaustion docs/balance.md
+/// describes.
 fn both_sides_exhausted(battle: &mut Battle) -> bool {
+    let era = battle.world().resource::<ActiveLevel>().0.era;
+    let harvester = UnitKind::Harvester.in_era(era).expect("every age harvests");
     [Team::Azure, Team::Crimson].into_iter().all(|team| {
-        battle.units(team, None).is_empty() && battle.credits(team) < UnitKind::OreCart.spec().cost
+        battle.units(team, None).is_empty() && battle.credits(team) < harvester.spec().cost
     })
+}
+
+fn gunpowder_battle(enemy_ai: bool, starting_forces: bool) -> Battle {
+    let level = SkirmishOptions {
+        era: Era::Gunpowder,
+        ..default()
+    }
+    .to_level();
+    Battle::new(BattleSetup {
+        enemy_ai,
+        starting_forces,
+        level: Some(level),
+    })
+}
+
+#[test]
+fn a_gunpowder_base_fields_and_builds_its_own_age() {
+    let mut battle = gunpowder_battle(false, true);
+    let eras = eras_of(&mut battle, Team::Azure);
+    assert!(eras.iter().all(|&era| era == Era::Gunpowder), "{eras:?}");
+    battle.construct(BuildingKind::Barracks, Team::Azure, BARRACKS_SITE);
+    battle.set_credits(Team::Azure, 5000);
+    assert!(battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Musketeer)));
+    assert!(!battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Spearman)));
+    assert!(!battle.enqueue(Team::Azure, BuildItem::Unit(UnitKind::Rifleman)));
+    assert!(!battle.enqueue(Team::Azure, BuildItem::Structure(BuildingKind::Watchtower)));
+    assert!(battle.enqueue(Team::Azure, BuildItem::Structure(BuildingKind::CannonTower)));
+    let palisade = BuildItem::Structure(BuildingKind::Palisade);
+    assert!(
+        battle
+            .world()
+            .resource::<Production>()
+            .allows(Team::Azure, palisade)
+    );
+}
+
+#[test]
+fn the_palisade_lasts_through_the_age_of_gunpowder_and_becomes_a_wall_after_it() {
+    assert_eq!(BuildingKind::Palisade.promoted_into(Era::Gunpowder), None);
+    assert_eq!(
+        BuildingKind::Palisade.promoted_into(Era::Modern),
+        Some(BuildingKind::Wall)
+    );
+    assert_eq!(
+        BuildingKind::Watchtower.promoted_into(Era::Gunpowder),
+        Some(BuildingKind::CannonTower)
+    );
+    assert_eq!(
+        UnitKind::Spearman.promoted_into(Era::Gunpowder),
+        Some(UnitKind::Musketeer)
+    );
+    assert_eq!(
+        UnitKind::Musketeer.promoted_into(Era::Modern),
+        Some(UnitKind::Rifleman)
+    );
+    assert_eq!(
+        Era::Antiquity.next_playable(),
+        Some(Era::Gunpowder),
+        "a world goes through the age of gunpowder"
+    );
+}
+
+#[test]
+fn spearmen_become_musketeers_when_gunpowder_comes() {
+    let mut battle = ancient_battle(false, false);
+    battle.construct(BuildingKind::Barracks, Team::Azure, BARRACKS_SITE);
+    let spearman = battle.spawn_unit(UnitKind::Spearman, Team::Azure, BESIDE_THE_BARRACKS);
+    turn_the_age(&mut battle, Era::Gunpowder);
+    battle.set_credits(Team::Azure, 1000);
+    let id = battle.sim_id(spearman);
+    battle.issue(Team::Azure, PlayerCommand::Promote { ids: vec![id] });
+    let promoted = battle.run_until(30.0, |battle| {
+        battle.world().get::<Unit>(spearman).map(|unit| unit.0) == Some(UnitKind::Musketeer)
+    });
+    assert!(promoted.is_some(), "the spearman was never promoted");
+}
+
+/// A block of `count` units, four abreast, attack-moving towards `towards`, as the balance tool's duels deploy.
+fn block_attacking(
+    battle: &mut Battle,
+    kind: UnitKind,
+    team: Team,
+    at: IVec2,
+    count: i32,
+    towards: IVec2,
+) -> Vec<Entity> {
+    (0..count)
+        .map(|k| {
+            let unit = battle.spawn_unit(kind, team, at + IVec2::new(k % 4 - 2, k / 4 - 1));
+            battle
+                .world()
+                .get_mut::<Orders>(unit)
+                .unwrap()
+                .replace_with(Order::AttackMove(towards));
+            unit
+        })
+        .collect()
+}
+
+#[test]
+fn a_line_of_muskets_stops_cuirassiers_of_the_same_price() {
+    let mut battle = gunpowder_battle(false, false);
+    let (west, east) = (IVec2::new(22, 46), IVec2::new(38, 46));
+    let line = block_attacking(
+        &mut battle,
+        UnitKind::Musketeer,
+        Team::Azure,
+        west,
+        22,
+        east,
+    );
+    let riders = block_attacking(
+        &mut battle,
+        UnitKind::Cuirassier,
+        Team::Crimson,
+        east,
+        4,
+        west,
+    );
+    battle.run_until(150.0, |battle| {
+        survivors(battle, &line) == 0 || survivors(battle, &riders) == 0
+    });
+    assert_eq!(
+        survivors(&mut battle, &riders),
+        0,
+        "the cuirassiers broke the line"
+    );
+    assert!(survivors(&mut battle, &line) > 0);
+}
+
+#[test]
+fn a_gunpowder_battle_between_computers_is_fought_to_the_end() {
+    let mut battle = gunpowder_battle(true, true);
+    battle.add_ai(Team::Azure, BaseSite::SouthWest.origin(), Difficulty::Hard);
+    let over = battle.run_until(60.0 * 60.0, |battle| {
+        battle.outcome() != GameOutcome::Ongoing || both_sides_exhausted(battle)
+    });
+    assert!(over.is_some(), "an hour passed and both sides still fight");
+    for team in [Team::Azure, Team::Crimson] {
+        let eras = eras_of(&mut battle, team);
+        assert!(eras.iter().all(|&era| era == Era::Gunpowder), "{eras:?}");
+    }
 }

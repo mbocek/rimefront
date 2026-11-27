@@ -589,14 +589,17 @@ fn the_industrial_age_takes_to_the_air_and_builds_flak_and_walls() {
 
 #[test]
 fn every_age_on_the_way_promotes_into_the_next() {
-    let ages = [Era::Antiquity, Era::Gunpowder, Era::Industrial, Era::Modern];
-    assert_eq!(Era::playable().collect::<Vec<_>>(), ages);
+    assert_eq!(Era::playable().collect::<Vec<_>>(), Era::ALL);
     let mut infantry = UnitKind::Spearman;
-    for &era in &ages[1..] {
+    for &era in &Era::ALL[1..] {
         infantry = infantry.promoted_into(era).expect("infantry in every age");
         assert_eq!(infantry.era(), era);
     }
-    assert_eq!(infantry, UnitKind::Rifleman);
+    assert_eq!(infantry, UnitKind::ExoTrooper);
+    assert_eq!(
+        UnitKind::Rifleman.promoted_into(Era::Future),
+        Some(UnitKind::ExoTrooper)
+    );
     assert_eq!(
         BuildingKind::CannonTower.promoted_into(Era::Industrial),
         Some(BuildingKind::Pillbox)
@@ -616,4 +619,28 @@ fn an_industrial_battle_between_computers_is_fought_to_the_end() {
         battle.outcome() != GameOutcome::Ongoing || both_sides_exhausted(battle)
     });
     assert!(over.is_some(), "an hour passed and both sides still fight");
+}
+
+#[test]
+fn the_future_army_is_fielded_and_the_project_stands_only_in_a_world() {
+    let level = SkirmishOptions {
+        era: Era::Future,
+        ..default()
+    }
+    .to_level();
+    let mut battle = Battle::new(BattleSetup {
+        enemy_ai: false,
+        starting_forces: true,
+        level: Some(level),
+    });
+    let eras = eras_of(&mut battle, Team::Azure);
+    assert!(eras.iter().all(|&era| era == Era::Future), "{eras:?}");
+    let production = battle.world().resource::<Production>();
+    let project = BuildItem::Structure(BuildingKind::Project);
+    assert!(
+        !production.allows(Team::Azure, project),
+        "a skirmish has no Project"
+    );
+    assert!(production.allows(Team::Azure, BuildItem::Structure(BuildingKind::LaserTurret)));
+    assert!(production.allows(Team::Azure, BuildItem::Unit(UnitKind::HoverTank)));
 }

@@ -101,6 +101,13 @@ biplanes and flak. **The difficulties are out of order in this age**: Hard again
 both base sites (15:7 as challenger, 7:16 as defender) and Brutal loses to Hard 8:14, while Easy wins none of
 24. Fewer bombs, weaker mortars and splitting waves or not did not change it; it is left open for play.
 
+## The future
+
+`--era future`, 24 matches per pairing: exo troopers beat lancers (+89), lancers beat hover tanks (+38) and rail
+cannons (+27), hover bikes beat troopers (+74), lancers and rail cannons, the hover tank beats troopers, bikes and
+rail cannons, and the rail cannon shells troopers (+57). The interceptor only fights aircraft. Hard beats Normal
+20:2 and 18:1 (from either base site), Easy wins 5 of 23 against Normal.
+
 ## Commander personalities
 
 Each personality plays Normal against the Balanced commander on Normal, with fog of war, 40 matches per

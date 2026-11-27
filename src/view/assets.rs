@@ -35,7 +35,7 @@ const WALL_LINK_MODEL: &str = "wall_link";
 const PALISADE_LINK_MODEL: &str = "palisade_link";
 
 /// Structures that every era builds wear the look of the age; the modern one is their own model.
-const ERA_LOOKS: [(BuildingKind, Era, &str); 21] = [
+const ERA_LOOKS: [(BuildingKind, Era, &str); 28] = [
     (
         BuildingKind::CommandCenter,
         Era::Antiquity,
@@ -113,6 +113,17 @@ const ERA_LOOKS: [(BuildingKind, Era, &str); 21] = [
         Era::Industrial,
         "repair_bay_industrial",
     ),
+    (
+        BuildingKind::CommandCenter,
+        Era::Future,
+        "command_center_future",
+    ),
+    (BuildingKind::PowerPlant, Era::Future, "power_plant_future"),
+    (BuildingKind::Refinery, Era::Future, "refinery_future"),
+    (BuildingKind::Barracks, Era::Future, "barracks_future"),
+    (BuildingKind::Factory, Era::Future, "factory_future"),
+    (BuildingKind::TechCenter, Era::Future, "tech_center_future"),
+    (BuildingKind::RepairBay, Era::Future, "repair_bay_future"),
 ];
 
 pub fn building_model(kind: BuildingKind, era: Era) -> &'static str {

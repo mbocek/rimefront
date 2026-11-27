@@ -84,7 +84,11 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
         | UnitKind::Fusilier
         | UnitKind::MortarTeam
         | UnitKind::Orderly
-        | UnitKind::Pioneer => 2.4,
+        | UnitKind::Pioneer
+        | UnitKind::ExoTrooper
+        | UnitKind::Lancer
+        | UnitKind::Medtech
+        | UnitKind::Fabricator => 2.4,
         UnitKind::Horseman => 6.2,
         UnitKind::Chariot => 4.6,
         UnitKind::Catapult => 2.0,
@@ -99,6 +103,12 @@ fn authored_drive_speed(kind: UnitKind) -> f32 {
         UnitKind::SiegeGun => 2.2,
         UnitKind::Lorry => 5.0,
         UnitKind::SteamHarvester => 2.4,
+        UnitKind::HoverBike => 8.0,
+        UnitKind::HoverTank => 4.5,
+        UnitKind::RailCannon => 3.0,
+        UnitKind::HoverCarrier => 6.0,
+        UnitKind::HarvestDrone => 3.0,
+        UnitKind::Interceptor => 12.0,
         UnitKind::Bulwark => 2.2,
         UnitKind::Gunship => 6.5,
         UnitKind::FlakTrack => 3.2,

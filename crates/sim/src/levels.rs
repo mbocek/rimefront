@@ -400,6 +400,9 @@ impl LevelDefinition {
         if !kind.exists_in(self.era) {
             return false;
         }
+        if kind == BuildingKind::Project {
+            return self.objective == Objective::World;
+        }
         kind == BuildingKind::CommandCenter
             || self.available_buildings.is_empty()
             || self

@@ -125,6 +125,9 @@ PALETTE = {
     "Khaki": Surface((0.46, 0.42, 0.28), roughness=0.9),
     "Olive": Surface((0.30, 0.33, 0.21), roughness=0.7),
     "Corrugated": Surface((0.46, 0.48, 0.49), metallic=0.6, roughness=0.5),
+    "Plating": Surface((0.82, 0.84, 0.86), metallic=0.3, roughness=0.35),
+    "PlatingDark": Surface((0.22, 0.24, 0.27), metallic=0.5, roughness=0.4),
+    "Glow": Surface((0.3, 0.9, 1.0), emission=(0.25, 0.85, 1.0), emission_strength=3.0),
 }
 
 

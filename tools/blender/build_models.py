@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rimefront_models import (antiquity, buildings, decorations, gunpowder, industrial, nature, ore, soldier, units, upgrades,  # noqa: E402
+from rimefront_models import (antiquity, buildings, decorations, future, gunpowder, industrial, nature, ore, soldier, units, upgrades,  # noqa: E402
                               vegetation)
 from rimefront_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # noqa: E402
 from rimefront_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
@@ -117,6 +117,25 @@ TEAM_MODELS = {
     "factory_industrial": (industrial.build_factory_industrial, BUILDING_TRIANGLE_BUDGET),
     "tech_center_industrial": (industrial.build_tech_center_industrial, BUILDING_TRIANGLE_BUDGET),
     "repair_bay_industrial": (industrial.build_repair_bay_industrial, BUILDING_TRIANGLE_BUDGET),
+    "exo_trooper": (future.build_exo_trooper, UNIT_TRIANGLE_BUDGET),
+    "lancer": (future.build_lancer, UNIT_TRIANGLE_BUDGET),
+    "medtech": (future.build_medtech, UNIT_TRIANGLE_BUDGET),
+    "fabricator": (future.build_fabricator, UNIT_TRIANGLE_BUDGET),
+    "hover_bike": (future.build_hover_bike, UNIT_TRIANGLE_BUDGET),
+    "hover_tank": (future.build_hover_tank, UNIT_TRIANGLE_BUDGET),
+    "rail_cannon": (future.build_rail_cannon, UNIT_TRIANGLE_BUDGET),
+    "hover_carrier": (future.build_hover_carrier, UNIT_TRIANGLE_BUDGET),
+    "harvest_drone": (future.build_harvest_drone, UNIT_TRIANGLE_BUDGET),
+    "interceptor": (future.build_interceptor, UNIT_TRIANGLE_BUDGET),
+    "laser_turret": (future.build_laser_turret, BUILDING_TRIANGLE_BUDGET),
+    "project": (future.build_project, BUILDING_TRIANGLE_BUDGET),
+    "command_center_future": (future.build_command_center_future, BUILDING_TRIANGLE_BUDGET),
+    "power_plant_future": (future.build_power_plant_future, BUILDING_TRIANGLE_BUDGET),
+    "refinery_future": (future.build_refinery_future, BUILDING_TRIANGLE_BUDGET),
+    "barracks_future": (future.build_barracks_future, BUILDING_TRIANGLE_BUDGET),
+    "factory_future": (future.build_factory_future, BUILDING_TRIANGLE_BUDGET),
+    "tech_center_future": (future.build_tech_center_future, BUILDING_TRIANGLE_BUDGET),
+    "repair_bay_future": (future.build_repair_bay_future, BUILDING_TRIANGLE_BUDGET),
 }
 ICON_ONLY_MODELS = {
     "upgrade_armour": upgrades.build_armour_upgrade,
@@ -151,7 +170,7 @@ NEUTRAL_MODELS = {
     "bush_round": (vegetation.build_bush_round, 2_000),
     "bush_flowering": (vegetation.build_bush_flowering, 2_000),
 }
-MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower", "field_gun", "cannon_tower", "armoured_car", "siege_gun", "pillbox"}
+MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower", "field_gun", "cannon_tower", "armoured_car", "siege_gun", "pillbox", "hover_tank", "rail_cannon", "laser_turret"}
 INFANTRY_NODES = ("Rig", "Body", "hips", "chest", "head", "rifle", "hand.L", "hand.R")
 INFANTRY_CLIPS = {"Idle": None, "Walk": None, "KneelFire": None, "Death": None}
 REQUIRED_NODES = {
@@ -175,6 +194,11 @@ REQUIRED_NODES = {
     "mortar_team": INFANTRY_NODES,
     "orderly": INFANTRY_NODES,
     "pioneer": INFANTRY_NODES,
+    "exo_trooper": INFANTRY_NODES,
+    "lancer": INFANTRY_NODES,
+    "medtech": INFANTRY_NODES,
+    "fabricator": INFANTRY_NODES,
+    "harvest_drone": ("OreLoad", "CollectorDrum"),
     "steam_harvester": ("OreLoad", "CollectorDrum"),
     "ore_cart": ("OreLoad", "CollectorDrum"),
     "ore_wagon": ("OreLoad", "CollectorDrum"),
@@ -205,6 +229,13 @@ REQUIRED_ANIMATIONS = {
     "mortar_team": INFANTRY_CLIPS,
     "orderly": INFANTRY_CLIPS,
     "pioneer": INFANTRY_CLIPS,
+    "exo_trooper": INFANTRY_CLIPS,
+    "lancer": INFANTRY_CLIPS,
+    "medtech": INFANTRY_CLIPS,
+    "fabricator": INFANTRY_CLIPS,
+    "harvest_drone": {"Work": "CollectorDrum"},
+    "hover_tank": {"Fire": "Barrel"},
+    "rail_cannon": {"Fire": "Barrel"},
     "steam_harvester": {"Drive": None, "Work": "CollectorDrum"},
     "siege_gun": {"Drive": None, "Fire": "Barrel"},
     "ore_cart": {"Drive": None, "Work": "CollectorDrum"},

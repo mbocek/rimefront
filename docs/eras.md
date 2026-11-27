@@ -2,8 +2,8 @@
 
 A battle is fought in one age. Every side builds that age's army and that age's defences; the other structures
 are the same buildings in every age, only in its look. The game knows five ages, antiquity, gunpowder, the
-industrial age, the modern age and the future, and has armies for four of them so far: antiquity, the age of
-gunpowder, the industrial age and the modern age (the units of the campaign). The battle editor's *Age* setting picks one; missions are modern.
+industrial age, the modern age and the future, and has an army for every one: antiquity, the age of gunpowder,
+the industrial age, the modern age (the units of the campaign) and the future, a world's final age. The battle editor's *Age* setting picks one; missions are modern.
 
 The plan the ages come from, a persistent world that goes through them towards a final race, is
 [brainstorm-vekysveta-2026-11-26.md](../brainstorm-vekysveta-2026-11-26.md) (Czech).
@@ -14,22 +14,26 @@ Each unit belongs to a line, its place in an army whatever the age (`UnitLine` i
 and each line has at most one unit per age. Defences have lines too (`DefenceLine`): tower, anti-aircraft gun,
 bunker and wall.
 
-| Line | Antiquity | Gunpowder | Industrial | Modern |
-| --- | --- | --- | --- | --- |
-| Infantry | Spearman | Musketeer | Fusilier | Rifleman |
-| Ranged | Archer | Bombardier | Mortar Team | Grenadier |
-| Healer | Healer | Field Surgeon | Orderly | Field Medic |
-| Builder | Builder | Sapper | Pioneer | Engineer |
-| Fast | Horseman | Dragoon | Armoured Car | Scout Buggy |
-| Main | Chariot | Cuirassier | Landship | Battle Tank |
-| Siege | Catapult (Tech Center) | Field Gun (Tech Center) | Siege Gun (Tech Center) | Howitzer |
-| Transport | Supply Wagon | - | Lorry | Troop Carrier |
-| Harvester | Ore Cart | Ore Wagon | Steam Harvester | Harvester |
-| Fighter | - | - | Biplane | Fighter |
-| Bomber | - | - | Biplane Bomber | Bomber |
-| Tower | Watchtower | Cannon Tower | Pillbox | Gun Turret |
-| Anti-aircraft | - | - | Flak Cannon | Flak Cannon |
-| Wall | Palisade | Palisade | Wall | Wall |
+| Line | Antiquity | Gunpowder | Industrial | Modern | Future |
+| --- | --- | --- | --- | --- | --- |
+| Infantry | Spearman | Musketeer | Fusilier | Rifleman | Exo Trooper |
+| Ranged | Archer | Bombardier | Mortar Team | Grenadier | Lancer |
+| Healer | Healer | Field Surgeon | Orderly | Field Medic | Medtech |
+| Builder | Builder | Sapper | Pioneer | Engineer | Fabricator |
+| Fast | Horseman | Dragoon | Armoured Car | Scout Buggy | Hover Bike |
+| Main | Chariot | Cuirassier | Landship | Battle Tank | Hover Tank |
+| Siege | Catapult (Tech Center) | Field Gun (Tech Center) | Siege Gun (Tech Center) | Howitzer | Rail Cannon (Tech Center) |
+| Transport | Supply Wagon | - | Lorry | Troop Carrier | Hover Carrier |
+| Harvester | Ore Cart | Ore Wagon | Steam Harvester | Harvester | Harvest Drone |
+| Fighter | - | - | Biplane | Fighter | Interceptor |
+| Bomber | - | - | Biplane Bomber | Bomber | - |
+| Tower | Watchtower | Cannon Tower | Pillbox | Gun Turret | Laser Turret |
+| Anti-aircraft | - | - | Flak Cannon | Flak Cannon | Flak Cannon |
+| Wall | Palisade | Palisade | Wall | Wall | Wall |
+
+The future's hover craft run as wheeled vehicles do. The **Project** (12 000 credits, 10 minutes to build,
+20 000 health, Tech Center first) stands only in the future and only in a persistent world: it is what the
+world's final age races for.
 
 A line with no member in an age keeps what it has: a supply wagon stays a supply wagon through the age of
 gunpowder and becomes a troop carrier in the modern one, and the palisade stands in both early ages
@@ -147,7 +151,7 @@ A resumed world starts in the age of its saved tick without turning it again, wi
 Units have their own models; scripted reinforcements arrive as their line's member in the level's age. A structure every age builds is shown as `ERA_LOOKS` in `src/view/assets.rs` says,
 its modern model otherwise; when the age turns, `redress_buildings_for_the_age` swaps the models of the
 structures standing. The ancient models are built by `tools/blender/rimefront_models/antiquity.py`, those of the age of gunpowder by
-`gunpowder.py` and those of the industrial age by `industrial.py` beside it; their
+`gunpowder.py`, `industrial.py` and `future.py` beside it; their
 sounds (`bow_shot`, `catapult_throw`, `blade_strike`, and `musket_shot` for the age of gunpowder) by
 `tools/audio/sound_effects.py`, and the hooves
 and creaking carts its horsemen, chariots and wagons make on the move (`loop_hooves`) by

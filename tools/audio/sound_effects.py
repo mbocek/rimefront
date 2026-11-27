@@ -105,6 +105,20 @@ def flak_shot():
                         reflection_level=0.35, tail_seconds=1.0, tail_wet=0.16)
 
 
+def pulse_shot(variant):
+    """A charged bolt: a falling electric zap over a crack of static, with a short metallic ring."""
+    rng = random.Random(1250 + variant)
+    duration = 0.5
+    length = samples(duration)
+    sweep = exponential_glide((1900.0, 2300.0)[variant], 180.0, length, 0.05)
+    zap = multiplied(saw(sweep, length), exponential_decay(length, 0.09))
+    crack = biquad(multiplied(white_noise(length, rng), exponential_decay(length, 0.015)), "highpass", 2500.0)
+    ring = multiplied(sine(3100.0 + 300.0 * variant, length), exponential_decay(length, 0.12))
+    shot = summed(scaled(zap, 0.6), scaled(crack, 0.7), scaled(ring, 0.2))
+    return outdoor_shot(soft_clip(shot, RECORDING_DRIVE), rng, duration, reflections=4, first=0.03, last=0.25,
+                        reflection_level=0.3, tail_seconds=0.6, tail_wet=0.15)
+
+
 def cannon_shot(variant):
     """A tank gun: a naval gun recorded by the US military, the second one deeper and rounder."""
     rng = random.Random(1200 + variant)
@@ -546,6 +560,8 @@ SOUND_EFFECTS = {
     "sfx/blade_strike_2": lambda: blade_strike(1),
     "sfx/musket_shot_1": lambda: musket_shot(0),
     "sfx/musket_shot_2": lambda: musket_shot(1),
+    "sfx/pulse_shot_1": lambda: pulse_shot(0),
+    "sfx/pulse_shot_2": lambda: pulse_shot(1),
 }
 
 # Every weapon and blast also has a version heard from far away; the game picks it for sounds off screen.
@@ -553,7 +569,7 @@ HEARD_FROM_AFAR = [
     "rifle_shot_1", "rifle_shot_2", "mg_shot_1", "sniper_shot", "flak_shot", "grenade_launch_1",
     "cannon_shot_1", "cannon_shot_2",
     "heavy_cannon_shot", "howitzer_shot", "missile_launch", "flame_burst", "explosion_1", "explosion_2",
-    "explosion_3", "explosion_large", "building_collapse", "catapult_throw", "musket_shot_1",
+    "explosion_3", "explosion_large", "building_collapse", "catapult_throw", "musket_shot_1", "pulse_shot_1",
 ]
 SOUND_EFFECTS.update({
     f"sfx/{name}_far": distant_version(SOUND_EFFECTS[f"sfx/{name}"]) for name in HEARD_FROM_AFAR

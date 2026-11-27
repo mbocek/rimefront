@@ -311,12 +311,12 @@ mod tests {
     #[test]
     fn a_world_in_the_last_age_with_an_army_stays_there() {
         let schedule = AgeSchedule {
-            age: Era::Modern,
+            age: Era::Future,
             since: 1_000,
             ..AgeSchedule::default()
         };
         assert_eq!(schedule.next_turn_after(2_000), None);
-        assert_eq!(schedule.era_at(u64::MAX / 2), Era::Modern);
+        assert_eq!(schedule.era_at(u64::MAX / 2), Era::Future);
     }
 
     #[test]

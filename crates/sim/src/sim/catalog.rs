@@ -437,6 +437,16 @@ pub enum UnitKind {
     SteamHarvester,
     Biplane,
     BiplaneBomber,
+    ExoTrooper,
+    Lancer,
+    Medtech,
+    Fabricator,
+    HoverBike,
+    HoverTank,
+    RailCannon,
+    HoverCarrier,
+    HarvestDrone,
+    Interceptor,
 }
 
 pub struct UnitSpec {
@@ -467,7 +477,7 @@ pub struct UnitSpec {
 }
 
 impl UnitKind {
-    pub const INFANTRY: [UnitKind; 19] = [
+    pub const INFANTRY: [UnitKind; 23] = [
         UnitKind::Spearman,
         UnitKind::Archer,
         UnitKind::Healer,
@@ -480,6 +490,10 @@ impl UnitKind {
         UnitKind::MortarTeam,
         UnitKind::Orderly,
         UnitKind::Pioneer,
+        UnitKind::ExoTrooper,
+        UnitKind::Lancer,
+        UnitKind::Medtech,
+        UnitKind::Fabricator,
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Grenadier,
@@ -488,7 +502,7 @@ impl UnitKind {
         UnitKind::Medic,
         UnitKind::Engineer,
     ];
-    pub const VEHICLES: [UnitKind; 30] = [
+    pub const VEHICLES: [UnitKind; 36] = [
         UnitKind::Horseman,
         UnitKind::Chariot,
         UnitKind::Catapult,
@@ -505,6 +519,12 @@ impl UnitKind {
         UnitKind::SteamHarvester,
         UnitKind::Biplane,
         UnitKind::BiplaneBomber,
+        UnitKind::HoverBike,
+        UnitKind::HoverTank,
+        UnitKind::RailCannon,
+        UnitKind::HoverCarrier,
+        UnitKind::HarvestDrone,
+        UnitKind::Interceptor,
         UnitKind::Scout,
         UnitKind::TroopCarrier,
         UnitKind::RaiderBike,
@@ -521,7 +541,7 @@ impl UnitKind {
         UnitKind::Harvester,
     ];
     /// New kinds go at the end: replays store a unit's look as its place in this list.
-    pub const ALL: [UnitKind; 49] = [
+    pub const ALL: [UnitKind; 59] = [
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Medic,
@@ -571,6 +591,16 @@ impl UnitKind {
         UnitKind::SteamHarvester,
         UnitKind::Biplane,
         UnitKind::BiplaneBomber,
+        UnitKind::ExoTrooper,
+        UnitKind::Lancer,
+        UnitKind::Medtech,
+        UnitKind::Fabricator,
+        UnitKind::HoverBike,
+        UnitKind::HoverTank,
+        UnitKind::RailCannon,
+        UnitKind::HoverCarrier,
+        UnitKind::HarvestDrone,
+        UnitKind::Interceptor,
     ];
 
     pub fn flies(self) -> bool {
@@ -628,6 +658,16 @@ impl UnitKind {
             UnitKind::SteamHarvester => &STEAM_HARVESTER,
             UnitKind::Biplane => &BIPLANE,
             UnitKind::BiplaneBomber => &BIPLANE_BOMBER,
+            UnitKind::ExoTrooper => &EXO_TROOPER,
+            UnitKind::Lancer => &LANCER,
+            UnitKind::Medtech => &MEDTECH,
+            UnitKind::Fabricator => &FABRICATOR,
+            UnitKind::HoverBike => &HOVER_BIKE,
+            UnitKind::HoverTank => &HOVER_TANK,
+            UnitKind::RailCannon => &RAIL_CANNON,
+            UnitKind::HoverCarrier => &HOVER_CARRIER,
+            UnitKind::HarvestDrone => &HARVEST_DRONE,
+            UnitKind::Interceptor => &INTERCEPTOR,
         }
     }
 
@@ -668,6 +708,8 @@ pub enum BuildingKind {
     Palisade,
     CannonTower,
     Pillbox,
+    LaserTurret,
+    Project,
 }
 
 pub struct BuildingSpec {
@@ -690,7 +732,7 @@ pub struct BuildingSpec {
 }
 
 impl BuildingKind {
-    pub const CONSTRUCTIBLE: [BuildingKind; 15] = [
+    pub const CONSTRUCTIBLE: [BuildingKind; 17] = [
         BuildingKind::PowerPlant,
         BuildingKind::Refinery,
         BuildingKind::Barracks,
@@ -706,6 +748,8 @@ impl BuildingKind {
         BuildingKind::Palisade,
         BuildingKind::CannonTower,
         BuildingKind::Pillbox,
+        BuildingKind::LaserTurret,
+        BuildingKind::Project,
     ];
 
     /// Stand unclaimed on the map until an engineer takes one; nobody builds them.
@@ -749,6 +793,8 @@ impl BuildingKind {
             BuildingKind::Watchtower => &WATCHTOWER,
             BuildingKind::CannonTower => &CANNON_TOWER,
             BuildingKind::Pillbox => &PILLBOX,
+            BuildingKind::LaserTurret => &LASER_TURRET,
+            BuildingKind::Project => &PROJECT,
             BuildingKind::Palisade => &PALISADE,
         }
     }
@@ -1590,7 +1636,7 @@ const GUN_TURRET: BuildingSpec = BuildingSpec {
 };
 
 const WALL: BuildingSpec = BuildingSpec {
-    era: Eras::Span(Era::Industrial, Era::Modern),
+    era: Eras::Since(Era::Industrial),
     line: Some(DefenceLine::Wall),
     name: "Wall",
     role: "Concrete barrier. Drag to lay a line; each segment is paid as it is placed.",
@@ -1624,7 +1670,7 @@ const HELIPAD: BuildingSpec = BuildingSpec {
 };
 
 const FLAK_CANNON: BuildingSpec = BuildingSpec {
-    era: Eras::Span(Era::Industrial, Era::Modern),
+    era: Eras::Since(Era::Industrial),
     line: Some(DefenceLine::AntiAir),
     name: "Flak Cannon",
     role: "Anti-aircraft gun pit. Cannot shoot at ground targets.",
@@ -2706,6 +2752,359 @@ const PILLBOX: BuildingSpec = BuildingSpec {
     prerequisites: &[BuildingKind::Barracks],
     weapon: Some(PILLBOX_GUN),
     sight: 16.0,
+    faction: None,
+};
+
+const PULSE_RIFLE: WeaponSpec = WeaponSpec {
+    range: 9.0,
+    damage: 12.0,
+    reload_secs: 0.9,
+    projectile_speed: 70.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.2,
+    versus_structure: 0.3,
+    versus_aircraft: 0.3,
+    report: Sound::PulseShot,
+};
+
+const LANCE: WeaponSpec = WeaponSpec {
+    range: 10.0,
+    damage: 50.0,
+    reload_secs: 2.4,
+    projectile_speed: 30.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Missile,
+    versus_infantry: 0.5,
+    versus_vehicle: 1.3,
+    versus_structure: 0.6,
+    versus_aircraft: 0.6,
+    report: Sound::MissileLaunch,
+};
+
+const BIKE_BLASTER: WeaponSpec = WeaponSpec {
+    range: 8.0,
+    damage: 14.0,
+    reload_secs: 0.4,
+    projectile_speed: 70.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.3,
+    versus_structure: 0.1,
+    versus_aircraft: 0.2,
+    report: Sound::PulseShot,
+};
+
+const HOVER_RAIL: WeaponSpec = WeaponSpec {
+    range: 12.0,
+    damage: 60.0,
+    reload_secs: 1.8,
+    projectile_speed: 60.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Shell,
+    versus_infantry: 0.6,
+    versus_vehicle: 1.0,
+    versus_structure: 0.8,
+    versus_aircraft: 0.0,
+    report: Sound::HeavyCannonShot,
+};
+
+const RAIL_CANNON_SHOT: WeaponSpec = WeaponSpec {
+    range: 22.0,
+    damage: 95.0,
+    reload_secs: 4.5,
+    projectile_speed: 24.0,
+    splash_radius: 2.2,
+    style: ProjectileStyle::ArtilleryShell,
+    versus_infantry: 0.5,
+    versus_vehicle: 0.8,
+    versus_structure: 1.3,
+    versus_aircraft: 0.0,
+    report: Sound::HowitzerShot,
+};
+
+const INTERCEPTOR_LASERS: WeaponSpec = WeaponSpec {
+    range: 9.0,
+    damage: 16.0,
+    reload_secs: 0.5,
+    projectile_speed: 70.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 0.0,
+    versus_vehicle: 0.0,
+    versus_structure: 0.0,
+    versus_aircraft: 1.0,
+    report: Sound::PulseShot,
+};
+
+const LASER_TURRET_BEAM: WeaponSpec = WeaponSpec {
+    range: 13.0,
+    damage: 30.0,
+    reload_secs: 1.2,
+    projectile_speed: 70.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Bullet,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.9,
+    versus_structure: 0.3,
+    versus_aircraft: 0.5,
+    report: Sound::PulseShot,
+};
+
+const EXO_TROOPER: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Infantry,
+    name: "Exo Trooper",
+    role: "Infantry in a powered suit with a pulse rifle. Tough and quick.",
+    model_id: "exo_trooper",
+    cost: 150,
+    build_secs: 5.0,
+    max_health: 110.0,
+    speed: 2.8,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(PULSE_RIFLE),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const LANCER: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Ranged,
+    name: "Lancer",
+    role: "Fires guided lances. Pierces hover armour and hits aircraft; weak against troopers.",
+    model_id: "lancer",
+    cost: 350,
+    build_secs: 8.0,
+    max_health: 90.0,
+    speed: 2.6,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(LANCE),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 14.0,
+};
+
+const MEDTECH: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Healer,
+    name: "Medtech",
+    role: "Unarmed. Treats wounded infantry nearby and follows the squad.",
+    model_id: "medtech",
+    cost: 250,
+    build_secs: 6.0,
+    max_health: 70.0,
+    speed: 2.8,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 12.0,
+    sight: 12.0,
+};
+
+const FABRICATOR: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Builder,
+    name: "Fabricator",
+    role: "Unarmed. Right-click an enemy structure to take it over, or a damaged own one to mend it.",
+    model_id: "fabricator",
+    cost: 600,
+    build_secs: 9.0,
+    max_health: 70.0,
+    speed: 2.9,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const HOVER_BIKE: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Fast,
+    name: "Hover Bike",
+    role: "A fast skimmer with a blaster. Hunts infantry and lancers.",
+    model_id: "hover_bike",
+    cost: 450,
+    build_secs: 8.0,
+    max_health: 220.0,
+    speed: 8.0,
+    turn_rate: 6.0,
+    radius: 0.8,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(BIKE_BLASTER),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 18.0,
+};
+
+const HOVER_TANK: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Main,
+    name: "Hover Tank",
+    role: "The backbone of a future army: a hovering hull with a rail gun.",
+    model_id: "hover_tank",
+    cost: 1000,
+    build_secs: 15.0,
+    max_health: 700.0,
+    speed: 4.5,
+    turn_rate: 3.5,
+    radius: 1.3,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(HOVER_RAIL),
+    has_turret: true,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 15.0,
+};
+
+const RAIL_CANNON: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Siege,
+    name: "Rail Cannon",
+    role: "Hurls slugs across the field. Breaks structures and massed troops from afar.",
+    model_id: "rail_cannon",
+    cost: 1300,
+    build_secs: 18.0,
+    max_health: 320.0,
+    speed: 3.0,
+    turn_rate: 3.0,
+    radius: 1.2,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(RAIL_CANNON_SHOT),
+    has_turret: true,
+    producer: BuildingKind::Factory,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const HOVER_CARRIER: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Transport,
+    name: "Hover Carrier",
+    role: "Carries five infantry, who shoot from its hatches. Unarmed itself.",
+    model_id: "hover_carrier",
+    cost: 700,
+    build_secs: 10.0,
+    max_health: 450.0,
+    speed: 6.0,
+    turn_rate: 4.0,
+    radius: 1.2,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 14.0,
+};
+
+const HARVEST_DRONE: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Harvester,
+    name: "Harvest Drone",
+    role: "A hovering collector that gathers crystals and hauls them to the refinery. Unarmed.",
+    model_id: "harvest_drone",
+    cost: 1200,
+    build_secs: 15.0,
+    max_health: 700.0,
+    speed: 3.0,
+    turn_rate: 3.0,
+    radius: 1.2,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 10.0,
+};
+
+const INTERCEPTOR: UnitSpec = UnitSpec {
+    era: Era::Future,
+    line: UnitLine::Fighter,
+    name: "Interceptor",
+    role: "A drone fighter. Only shoots aircraft; returns to its Helipad to recharge.",
+    model_id: "interceptor",
+    cost: 1100,
+    build_secs: 14.0,
+    max_health: 240.0,
+    speed: 12.0,
+    turn_rate: 4.5,
+    radius: 1.2,
+    armor: ArmorClass::Aircraft,
+    weapon: Some(INTERCEPTOR_LASERS),
+    has_turret: false,
+    producer: BuildingKind::Helipad,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 22.0,
+};
+
+const LASER_TURRET: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Future),
+    line: Some(DefenceLine::Tower),
+    name: "Laser Turret",
+    role: "A turret with a laser emitter. Burns infantry, hover craft and low aircraft alike.",
+    model_id: "laser_turret",
+    footprint: IVec2::new(1, 1),
+    cost: 900,
+    build_secs: 11.0,
+    max_health: 900.0,
+    power: -15,
+    prerequisites: &[BuildingKind::Barracks],
+    weapon: Some(LASER_TURRET_BEAM),
+    sight: 17.0,
+    faction: None,
+};
+
+/// What a world's final age races to finish and hold; see docs/eras.md.
+const PROJECT: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Future),
+    line: None,
+    name: "Project",
+    role: "The work of the final age. Finish it and hold it to win the world.",
+    model_id: "project",
+    footprint: IVec2::new(3, 3),
+    cost: 12_000,
+    build_secs: 600.0,
+    max_health: 20_000.0,
+    power: -50,
+    prerequisites: &[BuildingKind::TechCenter],
+    weapon: None,
+    sight: 10.0,
     faction: None,
 };
 

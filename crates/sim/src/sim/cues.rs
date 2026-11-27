@@ -37,10 +37,11 @@ pub enum Sound {
     CatapultThrow,
     BladeStrike,
     MusketShot,
+    PulseShot,
 }
 
 impl Sound {
-    pub const ALL: [Sound; 33] = [
+    pub const ALL: [Sound; 34] = [
         Sound::RifleShot,
         Sound::MachineGunShot,
         Sound::CannonShot,
@@ -74,6 +75,7 @@ impl Sound {
         Sound::CatapultThrow,
         Sound::BladeStrike,
         Sound::MusketShot,
+        Sound::PulseShot,
     ];
 }
 

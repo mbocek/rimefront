@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
@@ -212,6 +212,21 @@ const TICKS_BETWEEN_COMPUTER_NEIGHBOURS: u64 = 5 * 60 * 20;
 /// again past the second.
 const STRUCTURES_FOR_A_HARD_NEIGHBOUR: usize = 8;
 const STRUCTURES_FOR_A_BRUTAL_NEIGHBOUR: usize = 20;
+/// The longest nickname a world keeps, in characters; the game's field takes no more either.
+pub const LONGEST_NICKNAME: usize = 16;
+
+/// A nickname as a world keeps it: control characters dropped, trimmed, at most `LONGEST_NICKNAME`
+/// characters; `None` when nothing is left. It is a name in a game, not an account, and is checked by nobody.
+pub fn kept_nickname(typed: &str) -> Option<String> {
+    let cleaned: String = typed
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect();
+    let kept: String = cleaned.trim().chars().take(LONGEST_NICKNAME).collect();
+    let kept = kept.trim_end().to_string();
+    (!kept.is_empty()).then_some(kept)
+}
+
 /// A side that arrives this far into an age has its first promotion for free when the age turns.
 const LATE_IN_AN_AGE: f64 = 0.75;
 
@@ -244,6 +259,8 @@ pub struct WorldHost {
     losses_when_left: HashMap<Team, AwayLosses>,
     /// Sides that arrived late in the age, promoted for free when it turns.
     late_in_the_age: BTreeSet<Team>,
+    /// What the player of each side is called, as they last entered.
+    nicknames: BTreeMap<Team, String>,
     /// What the world promoted of each away side when the age turned, to tell its player on return; not saved.
     promoted_while_away: HashMap<Team, (u32, u32)>,
     /// The generated site each newcomer's side was deployed on.
@@ -336,6 +353,7 @@ impl WorldHost {
         host.colors = hosting.colors.iter().copied().collect();
         host.deposits.clone_from(&hosting.deposits);
         host.late_in_the_age = hosting.late_in_the_age.iter().copied().collect();
+        host.nicknames = hosting.nicknames.iter().cloned().collect();
         let world = host.app.world_mut();
         let mut diplomacy = world.resource_mut::<Diplomacy>();
         for camp in &hosting.alliances {
@@ -424,6 +442,11 @@ impl WorldHost {
             alliance_offers: world.resource::<AllianceOffers>().pairs(),
             deposits: self.deposits.clone(),
             late_in_the_age: self.late_in_the_age.iter().copied().collect(),
+            nicknames: self
+                .nicknames
+                .iter()
+                .map(|(&team, name)| (team, name.clone()))
+                .collect(),
             colors,
             computer_sides,
             level_side_taken: self.level_side_taken,
@@ -497,6 +520,7 @@ impl WorldHost {
             away_since: HashMap::new(),
             losses_when_left: HashMap::new(),
             late_in_the_age: BTreeSet::new(),
+            nicknames: BTreeMap::new(),
             promoted_while_away: HashMap::new(),
             sites: HashMap::new(),
             effects: WorldEffects::default(),
@@ -760,6 +784,7 @@ impl WorldHost {
         self.away_since.remove(&team);
         self.losses_when_left.remove(&team);
         self.late_in_the_age.remove(&team);
+        self.nicknames.remove(&team);
         self.promoted_while_away.remove(&team);
         self.colors.remove(&team);
         if let Some(site) = self.sites.remove(&team) {
@@ -797,6 +822,7 @@ impl WorldHost {
                     protocol,
                     player: key,
                     color,
+                    nickname,
                     ..
                 },
                 None,
@@ -817,6 +843,10 @@ impl WorldHost {
                 player.entry = self.entries;
                 player.team = Some(team);
                 self.paint(team, color);
+                match nickname.as_deref().and_then(kept_nickname) {
+                    Some(name) => self.nicknames.insert(team, name),
+                    None => self.nicknames.remove(&team),
+                };
                 let level = &self.app.world().resource::<ActiveLevel>().0;
                 player.connection.send(&Message::Entered {
                     team,
@@ -1227,6 +1257,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
             color: None,
+            nickname: None,
         });
         let team = Team::Azure;
         let mut mirror = WorldMirror::default();
@@ -1449,6 +1480,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: key.clone(),
             color: None,
+            nickname: None,
         });
         let mut mirror = WorldMirror::default();
         run(host, 1, &mut mirror, &mut back);
@@ -1465,6 +1497,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
             color: None,
+            nickname: None,
         });
         host.step(SIMULATION_TICK);
         let ages = player
@@ -1540,6 +1573,17 @@ mod tests {
             promotions_told(&welcomed_back(&mut host, &poor_key)).expect("the poor side was told");
         assert_eq!(promoted, 0);
         assert!(unpromoted > 0);
+    }
+
+    #[test]
+    fn a_nickname_is_kept_short_and_clean() {
+        assert_eq!(kept_nickname("  Kowalski  "), Some("Kowalski".into()));
+        assert_eq!(kept_nickname("a\u{7}b\nc"), Some("abc".into()));
+        assert_eq!(kept_nickname("   "), None);
+        assert_eq!(
+            kept_nickname("Žluťoučký kůň pěl ódy").map(|name| name.chars().count()),
+            Some(LONGEST_NICKNAME)
+        );
     }
 
     #[test]
@@ -1687,6 +1731,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
             color: None,
+            nickname: None,
         });
         let mut mirror = WorldMirror::default();
         host.step(SIMULATION_TICK);
@@ -1771,6 +1816,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: key.clone(),
             color: None,
+            nickname: None,
         });
         host.step(SIMULATION_TICK);
         let team = entered(&mut player).expect("the world let the player in");
@@ -1937,6 +1983,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: attacker_key.clone(),
             color: None,
+            nickname: None,
         });
         let mut mirror = WorldMirror::default();
         run(&mut host, 1, &mut mirror, &mut attacker);
@@ -2242,6 +2289,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: key.clone(),
             color: None,
+            nickname: None,
         });
         for _ in 0..TICKS_PER_VIEW {
             resumed.step(SIMULATION_TICK);
@@ -2393,6 +2441,7 @@ mod tests {
             protocol: WORLD_PROTOCOL,
             player: PlayerKey::new_random(),
             color,
+            nickname: None,
         });
         host.step(SIMULATION_TICK);
         let team = entered(&mut player).expect("the world let the player in");
@@ -2704,6 +2753,7 @@ mod tests {
             protocol,
             player: PlayerKey::new_random(),
             color: None,
+            nickname: None,
         });
         host.step(SIMULATION_TICK);
         player

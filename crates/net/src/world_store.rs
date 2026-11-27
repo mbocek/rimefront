@@ -76,6 +76,8 @@ pub struct HostingRecord {
     pub alliance_offers: Vec<(Team, Team)>,
     /// Sides promoted for free when the age turns, since they arrived late in it.
     pub late_in_the_age: Vec<Team>,
+    /// What the player of each side is called.
+    pub nicknames: Vec<(Team, String)>,
 }
 
 /// Everything of a world that is not kept by chunk, and the file of every chunk saved with it.
@@ -376,6 +378,7 @@ mod layout_7 {
                     alliances: hosting.alliances,
                     alliance_offers: hosting.alliance_offers,
                     late_in_the_age: Vec::new(),
+                    nicknames: Vec::new(),
                 },
                 chunks: old.chunks,
             }
@@ -441,6 +444,7 @@ mod layout_6 {
                     alliances: Vec::new(),
                     alliance_offers: Vec::new(),
                     late_in_the_age: Vec::new(),
+                    nicknames: Vec::new(),
                 },
                 chunks: old.chunks,
             }
@@ -794,6 +798,7 @@ mod tests {
                 alliances: vec![vec![Team::from_index(4), Team::from_index(6)]],
                 alliance_offers: vec![(Team::from_index(5), Team::from_index(4))],
                 late_in_the_age: vec![Team::from_index(7)],
+                nicknames: vec![(Team::from_index(4), "Kowalski".into())],
             },
             chunks: vec![(IVec2::new(-1, 2), "-1_2_77.bin".into())],
         }

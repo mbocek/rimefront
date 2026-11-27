@@ -140,6 +140,7 @@ fn a_world_played_alone_is_there_the_next_time() {
         directory: directory.clone(),
         player: player.clone(),
         color: None,
+        nickname: None,
     };
 
     let mut app = player_of(WorldClient::alone_in(own(), 29));
@@ -200,6 +201,7 @@ fn a_new_world_alone_puts_the_kept_one_aside_in_place_of_the_last() {
         directory: root.join("own"),
         player: PlayerKey::new_random(),
         color: None,
+        nickname: None,
     };
     let aside = root.join("own-previous");
     own.put_aside().expect("nothing to put aside is fine");

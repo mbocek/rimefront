@@ -84,12 +84,14 @@ impl WorldClient {
         connection: Box<dyn WorldConnection>,
         player: PlayerKey,
         color: Option<SideColor>,
+        nickname: Option<String>,
     ) -> Self {
         connection.send(&Message::EnterWorld {
             version: env!("CARGO_PKG_VERSION").into(),
             protocol: WORLD_PROTOCOL,
             color,
             player,
+            nickname,
         });
         Self {
             connection: Mutex::new(connection),
@@ -117,7 +119,7 @@ impl WorldClient {
             host.connect(Box::new(world_end));
             run_until_left(&mut host);
         });
-        Self::entering(Box::new(player), PlayerKey::new_random(), None).running(thread)
+        Self::entering(Box::new(player), PlayerKey::new_random(), None, None).running(thread)
     }
 
     /// The world kept in `own`, or a new one grown from `map_seed` when it holds none, on a thread of the
@@ -153,7 +155,7 @@ impl WorldClient {
                 );
             }
         });
-        Self::entering(Box::new(player), own.player, own.color).running(thread)
+        Self::entering(Box::new(player), own.player, own.color, own.nickname).running(thread)
     }
 
     fn running(mut self, thread: JoinHandle<()>) -> Self {
@@ -163,7 +165,11 @@ impl WorldClient {
 
     /// The world of the server at `address`, e.g. `ws://server:47300/world`, asking for `color` for the
     /// player's side.
-    pub fn on_server(address: &str, color: Option<SideColor>) -> Result<Self, String> {
+    pub fn on_server(
+        address: &str,
+        color: Option<SideColor>,
+        nickname: Option<String>,
+    ) -> Result<Self, String> {
         let target = JoinTarget::parse(address, DEFAULT_PORT)?;
         let socket_address = std::net::ToSocketAddrs::to_socket_addrs(&target.address)
             .map_err(|error| error.to_string())?
@@ -176,7 +182,12 @@ impl WorldClient {
             trusted: None,
         };
         let link = Link::guest_side_to(stream, dialling).map_err(|error| error.to_string())?;
-        Ok(Self::entering(Box::new(link), saved_player_key(), color))
+        Ok(Self::entering(
+            Box::new(link),
+            saved_player_key(),
+            color,
+            nickname,
+        ))
     }
 
     pub fn team(&self) -> Option<Team> {
@@ -241,6 +252,7 @@ pub struct OwnWorld {
     pub player: PlayerKey,
     /// The colour the player chose for their side; `None` leaves it to the world.
     pub color: Option<SideColor>,
+    pub nickname: Option<String>,
 }
 
 impl OwnWorld {
@@ -264,6 +276,7 @@ impl OwnWorld {
             directory: game_data_directory().join(OWN_WORLD_DIRECTORY),
             player: saved_player_key(),
             color: None,
+            nickname: None,
         }
     }
 }

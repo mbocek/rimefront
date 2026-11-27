@@ -432,6 +432,12 @@ Taken on 2026-11-27 ([eras.md](eras.md#ages-of-a-world), from
   hour of the world's day; every player is in the world's current age, a newcomer too. A side that arrives in the last quarter
   of an age has its first promotion for free, and an absent player's side is promoted from its own credits.
 
+- **A player may give a nickname**, typed on the network page below the address (Tab moves between the two),
+  sent as they enter a world (`EnterWorld::nickname`, which older games leave out) and kept with the world for
+  its hall of fame. The world drops control characters and keeps at most 16 characters
+  (`world_host::kept_nickname`); without one a player is "Player N". It is a name in a game, not an account:
+  nobody checks it, and nothing else about the player is asked for or kept.
+
 ### Measured: a world with many players
 
 `tests/world_bench.rs` lets players enter a world, each bringing a computer neighbour where none is near,

@@ -867,6 +867,7 @@ mod tests {
                 protocol: WORLD_PROTOCOL,
                 player: PlayerKey::from_saved("00112233445566778899aabbccddeeff").unwrap(),
                 color: Some(SideColor([200, 100, 0])),
+                nickname: None,
             },
             Message::Entered {
                 team: Team::from_index(4),

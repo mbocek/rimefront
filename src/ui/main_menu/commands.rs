@@ -175,6 +175,7 @@ pub(super) fn run_command(
         MenuCommand::PlayWorldAlone => {
             let own = OwnWorld {
                 color: settings.side_color,
+                nickname: settings.world_nickname(),
                 ..OwnWorld::kept_with_the_game()
             };
             commands.insert_resource(WorldClient::alone_in(own, rand::rng().random()));
@@ -182,6 +183,7 @@ pub(super) fn run_command(
         MenuCommand::NewWorldAlone => {
             let own = OwnWorld {
                 color: settings.side_color,
+                nickname: settings.world_nickname(),
                 ..OwnWorld::kept_with_the_game()
             };
             match own.put_aside() {
@@ -192,7 +194,11 @@ pub(super) fn run_command(
             }
         }
         MenuCommand::EnterServerWorld => {
-            match WorldClient::on_server(&settings.join_address, settings.side_color) {
+            match WorldClient::on_server(
+                &settings.join_address,
+                settings.side_color,
+                settings.world_nickname(),
+            ) {
                 Ok(client) => commands.insert_resource(client),
                 Err(reason) => lobby.fail(reason),
             }

@@ -99,6 +99,7 @@ impl SoakPlayer {
             protocol: WORLD_PROTOCOL,
             player: self.key.clone(),
             color: None,
+            nickname: None,
         });
         self.connection = Some(player);
         self.team = None;

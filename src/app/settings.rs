@@ -113,6 +113,8 @@ pub struct GameSettings {
     pub side_color: Option<SideColor>,
     /// The host the player last joined for a network battle.
     pub join_address: String,
+    /// What the player is called in a world's hall of fame; empty leaves them "Player N".
+    pub nickname: String,
     /// Names of the campaign missions the player has won.
     pub completed_missions: Vec<String>,
     /// How hard campaign missions are played, against their authored difficulty.
@@ -151,6 +153,7 @@ impl Default for GameSettings {
             check_for_updates: true,
             side_color: None,
             join_address: "127.0.0.1".to_string(),
+            nickname: String::new(),
             completed_missions: Vec::new(),
             campaign_difficulty: Difficulty::Normal,
             last_campaign: String::new(),
@@ -162,6 +165,11 @@ impl Default for GameSettings {
 }
 
 impl GameSettings {
+    pub fn world_nickname(&self) -> Option<String> {
+        let nickname = self.nickname.trim();
+        (!nickname.is_empty()).then(|| nickname.to_string())
+    }
+
     /// Sets every detail option to the preset's values; `Custom` leaves them untouched.
     pub fn apply_preset(&mut self, preset: QualityPreset) {
         self.preset = preset;

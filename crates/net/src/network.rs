@@ -112,6 +112,9 @@ pub enum Message {
         /// The colour the player chose for their side; `None` leaves it to the world.
         #[serde(default)]
         color: Option<SideColor>,
+        /// What the player is called in the world's hall of fame; `None` leaves them "Player N".
+        #[serde(default)]
+        nickname: Option<String>,
     },
     /// From a world: the side the player commands there, the world's tick when they entered, and when its
     /// ages turn.

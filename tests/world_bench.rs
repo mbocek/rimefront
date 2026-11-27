@@ -27,6 +27,7 @@ fn enter(host: &mut WorldHost) -> LocalConnection {
         protocol: WORLD_PROTOCOL,
         player: PlayerKey::new_random(),
         color: None,
+        nickname: None,
     });
     host.step(SIMULATION_TICK);
     player

@@ -4,6 +4,9 @@ use super::*;
 pub struct JoinAddressText;
 
 #[derive(Component)]
+pub struct NicknameText;
+
+#[derive(Component)]
 pub struct NetworkStatusText;
 
 #[derive(Component)]
@@ -11,14 +14,27 @@ pub struct ChatDraftText;
 
 pub(super) const ADDRESS_CHARACTERS: &str = "0123456789.:-abcdefghijklmnopqrstuvwxyz";
 pub(super) const LONGEST_ADDRESS: usize = 64;
+/// As long as a world keeps a nickname (`world_host::LONGEST_NICKNAME`).
+const LONGEST_NICKNAME: usize = 16;
 
-/// Typing on the network battle page: the host's address before connecting, a chat line afterwards.
+/// Typing on the network battle page: the host's address or, after Tab, the nickname before connecting, a
+/// chat line afterwards.
+#[allow(clippy::type_complexity)]
 pub fn type_on_network_page(
     menu: Option<Res<MainMenu>>,
     mut typed: MessageReader<KeyboardInput>,
     mut settings: ResMut<GameSettings>,
     mut lobby: ResMut<NetLobby>,
-    mut address_fields: Query<&mut Text, (With<JoinAddressText>, Without<ChatDraftText>)>,
+    mut naming: Local<bool>,
+    mut address_fields: Query<
+        &mut Text,
+        (
+            With<JoinAddressText>,
+            Without<ChatDraftText>,
+            Without<NicknameText>,
+        ),
+    >,
+    mut nickname_fields: Query<&mut Text, (With<NicknameText>, Without<ChatDraftText>)>,
     mut draft_fields: Query<&mut Text, With<ChatDraftText>>,
 ) {
     let on_network_page = menu.is_some_and(|menu| menu.selection == Selection::Network);
@@ -28,7 +44,12 @@ pub fn type_on_network_page(
     }
     let chatting = lobby.has_partner();
     for key in typed.read().filter(|key| key.state.is_pressed()) {
+        if !chatting && *naming {
+            type_nickname(&mut settings.nickname, &key.logical_key, &mut naming);
+            continue;
+        }
         match (&key.logical_key, chatting) {
+            (Key::Tab, false) => *naming = true,
             (Key::Enter, true) => lobby.say(),
             (Key::Backspace, true) => {
                 lobby.draft.pop();
@@ -49,11 +70,37 @@ pub fn type_on_network_page(
             _ => {}
         }
     }
+    let caret = |focused: bool| if focused { "_" } else { "" };
     for mut field in &mut address_fields {
-        field.set_if_neq(Text(settings.join_address.clone()));
+        field.set_if_neq(Text(format!(
+            "{}{}",
+            settings.join_address,
+            caret(!*naming)
+        )));
+    }
+    for mut field in &mut nickname_fields {
+        field.set_if_neq(Text(format!("{}{}", settings.nickname, caret(*naming))));
     }
     for mut field in &mut draft_fields {
         field.set_if_neq(Text(format!("{}_", lobby.draft)));
+    }
+}
+
+fn type_nickname(nickname: &mut String, key: &Key, naming: &mut bool) {
+    match key {
+        Key::Tab => *naming = false,
+        Key::Backspace => {
+            nickname.pop();
+        }
+        Key::Space if nickname.chars().count() < LONGEST_NICKNAME => nickname.push(' '),
+        Key::Character(text) => {
+            for character in text.chars().filter(|character| !character.is_control()) {
+                if nickname.chars().count() < LONGEST_NICKNAME {
+                    nickname.push(character);
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -89,6 +136,13 @@ pub(super) fn spawn_network_details(
             MenuCommand::HostNetworkBattle,
         );
         spawn_address_row(panel, fonts, join_address);
+        spawn_text_field(
+            panel,
+            fonts,
+            tr("Nickname in worlds (Tab to type it)"),
+            String::new(),
+            NicknameText,
+        );
         spawn_command_button(panel, fonts, tr("JOIN"), MenuCommand::JoinNetworkBattle);
         spawn_command_button(
             panel,

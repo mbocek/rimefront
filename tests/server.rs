@@ -327,6 +327,7 @@ fn a_player_enters_the_world_a_server_runs() {
         protocol: WORLD_PROTOCOL,
         player: PlayerKey::new_random(),
         color: None,
+        nickname: None,
     });
     let mut entered = None;
     for _ in 0..5_000 {

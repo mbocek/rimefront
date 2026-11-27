@@ -9,6 +9,7 @@ use bevy::time::TimeUpdateStrategy;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
+use crate::hall_of_fame::{self, FamedSide, HallOfFameEntry};
 use crate::network::{Arrival, Link, Message};
 use crate::world_store::{HostingRecord, SaveReport, SavedWorld, WorldStore, restore};
 use crate::world_view::{Effect, MinedCrystal, SentView, WorldEffects, WorldNews, WorldSnapshot};
@@ -31,7 +32,7 @@ use rimefront_sim::sim::notifications::{AwayLosses, AwayReport, News, SideNews};
 use rimefront_sim::sim::player_commands::{
     CommandQueue, GroundOrder, PlayerCommand, SimulationTick,
 };
-use rimefront_sim::sim::production::{Production, UnitLimit};
+use rimefront_sim::sim::production::{BuildItem, Production, UnitLimit};
 use rimefront_sim::sim::promotion::{AgeTurned, make_successor, promotions_wanted};
 use rimefront_sim::sim::sides::{Shelter, retire_side, side_stands};
 use rimefront_sim::world::deposits::lay_new_deposit;
@@ -227,8 +228,18 @@ pub fn kept_nickname(typed: &str) -> Option<String> {
     (!kept.is_empty()).then_some(kept)
 }
 
+/// A side whose Project stands this long wins the world, with its allies.
+const PROJECT_HELD_TO_WIN: Duration = Duration::from_secs(12 * 3600);
+/// A player who was in the world this recently counts towards the size alliances may grow to.
+const ACTIVE_WITHIN: Duration = Duration::from_secs(7 * 24 * 3600);
+const PLACES_IN_THE_HALL: usize = 3;
+
 /// A side that arrives this far into an age has its first promotion for free when the age turns.
 const LATE_IN_AN_AGE: f64 = 0.75;
+
+fn looks_at_projects(tick: u64) -> u64 {
+    tick / TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES
+}
 
 fn ticks_in(duration: Duration) -> u64 {
     (duration.as_secs_f64() / SIMULATION_TICK.as_secs_f64()).round() as u64
@@ -261,6 +272,10 @@ pub struct WorldHost {
     late_in_the_age: BTreeSet<Team>,
     /// What the player of each side is called, as they last entered.
     nicknames: BTreeMap<Team, String>,
+    /// The tick each side's Project has stood since.
+    projects_standing_since: BTreeMap<Team, u64>,
+    /// The longest any Project of each side stood, in ticks, counting the one standing only once it falls.
+    projects_held_longest: BTreeMap<Team, u64>,
     /// What the world promoted of each away side when the age turned, to tell its player on return; not saved.
     promoted_while_away: HashMap<Team, (u32, u32)>,
     /// The generated site each newcomer's side was deployed on.
@@ -354,6 +369,8 @@ impl WorldHost {
         host.deposits.clone_from(&hosting.deposits);
         host.late_in_the_age = hosting.late_in_the_age.iter().copied().collect();
         host.nicknames = hosting.nicknames.iter().cloned().collect();
+        host.projects_standing_since = hosting.projects_standing_since.iter().copied().collect();
+        host.projects_held_longest = hosting.projects_held_longest.iter().copied().collect();
         let world = host.app.world_mut();
         let mut diplomacy = world.resource_mut::<Diplomacy>();
         for camp in &hosting.alliances {
@@ -447,6 +464,8 @@ impl WorldHost {
                 .iter()
                 .map(|(&team, name)| (team, name.clone()))
                 .collect(),
+            projects_standing_since: self.projects_standing_since.clone().into_iter().collect(),
+            projects_held_longest: self.projects_held_longest.clone().into_iter().collect(),
             colors,
             computer_sides,
             level_side_taken: self.level_side_taken,
@@ -521,6 +540,8 @@ impl WorldHost {
             losses_when_left: HashMap::new(),
             late_in_the_age: BTreeSet::new(),
             nicknames: BTreeMap::new(),
+            projects_standing_since: BTreeMap::new(),
+            projects_held_longest: BTreeMap::new(),
             promoted_while_away: HashMap::new(),
             sites: HashMap::new(),
             effects: WorldEffects::default(),
@@ -567,6 +588,12 @@ impl WorldHost {
         self.app.update();
         if self.era() != era_before {
             self.promote_sides_the_age_left_behind();
+        }
+        if looks_at_projects(self.tick()) != looks_at_projects(before)
+            && let Some(entry) = self.finale_decided()
+        {
+            self.end_the_world(entry);
+            return;
         }
         let ticks_gone_by = self.tick() - before;
         self.wear_down_long_absent_sides(ticks_gone_by);
@@ -856,10 +883,14 @@ impl WorldHost {
                 });
             }
             (Message::Orders { commands }, Some(team)) => {
+                let allowed: Vec<PlayerCommand> = commands
+                    .into_iter()
+                    .filter(|command| self.alliance_allowed(team, command))
+                    .collect();
                 let world = self.app.world_mut();
                 let now = *world.resource::<SimulationTick>();
                 let mut queue = world.resource_mut::<CommandQueue>();
-                for command in commands {
+                for command in allowed {
                     queue.issue(now, team, command);
                 }
             }
@@ -913,6 +944,187 @@ impl WorldHost {
         self.sites.insert(team, site);
         self.give_a_computer_neighbour(site, Difficulty::Normal);
         Some(team)
+    }
+
+    /// An offer of alliance goes through unless the finale has begun or the alliance would grow past the
+    /// world's limit; the one who offered is told why not.
+    fn alliance_allowed(&mut self, team: Team, command: &PlayerCommand) -> bool {
+        let PlayerCommand::OfferAlliance { to } = *command else {
+            return true;
+        };
+        let refusal = if self.era() == Era::FINAL {
+            Some(SideNews::AlliancesClosed)
+        } else {
+            let most = self.largest_alliance();
+            let diplomacy = self.app.world().resource::<Diplomacy>();
+            let camp_size = |side: Team| {
+                diplomacy
+                    .alliances()
+                    .into_iter()
+                    .find(|camp| camp.contains(&side))
+                    .map_or(1, |camp| camp.len())
+            };
+            let grown = camp_size(team).max(camp_size(to)) + 1;
+            (grown > most).then_some(SideNews::AllianceTooLarge(most as u32))
+        };
+        let Some(news) = refusal else {
+            return true;
+        };
+        self.app.world_mut().write_message(News::to(team, news));
+        false
+    }
+
+    /// A third of the players active in the last week, and never fewer than two.
+    fn largest_alliance(&self) -> usize {
+        let now = self.tick();
+        let within = ticks_in(ACTIVE_WITHIN);
+        let active = self
+            .sides_of_players
+            .values()
+            .filter(|team| {
+                self.away_since
+                    .get(team)
+                    .is_none_or(|&since| now - since <= within)
+            })
+            .count();
+        active.div_ceil(3).max(2)
+    }
+
+    /// Notes which sides' Projects stand; the world's outcome once a Project stood long enough or the
+    /// finale ran out.
+    fn finale_decided(&mut self) -> Option<HallOfFameEntry> {
+        let now = self.tick();
+        let world = self.app.world_mut();
+        let standing: BTreeSet<Team> = world
+            .query::<(&Building, &Team)>()
+            .iter(world)
+            .filter(|(building, _)| building.kind == BuildingKind::Project)
+            .map(|(_, &team)| team)
+            .collect();
+        for &team in &standing {
+            self.projects_standing_since.entry(team).or_insert(now);
+        }
+        let fallen: Vec<(Team, u64)> = self
+            .projects_standing_since
+            .iter()
+            .filter(|(team, _)| !standing.contains(team))
+            .map(|(&team, &since)| (team, now - since))
+            .collect();
+        for (team, held) in fallen {
+            self.projects_standing_since.remove(&team);
+            let longest = self.projects_held_longest.entry(team).or_default();
+            *longest = (*longest).max(held);
+        }
+        let held_long_enough = self
+            .projects_standing_since
+            .values()
+            .any(|&since| now - since >= ticks_in(PROJECT_HELD_TO_WIN));
+        let schedule = self.app.world().resource::<ActiveLevel>().0.ages?;
+        let finale_over = schedule.finale_ends_at(now).is_some_and(|end| now >= end);
+        (held_long_enough || finale_over).then(|| self.standings())
+    }
+
+    /// The camps that came furthest with a Project, best first: the longest it stood, then how far the one
+    /// being built has come. A camp counts its best member.
+    fn standings(&mut self) -> HallOfFameEntry {
+        let now = self.tick();
+        let world = self.app.world();
+        let production = world.resource::<Production>();
+        let score = |team: Team| {
+            let standing = self
+                .projects_standing_since
+                .get(&team)
+                .map_or(0, |&since| now - since);
+            let held = standing.max(self.projects_held_longest.get(&team).copied().unwrap_or(0));
+            let lane = production.lane(team, BuildItem::Structure(BuildingKind::Project).lane());
+            let building = match (lane.ready, lane.queue.front()) {
+                (Some(BuildingKind::Project), _) => 1.0,
+                (_, Some(BuildItem::Structure(BuildingKind::Project))) => {
+                    lane.progress_secs / BuildingKind::Project.spec().build_secs
+                }
+                _ => 0.0,
+            };
+            (held, (building * 1000.0) as u64)
+        };
+        let alliances = world.resource::<Diplomacy>().alliances();
+        let camp_of = |team: Team| {
+            let mut camp = alliances
+                .iter()
+                .find(|camp| camp.contains(&team))
+                .cloned()
+                .unwrap_or_else(|| vec![team]);
+            camp.sort();
+            camp
+        };
+        let player_camps: BTreeSet<Vec<Team>> = self
+            .sides_of_players
+            .values()
+            .map(|&team| camp_of(team))
+            .collect();
+        let mut camps: Vec<((u64, u64), Vec<Team>)> = player_camps
+            .into_iter()
+            .map(|camp| {
+                (
+                    camp.iter()
+                        .map(|&team| score(team))
+                        .max()
+                        .unwrap_or_default(),
+                    camp,
+                )
+            })
+            .filter(|&(best, _)| best != (0, 0))
+            .collect();
+        camps.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+        let places = camps
+            .into_iter()
+            .take(PLACES_IN_THE_HALL)
+            .map(|(_, camp)| {
+                camp.into_iter()
+                    .map(|team| FamedSide {
+                        color: self.colors.get(&team).copied(),
+                        name: self
+                            .nicknames
+                            .get(&team)
+                            .cloned()
+                            .unwrap_or_else(|| format!("Player {}", team.index())),
+                    })
+                    .collect()
+            })
+            .collect();
+        let map_seed = world.resource::<ActiveLevel>().0.map_seed;
+        HallOfFameEntry::now(map_seed, places)
+    }
+
+    /// The world is over: it goes into the hall of fame beside its save, its players are told who won and
+    /// let go, and a new world grows from the next seed in the first age, kept where this one was.
+    fn end_the_world(&mut self, entry: HallOfFameEntry) {
+        let reason = format!(
+            "The world was won by {}. Enter again for the next one.",
+            entry.winners()
+        );
+        for player in &self.players {
+            player.connection.send(&Message::Refused {
+                reason: reason.clone(),
+            });
+        }
+        let level = &self.app.world().resource::<ActiveLevel>().0;
+        let next_seed = level.map_seed + 1;
+        let ages = level.ages.map(AgeSchedule::restarted);
+        let store = self.store.take();
+        if let Some(kept) = &store
+            && let Err(error) = hall_of_fame::add(kept.store.directory(), entry)
+        {
+            warn!("could not write the hall of fame: {error}");
+        }
+        let absence = self.absence;
+        *self = Self::with_ages(next_seed, ages);
+        self.absence = absence;
+        if let Some(kept) = store {
+            let every = SIMULATION_TICK * kept.every_ticks as u32;
+            if let Err(error) = self.keep_in(kept.store, every) {
+                warn!("could not save the new world: {error}");
+            }
+        }
     }
 
     fn era(&self) -> Era {
@@ -1430,6 +1642,8 @@ mod tests {
             since: 0,
             era_hours: 1,
             turn_hour: 1,
+            first: Era::Antiquity,
+            finale_hours: 1,
         }
     }
 
@@ -2033,6 +2247,128 @@ mod tests {
         for _ in 0..TICKS_PER_VIEW {
             host.step(SIMULATION_TICK);
         }
+    }
+
+    /// A world already in its finale, which lasts a day.
+    fn finale_world(directory: &std::path::Path) -> WorldHost {
+        let ages = AgeSchedule {
+            age: Era::FINAL,
+            since: 0,
+            era_hours: 1,
+            turn_hour: 1,
+            first: Era::FINAL,
+            finale_hours: 24,
+        };
+        let mut host = WorldHost::with_ages(29, Some(ages));
+        host.keep_in(WorldStore::at(directory), Duration::from_secs(3600))
+            .unwrap();
+        host
+    }
+
+    fn raise_a_project(host: &mut WorldHost, team: Team) -> Entity {
+        let world = host.world();
+        let site = free_site_near_base(world, Team::Azure, BuildingKind::Project);
+        let project = world.resource_scope(|world, mut map: Mut<GameMap>| {
+            let mut commands = world.commands();
+            spawn_building(&mut commands, &mut map, BuildingKind::Project, team, site)
+        });
+        world.flush();
+        project
+    }
+
+    fn look_at_the_projects(host: &mut WorldHost) {
+        for _ in 0..TICKS_BETWEEN_LOOKS_AT_COMPUTER_SIDES {
+            host.step(SIMULATION_TICK);
+        }
+    }
+
+    fn refusals(player: &mut LocalConnection) -> Vec<String> {
+        player
+            .drain()
+            .into_iter()
+            .filter_map(|arrival| match arrival {
+                Arrival::Message(Message::Refused { reason }) => Some(reason),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_project_held_half_a_day_wins_the_world_and_a_new_one_grows() {
+        let directory = scratch_directory("finale_won");
+        let mut host = finale_world(&directory);
+        let (mut player, team) = enter(&mut host);
+        raise_a_project(&mut host, team);
+        look_at_the_projects(&mut host);
+        let now = host.tick();
+        jump_to(&mut host, now + ticks_in(PROJECT_HELD_TO_WIN));
+        look_at_the_projects(&mut host);
+        let told = refusals(&mut player);
+        assert!(
+            told.iter().any(|reason| reason.contains("won by Player 0")),
+            "{told:?}"
+        );
+        let hall = hall_of_fame::read(&directory).unwrap();
+        assert_eq!(hall.len(), 1);
+        assert_eq!(hall[0].map_seed, 29);
+        assert_eq!(hall[0].places[0][0].name, "Player 0");
+        assert_eq!(host.world().resource::<ActiveLevel>().0.map_seed, 30);
+        assert!(host.tick() < 20, "the next world starts anew");
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn a_finale_without_a_winner_ranks_the_projects_by_how_long_they_stood() {
+        let directory = scratch_directory("finale_over");
+        let mut host = finale_world(&directory);
+        let (_first, first) = enter(&mut host);
+        let (_second, second) = enter(&mut host);
+        let short = raise_a_project(&mut host, second);
+        raise_a_project(&mut host, first);
+        look_at_the_projects(&mut host);
+        let now = host.tick();
+        jump_to(&mut host, now + 3600 * 20);
+        host.world().get_mut::<Health>(short).unwrap().current = 0.0;
+        look_at_the_projects(&mut host);
+        jump_to(&mut host, 24 * 3600 * 20);
+        look_at_the_projects(&mut host);
+        let hall = hall_of_fame::read(&directory).unwrap();
+        let places: Vec<&str> = hall[0]
+            .places
+            .iter()
+            .map(|camp| camp[0].name.as_str())
+            .collect();
+        let name = |team: Team| format!("Player {}", team.index());
+        assert_eq!(places, [name(first), name(second)]);
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn alliances_close_in_the_finale() {
+        let directory = scratch_directory("finale_alliances");
+        let mut host = finale_world(&directory);
+        let (one, _) = enter(&mut host);
+        let (_two, two) = enter(&mut host);
+        let (mut mirror, mut watching) = (WorldMirror::default(), one);
+        offer_alliance(&mut host, &watching, two);
+        run(&mut host, 1, &mut mirror, &mut watching);
+        assert!(mirror.told.contains(&SideNews::AlliancesClosed));
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn an_alliance_grows_no_larger_than_a_third_of_the_players() {
+        let mut host = WorldHost::new(29);
+        let (one, a) = enter(&mut host);
+        let (two, b) = enter(&mut host);
+        let (mut three, _) = enter(&mut host);
+        offer_alliance(&mut host, &one, b);
+        offer_alliance(&mut host, &two, a);
+        assert!(!host.world().resource::<Diplomacy>().hostile(a, b));
+        let mut mirror = WorldMirror::default();
+        offer_alliance(&mut host, &three, a);
+        run(&mut host, 1, &mut mirror, &mut three);
+        assert!(mirror.told.contains(&SideNews::AllianceTooLarge(2)));
     }
 
     #[test]

@@ -141,6 +141,25 @@ M5 Pro, release build), the age turning at hour 20 promoted every side at once w
 The first nine hours of antiquity took 0.39-0.78 ms a tick, as modern worlds did; the slower hours after them
 came with more sides and a wider world, not with the age. The soak writes the age into its last column.
 
+## The finale
+
+The future is a world's final age, its finale. It lasts at least `--finale-days` and is the only age a
+**Project** can be built in. A side whose Project stands twelve hours (`PROJECT_HELD_TO_WIN` in
+`world_host.rs`) wins the world, together with the allies it has then; whoever left the alliance before has no
+share in it. When the finale runs out without a winner, the side whose Project stood longest wins, and when no
+Project was ever finished, the one whose Project came furthest in its build queue. Second and third place are
+decided the same way, a camp of allies counting its best member; sides that never built anything of a Project
+have no place.
+
+Alliances are bounded: one may hold a third of the players who were in the world during the last week, and
+never fewer than two. Once the finale begins no new alliance is formed (`SideNews::AlliancesClosed`), though
+anyone may still leave one.
+
+When a world ends, its places go into `hall_of_fame.json` beside its save (`net::hall_of_fame`): the world's
+seed, when it ended, and for each place the colours and nicknames of its sides ("Player N" without one). Every
+player is told who won and let go, and a new world grows in the same directory from the next seed, in the first
+age of the same schedule; entering again takes them there.
+
 A resumed world starts in the age of its saved tick without turning it again, with what was left of the calm
 (the tick it turned on is saved), and the sides due a free promotion are saved too (layout 8, see
 [compatibility.md](compatibility.md)).

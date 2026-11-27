@@ -8,8 +8,10 @@ persistent world, entered at `ws://server:47300/world` from the game's network p
 of world time (`--save-every SECS`) and resumed from there when the server starts again; `--world SEED` then
 only grows a world when `DIR` holds none. A new world goes through the ages ([eras.md](eras.md#ages-of-a-world)):
 `--first-era antiquity` (the first age with an army, by default), `--era-days 7` for how long an age lasts at
-least (1 to 3650), and `--era-hour 20` for the hour of the world's day it turns at. These defaults suit friends;
-a public world wants ages of a month (`--era-days 28`). A resumed world keeps the schedule it was grown with,
+least (1 to 3650), `--finale-days 3` for the final age, and `--era-hour 20` for the hour of the world's day it
+turns at. These defaults suit friends; a public world wants ages of a month (`--era-days 28 --finale-days 7`).
+When the world is won, or its finale runs out, it is written into `hall_of_fame.json` in `DIR` and a new world
+grows there from the next seed ([eras.md](eras.md#the-finale)). A resumed world keeps the schedule it was grown with,
 and the flags are not read then. Ctrl-C or a termination signal (`SIGTERM`, as a service manager
 sends) saves the world before the server stops; a crash loses at most the time since the last save. A game
 of another version enters as long as it speaks the same world protocol; updating a server, and what may

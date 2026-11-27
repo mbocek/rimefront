@@ -38,6 +38,9 @@ impl Era {
     }
 
     /// The age called `name` in English, in any case, as command lines give it.
+    /// The age a world ends in: its finale.
+    pub const FINAL: Era = Era::Future;
+
     pub fn named(name: &str) -> Option<Era> {
         Era::ALL
             .into_iter()
@@ -71,24 +74,53 @@ pub struct AgeSchedule {
     pub since: u64,
     pub era_hours: u32,
     pub turn_hour: u32,
+    /// The age a world of this schedule starts in, and the next one after it is won.
+    pub first: Era,
+    /// How long the final age, the finale, lasts at least before the world ends without a winner.
+    pub finale_hours: u32,
 }
 
 /// Ages of a week, turning at the twentieth hour of the world's day: a world of friends sees them turn. A
 /// public world wants longer ones (docs/server.md).
 impl Default for AgeSchedule {
     fn default() -> Self {
-        Self::starting_in(Era::Antiquity, 7, 20)
+        Self::starting_in(Era::Antiquity, 7, 20).with_finale_days(3)
     }
 }
 
 impl AgeSchedule {
     pub fn starting_in(first: Era, era_days: u32, turn_hour: u32) -> Self {
+        let era_hours = era_days.clamp(1, 3650) * 24;
         Self {
             age: first,
             since: 0,
-            era_hours: era_days.clamp(1, 3650) * 24,
+            era_hours,
             turn_hour: turn_hour % 24,
+            first,
+            finale_hours: era_hours,
         }
+    }
+
+    pub fn with_finale_days(self, days: u32) -> Self {
+        Self {
+            finale_hours: days.clamp(1, 3650) * 24,
+            ..self
+        }
+    }
+
+    /// The same schedule for the next world, from its first age.
+    pub fn restarted(self) -> Self {
+        Self {
+            age: self.first,
+            since: 0,
+            ..self
+        }
+    }
+
+    /// When the finale running at `tick` ends; `None` before the world reaches its final age.
+    pub fn finale_ends_at(&self, tick: u64) -> Option<u64> {
+        let (era, started) = self.age_at(tick);
+        (era == Era::FINAL).then(|| self.turn_of(started, self.finale_hours))
     }
 
     /// The schedule held from the age running at `tick` on.
@@ -104,7 +136,8 @@ impl AgeSchedule {
     /// The tick the age running at `tick` turns into the next one; `None` while there is no next one.
     pub fn next_turn_after(&self, tick: u64) -> Option<u64> {
         let (era, started) = self.age_at(tick);
-        era.next_playable().map(|_| self.turn_of(started))
+        era.next_playable()
+            .map(|_| self.turn_of(started, self.era_hours))
     }
 
     /// The tick the age running at `tick` began.
@@ -115,7 +148,7 @@ impl AgeSchedule {
     fn age_at(&self, tick: u64) -> (Era, u64) {
         let (mut era, mut started) = (self.age, self.since);
         while let Some(next) = era.next_playable() {
-            let turn = self.turn_of(started);
+            let turn = self.turn_of(started, self.era_hours);
             if tick < turn {
                 break;
             }
@@ -124,8 +157,8 @@ impl AgeSchedule {
         (era, started)
     }
 
-    fn turn_of(&self, started: u64) -> u64 {
-        let earliest = started + u64::from(self.era_hours) * TICKS_PER_HOUR;
+    fn turn_of(&self, started: u64, hours: u32) -> u64 {
+        let earliest = started + u64::from(hours) * TICKS_PER_HOUR;
         let turn_in_day = u64::from(self.turn_hour) * TICKS_PER_HOUR;
         let day = earliest.saturating_sub(turn_in_day).div_ceil(TICKS_PER_DAY);
         (day * TICKS_PER_DAY + turn_in_day).max(started + 1)
@@ -341,6 +374,8 @@ mod tests {
             since: 0,
             era_hours: 1,
             turn_hour: 1,
+            first: Era::Antiquity,
+            finale_hours: 1,
         };
         assert_eq!(schedule.next_turn_after(0), Some(TICKS_PER_HOUR));
         let late = AgeSchedule {

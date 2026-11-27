@@ -328,6 +328,8 @@ fn main() -> std::io::Result<()> {
         since: 0,
         era_hours,
         turn_hour: 20,
+        first,
+        finale_hours: era_hours,
     };
     let mut host = WorldHost::with_ages(seed, Some(ages));
     host.keep_in(WorldStore::at(&directory), NEVER)?;

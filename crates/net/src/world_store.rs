@@ -78,6 +78,9 @@ pub struct HostingRecord {
     pub late_in_the_age: Vec<Team>,
     /// What the player of each side is called.
     pub nicknames: Vec<(Team, String)>,
+    /// The tick each side's Project has stood since, and the longest any of its Projects stood, in ticks.
+    pub projects_standing_since: Vec<(Team, u64)>,
+    pub projects_held_longest: Vec<(Team, u64)>,
 }
 
 /// Everything of a world that is not kept by chunk, and the file of every chunk saved with it.
@@ -166,6 +169,10 @@ struct WrittenSave {
 }
 
 impl WorldStore {
+    pub fn directory(&self) -> &Path {
+        &self.directory
+    }
+
     pub fn at(directory: impl Into<PathBuf>) -> Self {
         Self {
             directory: directory.into(),
@@ -379,6 +386,8 @@ mod layout_7 {
                     alliance_offers: hosting.alliance_offers,
                     late_in_the_age: Vec::new(),
                     nicknames: Vec::new(),
+                    projects_standing_since: Vec::new(),
+                    projects_held_longest: Vec::new(),
                 },
                 chunks: old.chunks,
             }
@@ -445,6 +454,8 @@ mod layout_6 {
                     alliance_offers: Vec::new(),
                     late_in_the_age: Vec::new(),
                     nicknames: Vec::new(),
+                    projects_standing_since: Vec::new(),
+                    projects_held_longest: Vec::new(),
                 },
                 chunks: old.chunks,
             }
@@ -799,6 +810,8 @@ mod tests {
                 alliance_offers: vec![(Team::from_index(5), Team::from_index(4))],
                 late_in_the_age: vec![Team::from_index(7)],
                 nicknames: vec![(Team::from_index(4), "Kowalski".into())],
+                projects_standing_since: vec![(Team::from_index(4), 900_000)],
+                projects_held_longest: vec![(Team::from_index(6), 1_200)],
             },
             chunks: vec![(IVec2::new(-1, 2), "-1_2_77.bin".into())],
         }

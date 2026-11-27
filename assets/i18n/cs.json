@@ -780,5 +780,7 @@
   "A turret with a laser emitter. Burns infantry, hover craft and low aircraft alike.": "Věž s laserovým zářičem. Pálí pěchotu, vznášedla i nízko letící letadla.",
   "Project": "Projekt",
   "The work of the final age. Finish it and hold it to win the world.": "Dílo poslední éry. Dokonči ho a udrž, a svět je tvůj.",
-  "Nickname in worlds (Tab to type it)": "Přezdívka ve světech (Tab pro psaní)"
+  "Nickname in worlds (Tab to type it)": "Přezdívka ve světech (Tab pro psaní)",
+  "The finale has begun: no new alliances until the world ends": "Začalo finále: až do konce světa žádná nová spojenectví",
+  "An alliance may hold at most {} sides in this world": "Spojenectví smí mít v tomto světě nejvýš {} stran"
 }

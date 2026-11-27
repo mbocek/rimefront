@@ -1,3 +1,4 @@
+pub mod hall_of_fame;
 pub mod link;
 pub mod lobby;
 pub mod network;

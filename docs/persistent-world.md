@@ -432,6 +432,9 @@ Taken on 2026-11-27 ([eras.md](eras.md#ages-of-a-world), from
   hour of the world's day; every player is in the world's current age, a newcomer too. A side that arrives in the last quarter
   of an age has its first promotion for free, and an absent player's side is promoted from its own credits.
 
+- **A world ends** when a side's Project, built in the final age, stands twelve hours, or when the finale runs
+  out; it goes into a hall of fame and the next world grows from the next seed. Alliances hold at most a third
+  of the week's players and close for the finale ([eras.md](eras.md#the-finale)).
 - **A player may give a nickname**, typed on the network page below the address (Tab moves between the two),
   sent as they enter a world (`EnterWorld::nickname`, which older games leave out) and kept with the world for
   its hall of fame. The world drops control characters and keeps at most 16 characters

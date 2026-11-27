@@ -98,6 +98,10 @@ pub enum SideNews {
         promoted: u32,
         unpromoted: u32,
     },
+    /// The world is in its finale: no new alliances until it ends.
+    AlliancesClosed,
+    /// An alliance would hold more sides than the world allows, this many.
+    AllianceTooLarge(u32),
 }
 
 /// How long a player was away from a world and what their side lost meanwhile; the losses are `None` when the
@@ -168,6 +172,13 @@ impl SideNews {
             SideNews::AllianceOffered(team) => tr_fmt("{} offers an alliance", &[&team.name()]),
             SideNews::AllianceFormed(team) => tr_fmt("Allied with {}", &[&team.name()]),
             SideNews::AllianceLeft(team) => tr_fmt("No longer allied with {}", &[&team.name()]),
+            SideNews::AlliancesClosed => {
+                tr("The finale has begun: no new alliances until the world ends").into()
+            }
+            SideNews::AllianceTooLarge(most) => tr_fmt(
+                "An alliance may hold at most {} sides in this world",
+                &[&most],
+            ),
             SideNews::WelcomeBack(report) => report.message(),
             SideNews::PromotedWithTheAge {
                 promoted,
@@ -207,6 +218,7 @@ impl SideNews {
             }
             SideNews::AgeTurned(_) => Sound::BaseAlert,
             SideNews::PromotedWithTheAge { .. } => Sound::UnitPromoted,
+            SideNews::AlliancesClosed | SideNews::AllianceTooLarge(_) => Sound::UiError,
             SideNews::Promoted(..) => Sound::UnitPromoted,
             SideNews::Captured(_) => Sound::StructureCaptured,
             SideNews::CapturedByEnemy(_) => Sound::StructureLost,

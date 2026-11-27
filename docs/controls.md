@@ -29,6 +29,7 @@
 | G / H / F | stance of the selected units: aggressive / hold position / hold fire |
 | right-click own Troop Carrier | selected infantry climbs in |
 | U | selected Troop Carriers let their passengers out |
+| B | promote the selected units and defences into the new age, see [eras.md](eras.md) |
 | Z / C, then left-click the map | call a recon flight / an artillery barrage there (right-click or Esc cancels) |
 | V | jump to the last attack on your base or a harvester |
 | Ctrl+1-9 (Cmd+1-9) | save the selection as a group |

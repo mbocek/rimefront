@@ -10,6 +10,10 @@ use crate::view::local_view::LocalView;
 pub struct EffectAssets {
     tracer_mesh: Handle<Mesh>,
     shell_mesh: Handle<Mesh>,
+    arrow_mesh: Handle<Mesh>,
+    boulder_mesh: Handle<Mesh>,
+    arrow_material: Handle<StandardMaterial>,
+    boulder_material: Handle<StandardMaterial>,
     blast_mesh: Handle<Mesh>,
     tracer_material: Handle<StandardMaterial>,
     shell_material: Handle<StandardMaterial>,
@@ -87,7 +91,21 @@ pub fn create_effect_assets(
         perceptual_roughness: 1.0,
         ..default()
     });
+    let arrow_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.32, 0.22, 0.12),
+        perceptual_roughness: 0.8,
+        ..default()
+    });
+    let boulder_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.42, 0.4, 0.37),
+        perceptual_roughness: 0.95,
+        ..default()
+    });
     commands.insert_resource(EffectAssets {
+        arrow_mesh: meshes.add(Capsule3d::new(0.025, 0.75)),
+        boulder_mesh: meshes.add(Sphere::new(0.3).mesh().ico(1).unwrap()),
+        arrow_material,
+        boulder_material,
         tracer_mesh: meshes.add(Capsule3d::new(0.05, 0.6)),
         shell_mesh: meshes.add(Sphere::new(0.14).mesh().ico(2).unwrap()),
         blast_mesh: meshes.add(Sphere::new(1.0).mesh().ico(2).unwrap()),
@@ -224,25 +242,29 @@ impl EffectAssets {
     pub fn projectile_visual(
         &self,
         style: ProjectileStyle,
-    ) -> (Mesh3d, MeshMaterial3d<StandardMaterial>) {
-        match style {
-            ProjectileStyle::Missile => (
-                Mesh3d(self.tracer_mesh.clone()),
-                MeshMaterial3d(self.shell_material.clone()),
-            ),
-            ProjectileStyle::Bullet => (
-                Mesh3d(self.tracer_mesh.clone()),
-                MeshMaterial3d(self.tracer_material.clone()),
-            ),
-            ProjectileStyle::Shell | ProjectileStyle::ArtilleryShell => (
-                Mesh3d(self.shell_mesh.clone()),
-                MeshMaterial3d(self.shell_material.clone()),
-            ),
-            ProjectileStyle::Flame => (
-                Mesh3d(self.blast_mesh.clone()),
-                MeshMaterial3d(self.fire_material.clone()),
-            ),
-        }
+    ) -> (Mesh3d, MeshMaterial3d<StandardMaterial>, Visibility) {
+        let (mesh, material) = match style {
+            ProjectileStyle::Missile => (&self.tracer_mesh, &self.shell_material),
+            ProjectileStyle::Bullet | ProjectileStyle::Strike => {
+                (&self.tracer_mesh, &self.tracer_material)
+            }
+            ProjectileStyle::Shell | ProjectileStyle::ArtilleryShell => {
+                (&self.shell_mesh, &self.shell_material)
+            }
+            ProjectileStyle::Flame => (&self.blast_mesh, &self.fire_material),
+            ProjectileStyle::Arrow => (&self.arrow_mesh, &self.arrow_material),
+            ProjectileStyle::Boulder => (&self.boulder_mesh, &self.boulder_material),
+        };
+        let visibility = if style == ProjectileStyle::Strike {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        (
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
+            visibility,
+        )
     }
 }
 

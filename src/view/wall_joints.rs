@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
-use crate::sim::components::WallSegment;
+use crate::sim::components::{Building, WallSegment};
 
-use crate::sim::catalog::Team;
+use crate::sim::catalog::{BuildingKind, Team};
 use crate::view::assets::ModelLibrary;
 
 /// The four neighbours a wall can join, as cell steps.
@@ -24,9 +24,11 @@ pub fn join_walls(
     models: Res<ModelLibrary>,
     mut removed: RemovedComponents<WallSegment>,
     added: Query<(), Added<WallSegment>>,
+    unjoined: Query<(), (With<WallSegment>, Without<WallJoints>)>,
     walls: Query<(
         Entity,
         &WallSegment,
+        Option<&Building>,
         &Transform,
         Option<&WallJoints>,
         Option<&Children>,
@@ -34,14 +36,15 @@ pub fn join_walls(
     runs: Query<(), With<WallRun>>,
 ) {
     let anything_removed = removed.read().count() > 0;
-    if !anything_removed && added.is_empty() {
+    if !anything_removed && added.is_empty() && unjoined.is_empty() {
         return;
     }
     let teams_by_cell: HashMap<IVec2, Team> = walls
         .iter()
         .map(|(_, segment, ..)| (segment.cell, segment.team))
         .collect();
-    for (entity, segment, placement, joints, children) in &walls {
+    for (entity, segment, building, placement, joints, children) in &walls {
+        let wall = building.map_or(BuildingKind::Wall, |building| building.kind);
         let wanted =
             joints_with(|step| teams_by_cell.get(&(segment.cell + step)) == Some(&segment.team));
         if joints.copied() == Some(wanted) {
@@ -60,7 +63,7 @@ pub fn join_walls(
                 for step in wanted.steps() {
                     post.spawn((
                         WallRun,
-                        models.wall_link(segment.team),
+                        models.wall_link(wall, segment.team),
                         Transform::from_rotation(Quat::from_rotation_y(
                             yaw_towards(step) - own_yaw,
                         )),

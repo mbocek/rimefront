@@ -191,7 +191,11 @@ impl Plugin for BattleViewPlugin {
                         dressing::show_harvester_load,
                         dressing::link_turret_nodes,
                         dressing::rotate_turret_nodes,
-                        dressing::lay_corpses,
+                        (
+                            dressing::lay_corpses,
+                            dressing::redress_buildings_for_the_age,
+                            dressing::redress_promoted,
+                        ),
                         ambience::trample_vegetation,
                         dressing::show_own_mines,
                         ambience::emit_crystal_sparkles,

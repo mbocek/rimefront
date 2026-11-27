@@ -215,9 +215,10 @@ impl Battle {
 
     pub fn construct(&mut self, kind: BuildingKind, team: Team, origin: IVec2) {
         let world = self.world();
+        let era = world.resource::<Production>().era();
         world.resource_scope(|world, mut map: Mut<GameMap>| {
             let mut commands = world.commands();
-            construct_building(&mut commands, &mut map, kind, team, origin);
+            construct_building(&mut commands, &mut map, kind, team, origin, era);
         });
         world.flush();
     }

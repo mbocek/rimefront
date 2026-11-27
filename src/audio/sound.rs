@@ -47,6 +47,9 @@ fn files(sound: Sound) -> &'static [&'static str] {
         Sound::SniperShot => &["sniper_shot"],
         Sound::FlameBurst => &["flame_burst"],
         Sound::GrenadeLaunch => &["grenade_launch_1", "grenade_launch_2"],
+        Sound::BowShot => &["bow_shot_1", "bow_shot_2"],
+        Sound::CatapultThrow => &["catapult_throw"],
+        Sound::BladeStrike => &["blade_strike_1", "blade_strike_2"],
     }
 }
 
@@ -66,6 +69,7 @@ fn distant_files(sound: Sound) -> &'static [&'static str] {
         Sound::SniperShot => &["sniper_shot_far"],
         Sound::FlameBurst => &["flame_burst_far"],
         Sound::GrenadeLaunch => &["grenade_launch_1_far"],
+        Sound::CatapultThrow => &["catapult_throw_far"],
         _ => &[],
     }
 }
@@ -73,7 +77,9 @@ fn distant_files(sound: Sound) -> &'static [&'static str] {
 /// How many screen widths beyond the edge of the view the sound is still heard.
 fn carry(sound: Sound) -> f32 {
     match sound {
-        Sound::BulletImpact => 0.15,
+        Sound::BulletImpact | Sound::BladeStrike => 0.15,
+        Sound::BowShot => 0.4,
+        Sound::CatapultThrow => 1.2,
         Sound::FlameBurst | Sound::GrenadeLaunch => 0.4,
         Sound::RifleShot | Sound::MachineGunShot => 0.6,
         Sound::FlakShot | Sound::MissileLaunch | Sound::SniperShot => 1.0,
@@ -88,7 +94,13 @@ fn carry(sound: Sound) -> f32 {
 /// How much one such sound on screen stirs the battle music; zero for anything but fighting.
 fn fury_raised_by(sound: Sound) -> f32 {
     match sound {
-        Sound::RifleShot | Sound::MachineGunShot | Sound::FlameBurst | Sound::GrenadeLaunch => 0.04,
+        Sound::RifleShot
+        | Sound::MachineGunShot
+        | Sound::FlameBurst
+        | Sound::GrenadeLaunch
+        | Sound::BowShot
+        | Sound::BladeStrike => 0.04,
+        Sound::CatapultThrow => 0.1,
         Sound::SniperShot | Sound::FlakShot | Sound::MissileLaunch => 0.07,
         Sound::CannonShot | Sound::HeavyCannonShot | Sound::HowitzerShot => 0.1,
         Sound::ShellExplosion => 0.08,
@@ -100,7 +112,11 @@ fn fury_raised_by(sound: Sound) -> f32 {
 /// How many copies may start within one throttle window, so a squad firing together stays readable.
 fn burst_limit(sound: Sound) -> usize {
     match sound {
-        Sound::RifleShot | Sound::MachineGunShot | Sound::BulletImpact => 3,
+        Sound::RifleShot
+        | Sound::MachineGunShot
+        | Sound::BulletImpact
+        | Sound::BowShot
+        | Sound::BladeStrike => 3,
         Sound::CannonShot
         | Sound::HeavyCannonShot
         | Sound::ShellExplosion
@@ -114,7 +130,7 @@ fn burst_limit(sound: Sound) -> usize {
 
 fn base_volume(sound: Sound) -> f32 {
     match sound {
-        Sound::RifleShot | Sound::MachineGunShot => 0.7,
+        Sound::RifleShot | Sound::MachineGunShot | Sound::BowShot | Sound::BladeStrike => 0.7,
         Sound::CannonShot | Sound::HeavyCannonShot | Sound::HowitzerShot => 0.5,
         Sound::BulletImpact => 0.35,
         Sound::UiClick | Sound::UnitAcknowledge => 0.5,

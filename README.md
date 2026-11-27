@@ -19,6 +19,7 @@ and explosions, which are built from public-domain recordings.
 - **Two factions:** the Coalition and the Syndicate, each with its own armoury, research and campaign.
 - **Campaign:** ten Coalition missions and the Syndicate missions, starting with a step-by-step tutorial.
 - **Skirmish:** random battles rolled from a seed, or your own levels made in the built-in battle editor.
+- **Ages:** fight with spears, bows, chariots and catapults in antiquity, or with today's army.
 - **Multiplayer:** up to four players over the network, with spectators, chat and replays.
 - **Tactics:** fog of war, engineers that capture, repair and lay mines, camouflaged snipers, aircraft and flak.
 - **Computer opponents** on three difficulties that build, expand, defend their harvesters and attack.
@@ -49,6 +50,7 @@ make help          # every target
 | --- | --- |
 | [Controls](docs/controls.md) | mouse, keyboard and rebindable keys |
 | [Rules](docs/rules.md) | factions, units, structures, research, economy, veterancy |
+| [Ages](docs/eras.md) | antiquity and the modern age, lines of units, promotion when the age turns |
 | [Missions and custom levels](docs/levels.md) | campaign, random battles, battle editor, level file format |
 | [Settings, saves and updates](docs/settings.md) | where settings and saves live, performance notes, update check |
 | [Sound and music](docs/audio.md) | effects, recorded gunfire, music, positional sound, voice reports |

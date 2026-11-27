@@ -10,7 +10,7 @@ use crate::world::map::{
     CELL_SIZE, GameMap, footprint_center, in_far_half, opposite_cell, opposite_origin,
 };
 
-const TURRET_TURN_RATE: f32 = 3.5;
+pub const TURRET_TURN_RATE: f32 = 3.5;
 
 pub fn spawn_unit(
     commands: &mut Commands,
@@ -60,10 +60,10 @@ pub fn spawn_unit(
     if kind.hides_when_still() {
         unit.insert(Camouflage::default());
     }
-    if kind == UnitKind::TroopCarrier {
+    if kind.carries_troops() {
         unit.insert(crate::sim::transport::Passengers::default());
     }
-    if kind == UnitKind::Harvester {
+    if kind.is_harvester() {
         unit.insert(Harvester {
             state: HarvestState::SeekingField,
             cargo: 0,

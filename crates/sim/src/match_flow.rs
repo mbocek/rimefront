@@ -6,6 +6,7 @@ use crate::sim::catalog::{BuildingKind, Diplomacy, Team, UnitKind};
 use crate::sim::combat::Targets;
 use crate::sim::determinism::{SimEntities, SimIds, SimulationRng};
 use crate::sim::economy::Economies;
+use crate::sim::eras::Era;
 use crate::sim::intel::Intel;
 use crate::sim::match_stats::MatchStats;
 use crate::sim::notifications::{LastAlert, Notifications};
@@ -97,6 +98,7 @@ pub fn reset_match_state(mut commands: Commands, level: Res<ActiveLevel>) {
     commands.insert_resource(Notifications::default());
     commands.insert_resource(LastAlert::default());
     commands.insert_resource(MatchClock::default());
+    commands.insert_resource(crate::sim::promotion::AgeTurned::default());
     commands.insert_resource(crate::world::weather::WeatherForecast::for_level(&level.0));
     commands.insert_resource(crate::level_events::EventsFired(vec![
         false;
@@ -142,7 +144,7 @@ pub fn scope_match_entities<Kind: Component>(
     }
 }
 
-fn forbidden_items(level: &crate::levels::LevelDefinition) -> Vec<BuildItem> {
+pub fn forbidden_items(level: &crate::levels::LevelDefinition) -> Vec<BuildItem> {
     let units = UnitKind::ALL
         .into_iter()
         .filter(|&k| !level.allows_unit(k))
@@ -186,8 +188,21 @@ impl Deployment {
     }
 }
 
-fn deploy_force(commands: &mut Commands, map: &mut GameMap, team: Team, force: &ForceSetup) {
-    deploy_force_at(commands, map, team, force, Deployment::on_level_site(force));
+fn deploy_force(
+    commands: &mut Commands,
+    map: &mut GameMap,
+    team: Team,
+    force: &ForceSetup,
+    era: Era,
+) {
+    deploy_force_at(
+        commands,
+        map,
+        team,
+        force,
+        Deployment::on_level_site(force),
+        era,
+    );
 }
 
 fn deploy_force_at(
@@ -196,11 +211,12 @@ fn deploy_force_at(
     team: Team,
     force: &ForceSetup,
     deployment: Deployment,
+    era: Era,
 ) {
     let base = deployment.base;
     spawn_building(commands, map, BuildingKind::CommandCenter, team, base);
     let mut own_buildings = vec![(base, BuildingKind::CommandCenter.spec().footprint)];
-    for &kind in &force.buildings {
+    for kind in force.buildings.iter().filter_map(|kind| kind.in_era(era)) {
         let context = PlacementContext {
             map,
             own_buildings: own_buildings.clone(),
@@ -211,7 +227,7 @@ fn deploy_force_at(
             warn!("no room for a starting {kind:?} of {team:?}");
             continue;
         };
-        construct_building(commands, map, kind, team, origin);
+        construct_building(commands, map, kind, team, origin, era);
         own_buildings.push((origin, kind.spec().footprint));
     }
 
@@ -219,7 +235,8 @@ fn deploy_force_at(
     let columns = 3;
     let lines_up_westward = in_far_half(base, BuildingKind::CommandCenter.spec().footprint);
     let direction = if lines_up_westward { -1 } else { 1 };
-    for (i, &kind) in force.units.iter().enumerate() {
+    let army = force.units.iter().filter_map(|kind| kind.in_era(era));
+    for (i, kind) in army.enumerate() {
         let slot = IVec2::new(i as i32 % columns, i as i32 / columns);
         let wanted = rally + slot * direction;
         let cell = map.nearest_passable(wanted).unwrap_or(wanted);
@@ -233,12 +250,13 @@ fn deploy_force_at(
 pub fn deploy_newcomer(world: &mut World, near: IVec2) -> Option<(Team, IVec2)> {
     let site = claim_starting_site(world, near)?;
     let team = admit_side(world);
+    let era = world.resource::<ActiveLevel>().0.era;
     let force = ForceSetup::default();
     world.resource_mut::<Economies>().of_mut(team).credits = force.credits;
     world.resource_scope(|world, mut map: Mut<GameMap>| {
         let mut commands = world.commands();
         let deployment = Deployment::on_generated_site(site);
-        deploy_force_at(&mut commands, &mut map, team, &force, deployment);
+        deploy_force_at(&mut commands, &mut map, team, &force, deployment, era);
     });
     world.flush();
     Some((team, site))
@@ -260,6 +278,7 @@ pub fn deploy_level_forces(
     let forbidden = forbidden_items(level);
     production.forbid_to_every_side(forbidden);
     production.set_player_faction(level.player_faction);
+    production.set_era(level.era);
     if restoring.is_some() || mirrored.is_some() {
         return;
     }
@@ -282,9 +301,15 @@ pub fn deploy_level_forces(
     if !rules.starting_forces {
         return;
     }
-    deploy_force(&mut commands, &mut map, Team::Azure, &level.player);
+    deploy_force(
+        &mut commands,
+        &mut map,
+        Team::Azure,
+        &level.player,
+        level.era,
+    );
     for (team, enemy) in level.opponents() {
-        deploy_force(&mut commands, &mut map, team, &enemy.force);
+        deploy_force(&mut commands, &mut map, team, &enemy.force, level.era);
     }
 }
 

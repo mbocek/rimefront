@@ -7,12 +7,13 @@ use serde::{Deserialize, Serialize};
 use crate::levels::{Difficulty, Personality};
 use crate::sim::abilities::{MINE_COST, Mine, lay_mine};
 use crate::sim::army_mix::{Sightings, counter_weight};
-use crate::sim::catalog::{ArmorClass, BuildingKind, Team, UnitKind};
+use crate::sim::catalog::{ArmorClass, BuildingKind, ProjectileStyle, Team, UnitKind};
 use crate::sim::combat::{DamageDealt, TargetInfo, Targets};
 use crate::sim::components::*;
 use crate::sim::determinism::{SimId, SimulationRng, in_simulation_order};
 use crate::sim::economy::Economies;
 use crate::sim::engineers::{EngineerJob, EngineerTask};
+use crate::sim::eras::{DefenceLine, UnitLine};
 use crate::sim::fog::FogOfWar;
 use crate::sim::intel::Intel;
 use crate::sim::movement::order_move;
@@ -36,7 +37,7 @@ const MAX_WAVE_SIZE: usize = 16;
 const SPLIT_WAVES_FROM: usize = 6;
 const FLANK_OFFSET: f32 = 24.0;
 const RAID_SIZE: usize = 3;
-const RAIDERS: [UnitKind; 3] = [UnitKind::Scout, UnitKind::RaiderBike, UnitKind::Gunship];
+const RAIDERS: [UnitLine; 3] = [UnitLine::Fast, UnitLine::Raider, UnitLine::Gunship];
 /// With no enemy soldier in sight for this long, whatever waits at home goes hunting.
 const QUIET_FRONT_SECS: f32 = 90.0;
 const BASE_DEFENSE_RADIUS: f32 = 16.0 * CELL_SIZE;
@@ -265,9 +266,17 @@ fn preference(personality: Personality, kind: UnitKind) -> f32 {
     }
 }
 
-fn mix_for(personality: Personality, mix: &[(UnitKind, f32)]) -> Vec<(UnitKind, f32)> {
+/// The wish list in the units of the current era; a commander likes a line as much in every age.
+fn mix_for(
+    personality: Personality,
+    mix: &[(UnitKind, f32)],
+    production: &Production,
+) -> Vec<(UnitKind, f32)> {
     mix.iter()
-        .map(|&(kind, weight)| (kind, weight * preference(personality, kind)))
+        .filter_map(|&(kind, weight)| {
+            let of_the_age = production.unit_of_the_age(kind)?;
+            Some((of_the_age, weight * preference(personality, kind)))
+        })
         .collect()
 }
 
@@ -342,7 +351,7 @@ pub fn command_enemies(
         );
         let harvesters = army
             .iter()
-            .filter(|(_, unit, team, ..)| **team == ai.team && unit.0 == UnitKind::Harvester)
+            .filter(|(_, unit, team, ..)| **team == ai.team && unit.0.is_harvester())
             .count();
         train_units(
             &mut rng,
@@ -367,7 +376,7 @@ pub fn command_enemies(
 
 /// Harvesters and engineers stay out of attack waves.
 fn fights(kind: UnitKind) -> bool {
-    !matches!(kind, UnitKind::Harvester | UnitKind::Engineer)
+    !kind.is_harvester() && !kind.is_engineer()
 }
 
 /// The three cells beside a turret on the side facing the middle of the map, where a short wall shields it.
@@ -396,7 +405,9 @@ pub fn fortify_turrets(
     {
         return;
     }
-    let wall = BuildingKind::Wall;
+    let Some(wall) = production.structure_of_the_age(BuildingKind::Wall) else {
+        return;
+    };
     let occupied: Vec<IVec2> = units.iter().map(|t| world_to_cell(t.translation)).collect();
     for ai in &commanders.0 {
         let owned = owned_building_kinds(&buildings, ai.team);
@@ -407,7 +418,7 @@ pub fn fortify_turrets(
         let mut turrets: Vec<IVec2> = buildings
             .iter()
             .filter(|(building, team)| {
-                **team == ai.team && building.kind == BuildingKind::GunTurret
+                **team == ai.team && building.kind.defence_line() == Some(DefenceLine::Tower)
             })
             .map(|(building, _)| building.origin)
             .collect();
@@ -420,7 +431,14 @@ pub fn fortify_turrets(
                 break;
             }
             if map.is_buildable(cell) && !occupied.contains(&cell) {
-                construct_building(&mut commands, &mut map, wall, ai.team, cell);
+                construct_building(
+                    &mut commands,
+                    &mut map,
+                    wall,
+                    ai.team,
+                    cell,
+                    production.era(),
+                );
                 economies.of_mut(ai.team).credits -= wall.spec().cost;
             }
         }
@@ -482,23 +500,22 @@ pub fn employ_engineers(
         let own = |team: &Team| *team == ai.team;
         let engineers: Vec<(Entity, bool)> = in_simulation_order(units, |unit| *unit.6)
             .into_iter()
-            .filter(|(_, unit, team, ..)| own(team) && unit.0 == UnitKind::Engineer)
+            .filter(|(_, unit, team, ..)| own(team) && unit.0.is_engineer())
             .map(|(entity, _, _, _, mobile, tasked, _)| (entity, tasked || mobile.is_moving()))
             .collect();
+        let Some(engineer) = production.unit_of_the_age(UnitKind::Engineer) else {
+            continue;
+        };
         let queued = production
             .lane(ai.team, Lane::Infantry)
             .queue
-            .contains(&BuildItem::Unit(UnitKind::Engineer));
+            .contains(&BuildItem::Unit(engineer));
         if engineers.is_empty() && !queued {
             let owned = owned_building_kinds(&buildings, ai.team);
-            let price = UnitKind::Engineer.spec().cost;
+            let price = engineer.spec().cost;
             if economies.of(ai.team).credits >= price + COMBAT_UNIT_RESERVE {
-                let _ = production.enqueue(
-                    &mut economies,
-                    ai.team,
-                    BuildItem::Unit(UnitKind::Engineer),
-                    &owned,
-                );
+                let _ =
+                    production.enqueue(&mut economies, ai.team, BuildItem::Unit(engineer), &owned);
             }
             continue;
         }
@@ -568,7 +585,7 @@ fn place_finished_structure(
         find_building_site(&context, ai.base, kind)
     };
     let origin = site?;
-    construct_building(commands, map, kind, ai.team, origin);
+    construct_building(commands, map, kind, ai.team, origin, production.era());
     production.lane_mut(ai.team, Lane::Structures).ready = None;
     Some(kind)
 }
@@ -647,35 +664,34 @@ fn plan_next_structure(
     if !production.lane(team, Lane::Structures).is_idle() {
         return None;
     }
-    let flak = BuildItem::Structure(BuildingKind::FlakCannon);
-    let flak_cannons = owned
-        .iter()
-        .filter(|&&k| k == BuildingKind::FlakCannon)
-        .count();
+    let flak_cannon = production.structure_of_the_age(BuildingKind::FlakCannon);
+    let flak_cannons = owned.iter().filter(|&&k| Some(k) == flak_cannon).count();
     let under_air_threat = sightings.share(ArmorClass::Aircraft) >= AIR_THREAT_SHARE;
     let flak_wanted = if owned.contains(&BuildingKind::Refinery) {
         FLAK_CANNONS_UNDER_AIR_THREAT
     } else {
         1
     };
-    let wants_flak = under_air_threat
-        && flak_cannons < flak_wanted
-        && production.allows(team, flak)
-        && flak.missing_requirement(owned).is_none();
+    let wanted_flak = flak_cannon.filter(|&flak_cannon| {
+        let flak = BuildItem::Structure(flak_cannon);
+        under_air_threat
+            && flak_cannons < flak_wanted
+            && production.allows(team, flak)
+            && flak.missing_requirement(owned).is_none()
+    });
     let mut planned_so_far = Vec::new();
     let next_in_plan = build_plan(personality)
         .iter()
-        .copied()
+        .filter_map(|&kind| production.structure_of_the_age(kind))
         .filter(|&kind| production.allows(team, BuildItem::Structure(kind)))
         .find(|&kind| {
             planned_so_far.push(kind);
             let wanted = planned_so_far.iter().filter(|&&k| k == kind).count();
             owned.iter().filter(|&&k| k == kind).count() < wanted
         });
-    let mut next = if wants_flak {
-        BuildingKind::FlakCannon
-    } else {
-        next_in_plan?
+    let mut next = match wanted_flak {
+        Some(flak_cannon) => flak_cannon,
+        None => next_in_plan?,
     };
 
     let economy = economies.of(team);
@@ -777,7 +793,9 @@ fn train_units(
         .count();
     let vehicles_idle = production.lane(team, Lane::Vehicles).queue.is_empty();
     let credits = economies.of(team).credits;
-    let stranded = harvesters == 0 && credits < UnitKind::Harvester.spec().cost;
+    let harvester = production.unit_of_the_age(UnitKind::Harvester);
+    let stranded =
+        harvester.is_some_and(|harvester| harvesters == 0 && credits < harvester.spec().cost);
     let reserve = if stranded {
         0
     } else {
@@ -796,13 +814,12 @@ fn train_units(
 
     if vehicles_idle {
         let wants_harvester = refineries > 0 && harvesters < refineries * HARVESTERS_PER_REFINERY;
-        if wants_harvester {
-            let _ =
-                production.enqueue(economies, team, BuildItem::Unit(UnitKind::Harvester), owned);
+        if let Some(harvester) = harvester.filter(|_| wants_harvester) {
+            let _ = production.enqueue(economies, team, BuildItem::Unit(harvester), owned);
         } else {
             let planned = ai.planned_vehicle.take().filter(|&kind| allowed(kind));
             if let Some(kind) = planned.or_else(|| {
-                let mix = mix_for(personality, &VEHICLE_MIX);
+                let mix = mix_for(personality, &VEHICLE_MIX, production);
                 pick_weighted(rng, &mix, sightings, allowed)
             }) {
                 if affordable(economies, kind) {
@@ -818,7 +835,7 @@ fn train_units(
     if infantry_queue < 2
         && let Some(kind) = pick_weighted(
             rng,
-            &mix_for(personality, &INFANTRY_MIX),
+            &mix_for(personality, &INFANTRY_MIX, production),
             sightings,
             allowed,
         )
@@ -898,7 +915,7 @@ fn direct_army(
         .map(|t| t.position);
     let harvesters: Vec<Entity> = army
         .iter()
-        .filter(|(_, unit, ..)| unit.0 == UnitKind::Harvester)
+        .filter(|(_, unit, ..)| unit.0.is_harvester())
         .map(|(entity, ..)| entity)
         .collect();
     let prey = visible_enemies
@@ -1023,7 +1040,7 @@ impl CarrierSeats {
     fn fill_from(&self, commands: &mut Commands, waiting_at_home: &mut Vec<WaitingUnit>) {
         let carriers: Vec<Entity> = waiting_at_home
             .iter()
-            .filter(|(_, kind, _)| *kind == UnitKind::TroopCarrier)
+            .filter(|(_, kind, _)| kind.carries_troops())
             .map(|(entity, ..)| *entity)
             .collect();
         for carrier in carriers {
@@ -1125,7 +1142,7 @@ fn busy_with_repairs(
 fn send_out_a_scout(ai: &mut AiCommander, waiting_at_home: &mut Vec<WaitingUnit>, site: Vec3) {
     let pick = waiting_at_home
         .iter()
-        .position(|(_, kind, _)| *kind == UnitKind::Scout)
+        .position(|(_, kind, _)| kind.line() == UnitLine::Fast)
         .or((!waiting_at_home.is_empty()).then_some(0));
     if let Some(index) = pick {
         let (scout, _, mut orders) = waiting_at_home.swap_remove(index);
@@ -1150,7 +1167,13 @@ fn launch_a_wave_when_ready(
     if !wave_ready && !finish_them_off {
         return;
     }
-    let flank = (waiting_at_home.len() >= SPLIT_WAVES_FROM)
+    let melee = waiting_at_home
+        .iter()
+        .filter(|(_, kind, _)| fights_hand_to_hand(*kind))
+        .count();
+    // Measured: split ancient waves lost Hard against Normal 7:14; whole ones won 14:6 (docs/eras.md).
+    let splits = waiting_at_home.len() >= SPLIT_WAVES_FROM && melee * 2 < waiting_at_home.len();
+    let flank = splits
         .then(|| flank_waypoint(map, home, objective))
         .flatten();
     for (index, (_, _, mut orders)) in waiting_at_home.into_iter().enumerate() {
@@ -1166,12 +1189,18 @@ fn launch_a_wave_when_ready(
     ai.wave_size = (ai.wave_size + growth).min(MAX_WAVE_SIZE);
 }
 
+fn fights_hand_to_hand(kind: UnitKind) -> bool {
+    kind.spec()
+        .weapon
+        .is_some_and(|weapon| weapon.style == ProjectileStyle::Strike)
+}
+
 /// Fast units waiting at home dash off to hunt an enemy harvester instead of waiting for the wave.
 fn raid(waiting_at_home: &mut Vec<WaitingUnit>, prey: Vec3) {
     for _ in 0..RAID_SIZE {
         let Some(index) = waiting_at_home
             .iter()
-            .position(|(_, kind, _)| RAIDERS.contains(kind))
+            .position(|(_, kind, _)| RAIDERS.contains(&kind.line()))
         else {
             return;
         };
@@ -1297,7 +1326,7 @@ pub fn mine_the_approaches(
     let mut engineers = in_simulation_order(
         engineers
             .iter_mut()
-            .filter(|engineer| engineer.1.0 == UnitKind::Engineer),
+            .filter(|engineer| engineer.1.0.is_engineer()),
         |engineer| *engineer.7,
     );
     for ai in &commanders.0 {
@@ -1365,7 +1394,10 @@ fn train_an_engineer(
     economies: &mut Economies,
     buildings: &Query<(&Building, &Team)>,
 ) {
-    let engineer = BuildItem::Unit(UnitKind::Engineer);
+    let Some(engineer) = production.unit_of_the_age(UnitKind::Engineer) else {
+        return;
+    };
+    let engineer = BuildItem::Unit(engineer);
     let queued = production
         .lane(team, Lane::Infantry)
         .queue
@@ -1437,7 +1469,7 @@ pub fn defend_harvesters(
             .filter(|(unit, owner, transform, mobile, attack, orders, _)| {
                 **owner == team
                     && fights(unit.0)
-                    && unit.0 != UnitKind::Engineer
+                    && !unit.0.is_engineer()
                     && !mobile.is_moving()
                     && attack.is_none_or(|attack| attack.target.is_none())
                     && orders.current.is_none()

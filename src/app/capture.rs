@@ -63,6 +63,9 @@ const CAPTURE_CLAIM_SITES_VAR: &str = "RIMEFRONT_CAPTURE_CLAIM_SITES";
 const CAPTURE_WORLD_VAR: &str = "RIMEFRONT_CAPTURE_WORLD";
 /// `RIMEFRONT_CAPTURE_DESTROY=1` destroys the player's vehicles two seconds in, to show their wrecks.
 const CAPTURE_DESTROY_VAR: &str = "RIMEFRONT_CAPTURE_DESTROY";
+/// `RIMEFRONT_CAPTURE_AGE=Modern` turns the battle to that age two seconds in and has the player promote
+/// everything they own, to show the age turning.
+const CAPTURE_AGE_VAR: &str = "RIMEFRONT_CAPTURE_AGE";
 /// `RIMEFRONT_CAPTURE_SCENE_ONLY=1` hides the interface, for pictures such as the main menu's backdrop.
 const CAPTURE_SCENE_ONLY_VAR: &str = "RIMEFRONT_CAPTURE_SCENE_ONLY";
 const LOAD_AFTER_SECS: f32 = 1.5;
@@ -141,6 +144,7 @@ impl Plugin for CapturePlugin {
                 decide_requested_outcome,
                 claim_requested_sites,
                 destroy_own_vehicles.run_if(|| std::env::var_os(CAPTURE_DESTROY_VAR).is_some()),
+                turn_the_age_and_promote.run_if(|| std::env::var_os(CAPTURE_AGE_VAR).is_some()),
             )
                 .run_if(in_state(GameState::Playing)),
         );
@@ -381,6 +385,35 @@ fn claim_requested_sites(world: &mut World) {
     for _ in claimed..sites {
         crate::world::sites::claim_starting_site(world, home);
     }
+}
+
+fn turn_the_age_and_promote(
+    mut done: Local<bool>,
+    clock: Res<crate::app::match_flow::MatchClock>,
+    mut level: ResMut<ActiveLevel>,
+    mut economies: ResMut<crate::sim::economy::Economies>,
+    mut issuer: crate::sim::player_commands::CommandIssuer,
+    owned: Query<(&crate::sim::determinism::SimId, &Team)>,
+) {
+    if *done || clock.elapsed_secs < 2.0 {
+        return;
+    }
+    *done = true;
+    let Some(era) = std::env::var(CAPTURE_AGE_VAR)
+        .ok()
+        .and_then(|name| serde_json::from_value(serde_json::Value::String(name)).ok())
+    else {
+        return;
+    };
+    level.0.era = era;
+    let team = issuer.team();
+    economies.of_mut(team).credits += 20_000;
+    let ids = owned
+        .iter()
+        .filter(|(_, owner)| **owner == team)
+        .map(|(&id, _)| id)
+        .collect();
+    issuer.issue(crate::sim::player_commands::PlayerCommand::Promote { ids });
 }
 
 fn destroy_own_vehicles(

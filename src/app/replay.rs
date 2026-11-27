@@ -13,6 +13,7 @@ use crate::sim::combat::{Impact, Projectile};
 use crate::sim::components::WallSegment;
 use crate::sim::components::{Aircraft, Building, Health, Mobile, Unit};
 use crate::sim::cues::BlastSize;
+use crate::sim::eras::Era;
 use crate::sim::movement::FLIGHT_ALTITUDE;
 use crate::sim::neutral_sites::UnclaimedSite;
 use crate::sim::outcome::GameOutcome;
@@ -72,12 +73,15 @@ fn unpack(packed: [i16; 3]) -> Vec3 {
     Vec3::from_array(packed.map(f32::from)) / DECIMETRES_PER_METER
 }
 
-const SHOT_STYLES: [ProjectileStyle; 5] = [
+const SHOT_STYLES: [ProjectileStyle; 8] = [
     ProjectileStyle::Bullet,
     ProjectileStyle::Shell,
     ProjectileStyle::ArtilleryShell,
     ProjectileStyle::Missile,
     ProjectileStyle::Flame,
+    ProjectileStyle::Arrow,
+    ProjectileStyle::Boulder,
+    ProjectileStyle::Strike,
 ];
 const BLAST_SIZES: [BlastSize; 3] = [
     BlastSize::ShellImpact,
@@ -106,11 +110,29 @@ const BUILDING_LOOKS_START: u8 = 100;
 /// Stands in an actor's team byte for a neutral site nobody holds.
 const UNCLAIMED_CODE: u8 = u8::MAX;
 
-/// New kinds go at the end, so the codes in replays recorded before them keep their meaning.
+/// Append only: a replay stores a structure's look as its place here.
+const BUILDING_LOOKS: [BuildingKind; 17] = [
+    BuildingKind::CommandCenter,
+    BuildingKind::PowerPlant,
+    BuildingKind::Refinery,
+    BuildingKind::Barracks,
+    BuildingKind::Factory,
+    BuildingKind::TechCenter,
+    BuildingKind::RepairBay,
+    BuildingKind::Helipad,
+    BuildingKind::GunTurret,
+    BuildingKind::FlakCannon,
+    BuildingKind::RocketBunker,
+    BuildingKind::Wall,
+    BuildingKind::SupplyDepot,
+    BuildingKind::ObservationPost,
+    BuildingKind::FieldHospital,
+    BuildingKind::Watchtower,
+    BuildingKind::Palisade,
+];
+
 fn all_buildings() -> impl Iterator<Item = BuildingKind> {
-    std::iter::once(BuildingKind::CommandCenter)
-        .chain(BuildingKind::CONSTRUCTIBLE)
-        .chain(BuildingKind::NEUTRAL_SITES)
+    BUILDING_LOOKS.into_iter()
 }
 
 impl Look {
@@ -723,12 +745,17 @@ pub fn fly_replay_shots(
     }
 }
 
-fn spawn_actor(commands: &mut Commands, models: &ModelLibrary, actor: Actor) -> Option<Entity> {
+fn spawn_actor(
+    commands: &mut Commands,
+    models: &ModelLibrary,
+    actor: Actor,
+    era: Era,
+) -> Option<Entity> {
     let look = actor.look()?;
     let model = match look {
         Look::Unit(kind) => models.unit(kind, actor.team()),
         Look::Building(kind) => match actor.holder() {
-            Some(team) => models.building(kind, team),
+            Some(team) => models.building(kind, team, era),
             None => models.unclaimed_site(kind),
         },
     };
@@ -838,7 +865,7 @@ pub fn play_replay(
                 }
             }
             None => {
-                if let Some(entity) = spawn_actor(&mut commands, &models, *actor) {
+                if let Some(entity) = spawn_actor(&mut commands, &models, *actor, level.0.era) {
                     commands.entity(entity).insert(placed);
                     playback.actors.insert(actor.id(), entity);
                 }
@@ -885,6 +912,24 @@ pub fn refresh_replay_hud(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn structure_looks_keep_the_codes_of_older_replays() {
+        assert_eq!(Look::Building(BuildingKind::Wall).code(), 111);
+        assert_eq!(Look::Building(BuildingKind::SupplyDepot).code(), 112);
+        assert_eq!(Look::Building(BuildingKind::FieldHospital).code(), 114);
+        let every_structure = std::iter::once(BuildingKind::CommandCenter)
+            .chain(BuildingKind::CONSTRUCTIBLE)
+            .chain(BuildingKind::NEUTRAL_SITES);
+        for kind in every_structure {
+            let code = Look::Building(kind).code();
+            assert_eq!(
+                Look::from_code(code),
+                Some(Look::Building(kind)),
+                "{kind:?}"
+            );
+        }
+    }
 
     fn frame(time: f32, x: f32) -> Frame {
         let actor = Actor::new(

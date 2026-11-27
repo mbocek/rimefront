@@ -26,7 +26,7 @@ sounds hollow and metallic.
 
 Units also make steady noise: tracked and wheeled engines that idle quietly and roar when they drive (their
 exhaust bark, valves and track links carry them on small speakers, which drop the low diesel buzz), the
-Gunship's rotors, a squad's boots on the march, a harvester grinding crystal and engineers hammering and
+Gunship's rotors, a squad's boots on the march, the hooves and creaking carts of an ancient army, a harvester grinding crystal and engineers hammering and
 welding at a structure under repair or just placed. Each is one seamless loop for every unit making it,
 louder the more of them are in view (but ten tanks are not ten times one) and coming from where most of them
 are; it follows the same rules of screen, zoom and fog and falls silent while the game is paused.

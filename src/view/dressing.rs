@@ -1,14 +1,19 @@
 use bevy::prelude::*;
 
+use crate::missions::levels::ActiveLevel;
 use crate::sim::abilities::Mine;
-use crate::sim::catalog::{ArmorClass, HARVESTER_CAPACITY, Team};
+use crate::sim::catalog::{ArmorClass, BuildingKind, HARVESTER_CAPACITY, Team};
 use crate::sim::combat::{DamageSource, Destroyed};
 use crate::sim::components::{Building, Harvester, Mobile, Turret, Unit};
+use crate::sim::eras::Era;
 use crate::sim::neutral_sites::UnclaimedSite;
 use crate::sim::sorties::{ON_THE_PAD_HEIGHT, Sortie};
-use crate::view::animation::{animated_building_model, animated_unit_model, spawn_corpse};
+use crate::view::animation::{
+    AnimatedModel, AnimationLink, animated_building_model, animated_unit_model, spawn_corpse,
+};
 use crate::view::assets::{ModelLibrary, named_node};
 use crate::view::local_view::LocalView;
+use crate::view::wall_joints::{WallJoints, WallRun};
 
 pub fn dress_new_unit(
     added: On<Add<Unit>>,
@@ -29,6 +34,7 @@ pub fn dress_new_building(
     added: On<Add<Building>>,
     buildings: Query<(&Building, Option<&Team>, Has<UnclaimedSite>)>,
     models: Res<ModelLibrary>,
+    level: Res<ActiveLevel>,
     mut commands: Commands,
 ) {
     let Ok((building, team, unclaimed)) = buildings.get(added.entity) else {
@@ -37,7 +43,10 @@ pub fn dress_new_building(
     let mut dressed = commands.entity(added.entity);
     match (team, unclaimed) {
         (Some(&team), false) => {
-            dressed.insert(models.building(building.kind, team));
+            dressed.insert((
+                models.building(building.kind, team, level.0.era),
+                DressedAs(building.kind),
+            ));
             if let Some(animated) = animated_building_model(building.kind) {
                 dressed.insert(animated);
             }
@@ -45,6 +54,72 @@ pub fn dress_new_building(
         _ => {
             dressed.insert(models.unclaimed_site(building.kind));
         }
+    }
+}
+
+/// The structure kind a building's model shows; a promotion changes the kind under it.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub struct DressedAs(BuildingKind);
+
+/// A promoted unit or defence is the same entity under a new kind, so it takes the model of its new self and
+/// its turret, animations and wall runs link again.
+pub fn redress_promoted(
+    units: Query<(Entity, &Unit, &Team, &AnimatedModel), Changed<Unit>>,
+    buildings: Query<(Entity, &Building, &Team, &DressedAs), Changed<Building>>,
+    level: Res<ActiveLevel>,
+    models: Res<ModelLibrary>,
+    children: Query<&Children>,
+    runs: Query<(), With<WallRun>>,
+    mut commands: Commands,
+) {
+    for (entity, unit, &team, shown) in &units {
+        let wanted = animated_unit_model(unit.0);
+        if shown.0 == wanted.0 {
+            continue;
+        }
+        commands
+            .entity(entity)
+            .insert((models.unit(unit.0, team), wanted))
+            .remove::<(AnimationLink, TurretNode, OreLoadLink)>();
+    }
+    for (entity, building, &team, &DressedAs(shown)) in &buildings {
+        if shown == building.kind {
+            continue;
+        }
+        let mut redressed = commands.entity(entity);
+        redressed
+            .insert((
+                models.building(building.kind, team, level.0.era),
+                DressedAs(building.kind),
+            ))
+            .remove::<(AnimationLink, TurretNode, AnimatedModel, WallJoints)>();
+        if let Some(animated) = animated_building_model(building.kind) {
+            redressed.insert(animated);
+        }
+        for &child in children.get(entity).into_iter().flatten() {
+            if runs.contains(child) {
+                commands.entity(child).despawn();
+            }
+        }
+    }
+}
+
+/// When the age turns, every structure that stays the same building takes on the look of the new one.
+pub fn redress_buildings_for_the_age(
+    level: Res<ActiveLevel>,
+    mut dressed_for: Local<Option<Era>>,
+    buildings: Query<(Entity, &Building, &Team), Without<UnclaimedSite>>,
+    models: Res<ModelLibrary>,
+    mut commands: Commands,
+) {
+    let era = level.0.era;
+    if dressed_for.replace(era).is_none_or(|before| before == era) {
+        return;
+    }
+    for (entity, building, &team) in &buildings {
+        commands
+            .entity(entity)
+            .insert(models.building(building.kind, team, era));
     }
 }
 

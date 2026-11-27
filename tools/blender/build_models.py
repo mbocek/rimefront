@@ -10,7 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rimefront_models import buildings, decorations, nature, ore, soldier, units, upgrades, vegetation  # noqa: E402
+from rimefront_models import (antiquity, buildings, decorations, nature, ore, soldier, units, upgrades,  # noqa: E402
+                              vegetation)
 from rimefront_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # noqa: E402
 from rimefront_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
 from rimefront_models.parts import TURRET, begin_model  # noqa: E402
@@ -62,6 +63,25 @@ TEAM_MODELS = {
     "supply_depot": (buildings.build_supply_depot, BUILDING_TRIANGLE_BUDGET),
     "observation_post": (buildings.build_observation_post, BUILDING_TRIANGLE_BUDGET),
     "field_hospital": (buildings.build_field_hospital, BUILDING_TRIANGLE_BUDGET),
+    "spearman": (antiquity.build_spearman, UNIT_TRIANGLE_BUDGET),
+    "archer": (antiquity.build_archer, UNIT_TRIANGLE_BUDGET),
+    "healer": (antiquity.build_healer, UNIT_TRIANGLE_BUDGET),
+    "builder": (antiquity.build_builder, UNIT_TRIANGLE_BUDGET),
+    "horseman": (antiquity.build_horseman, UNIT_TRIANGLE_BUDGET),
+    "chariot": (antiquity.build_chariot, UNIT_TRIANGLE_BUDGET),
+    "catapult": (antiquity.build_catapult, UNIT_TRIANGLE_BUDGET),
+    "wagon": (antiquity.build_wagon, UNIT_TRIANGLE_BUDGET),
+    "ore_cart": (antiquity.build_ore_cart, UNIT_TRIANGLE_BUDGET),
+    "watchtower": (antiquity.build_watchtower, BUILDING_TRIANGLE_BUDGET),
+    "palisade": (antiquity.build_palisade, 4_000),
+    "palisade_link": (antiquity.build_palisade_link, 2_000),
+    "command_center_antiquity": (antiquity.build_command_center_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "power_plant_antiquity": (antiquity.build_power_plant_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "refinery_antiquity": (antiquity.build_refinery_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "barracks_antiquity": (antiquity.build_barracks_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "factory_antiquity": (antiquity.build_factory_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "tech_center_antiquity": (antiquity.build_tech_center_antiquity, BUILDING_TRIANGLE_BUDGET),
+    "repair_bay_antiquity": (antiquity.build_repair_bay_antiquity, BUILDING_TRIANGLE_BUDGET),
 }
 ICON_ONLY_MODELS = {
     "upgrade_armour": upgrades.build_armour_upgrade,
@@ -96,7 +116,7 @@ NEUTRAL_MODELS = {
     "bush_round": (vegetation.build_bush_round, 2_000),
     "bush_flowering": (vegetation.build_bush_flowering, 2_000),
 }
-MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker"}
+MODELS_WITH_TURRET = {"troop_carrier", "tank", "stealth_tank", "artillery", "scout", "gun_turret", "bulwark", "flak_track", "flak_cannon", "missile_truck", "rocket_bunker", "watchtower"}
 INFANTRY_NODES = ("Rig", "Body", "hips", "chest", "head", "rifle", "hand.L", "hand.R")
 INFANTRY_CLIPS = {"Idle": None, "Walk": None, "KneelFire": None, "Death": None}
 REQUIRED_NODES = {
@@ -108,6 +128,11 @@ REQUIRED_NODES = {
     "sniper": INFANTRY_NODES,
     "flame_trooper": INFANTRY_NODES,
     "grenadier": INFANTRY_NODES,
+    "spearman": INFANTRY_NODES,
+    "archer": INFANTRY_NODES,
+    "healer": INFANTRY_NODES,
+    "builder": INFANTRY_NODES,
+    "ore_cart": ("OreLoad", "CollectorDrum"),
     "gunship": ("Rotor", "TailRotor"),
     "bomber": ("LandingGearL", "LandingGearR", "LandingGearN"),
     "fighter": ("LandingGearL", "LandingGearR", "LandingGearN"),
@@ -123,6 +148,11 @@ REQUIRED_ANIMATIONS = {
     "sniper": INFANTRY_CLIPS,
     "flame_trooper": INFANTRY_CLIPS,
     "grenadier": INFANTRY_CLIPS,
+    "spearman": INFANTRY_CLIPS,
+    "archer": INFANTRY_CLIPS,
+    "healer": INFANTRY_CLIPS,
+    "builder": INFANTRY_CLIPS,
+    "ore_cart": {"Drive": None, "Work": "CollectorDrum"},
     "missile_truck": {"Drive": None, "Fire": "Barrel"},
     "rocket_bunker": {"Fire": "Barrel"},
     "bulwark": {"Drive": None, "Fire": "Barrel"},

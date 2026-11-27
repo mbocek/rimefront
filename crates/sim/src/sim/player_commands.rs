@@ -5,7 +5,7 @@ use crate::sim::intel::Intel;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::sim::catalog::{ArmorClass, BuildingKind, Diplomacy, Team, UnitKind};
+use crate::sim::catalog::{ArmorClass, BuildingKind, Diplomacy, Team};
 use crate::sim::components::*;
 use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
@@ -16,6 +16,7 @@ use crate::sim::production::{
     BuildItem, Lane, Production, affordable_wall_line, construct_building, owned_building_kinds,
     placement_context,
 };
+use crate::sim::promotion::near_a_producer;
 use crate::sim::sides::Shelter;
 use crate::sim::structures::{StructureOrder, StructureOrderKind};
 use crate::sim::support_powers::{SupportPower, SupportPowers, owned_kinds};
@@ -120,6 +121,11 @@ pub enum PlayerCommand {
     },
     /// In a world: stop being anyone's ally.
     LeaveAlliance,
+    /// Queue a promotion into the current age for each unit and defence among `ids` that has a successor;
+    /// a unit only near a structure that builds its successor.
+    Promote {
+        ids: Vec<SimId>,
+    },
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -383,6 +389,7 @@ impl Battlefield<'_, '_> {
                 leave_alliance(&mut self.diplomacy, &mut self.news, team)
             }
             PlayerCommand::OfferAlliance { .. } | PlayerCommand::LeaveAlliance => {}
+            PlayerCommand::Promote { ids } => self.promote(team, &ids),
             PlayerCommand::OrderStructure { building, kind } => {
                 if let Some(building) = self.own_structure(team, building) {
                     self.structure_orders.write(StructureOrder {
@@ -421,7 +428,7 @@ impl Battlefield<'_, '_> {
     fn own_carrier(&self, team: Team, entity: Entity) -> bool {
         self.units
             .get(entity)
-            .is_ok_and(|unit| *unit.2 == team && unit.1.0 == UnitKind::TroopCarrier)
+            .is_ok_and(|unit| *unit.2 == team && unit.1.0.carries_troops())
     }
 
     fn board(&mut self, team: Team, ids: &[SimId], carrier: SimId) {
@@ -526,7 +533,7 @@ impl Battlefield<'_, '_> {
             let is_engineer = self
                 .units
                 .get(entity)
-                .is_ok_and(|unit| unit.1.0 == UnitKind::Engineer);
+                .is_ok_and(|unit| unit.1.0.is_engineer());
             if is_engineer {
                 self.commands
                     .entity(entity)
@@ -541,7 +548,7 @@ impl Battlefield<'_, '_> {
             let Ok((_, unit, _, transform, ..)) = self.units.get(entity) else {
                 continue;
             };
-            if unit.0 != UnitKind::Engineer {
+            if !unit.0.is_engineer() {
                 continue;
             }
             let cell = world_to_cell(transform.translation);
@@ -678,12 +685,64 @@ impl Battlefield<'_, '_> {
         if !placeable {
             return;
         }
-        construct_building(&mut self.commands, &mut self.map, kind, team, origin);
+        construct_building(
+            &mut self.commands,
+            &mut self.map,
+            kind,
+            team,
+            origin,
+            self.production.era(),
+        );
         self.production.lane_mut(team, Lane::Structures).ready = None;
     }
 
+    fn promote(&mut self, team: Team, ids: &[SimId]) {
+        let era = self.production.era();
+        let owned = owned_building_kinds(&self.owners, team);
+        let mut sorted = ids.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        for id in sorted {
+            let Some(entity) = self.ids.get(id) else {
+                continue;
+            };
+            let item = if let Ok((_, unit, owner, transform, ..)) = self.units.get(entity) {
+                let into = unit.0.promoted_into(era).filter(|_| *owner == team);
+                let Some(into) = into.filter(|&into| {
+                    near_a_producer(transform.translation, into, team, self.owners.iter())
+                }) else {
+                    continue;
+                };
+                BuildItem::Promotion { unit: id, into }
+            } else if let Ok((building, owner, _)) = self.structures.get(entity) {
+                let into = building.kind.promoted_into(era);
+                let Some(into) = into.filter(|_| owner == Some(&team)) else {
+                    continue;
+                };
+                BuildItem::Fortification {
+                    structure: id,
+                    into,
+                }
+            } else {
+                continue;
+            };
+            if self.production.is_promoting(team, id) {
+                continue;
+            }
+            if let Err(refusal) = self
+                .production
+                .enqueue(&mut self.economies, team, item, &owned)
+            {
+                self.news.write(News::to(team, SideNews::Refused(refusal)));
+                return;
+            }
+        }
+    }
+
     fn lay_wall(&mut self, team: Team, from: IVec2, to: IVec2) {
-        let wall = BuildingKind::Wall;
+        let Some(wall) = self.production.structure_of_the_age(BuildingKind::Wall) else {
+            return;
+        };
         let owned = owned_building_kinds(&self.owners, team);
         let item = BuildItem::Structure(wall);
         if !self.production.allows(team, item) || item.missing_requirement(&owned).is_some() {
@@ -694,10 +753,11 @@ impl Battlefield<'_, '_> {
             let known_ground = self.intel.vision(team);
             let mut context =
                 placement_context(&self.map, team, known_ground, &self.owners, &self.positions);
-            affordable_wall_line(&mut context, from, to, credits)
+            affordable_wall_line(&mut context, wall, from, to, credits)
         };
         for &cell in &segments {
-            construct_building(&mut self.commands, &mut self.map, wall, team, cell);
+            let era = self.production.era();
+            construct_building(&mut self.commands, &mut self.map, wall, team, cell, era);
         }
         self.economies.of_mut(team).credits -= segments.len() as i32 * wall.spec().cost;
     }

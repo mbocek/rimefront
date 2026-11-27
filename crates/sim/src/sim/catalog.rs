@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::cues::Sound;
+use crate::sim::eras::{DefenceLine, Era, Eras, UnitLine};
 
 /// A side in the battle. The first four are the sides a level names; a world that players join has more.
 /// Which side is played from this machine is `LocalTeam`, not necessarily `Team::Azure`.
@@ -347,6 +348,10 @@ pub enum ProjectileStyle {
     ArtilleryShell,
     Missile,
     Flame,
+    Arrow,
+    Boulder,
+    /// A blow struck at arm's length: nothing flies, the hit lands at once.
+    Strike,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -404,9 +409,20 @@ pub enum UnitKind {
     Bomber,
     Fighter,
     TroopCarrier,
+    Spearman,
+    Archer,
+    Healer,
+    Builder,
+    Horseman,
+    Chariot,
+    Catapult,
+    Wagon,
+    OreCart,
 }
 
 pub struct UnitSpec {
+    pub era: Era,
+    pub line: UnitLine,
     pub name: &'static str,
     pub role: &'static str,
     pub model_id: &'static str,
@@ -432,7 +448,11 @@ pub struct UnitSpec {
 }
 
 impl UnitKind {
-    pub const INFANTRY: [UnitKind; 7] = [
+    pub const INFANTRY: [UnitKind; 11] = [
+        UnitKind::Spearman,
+        UnitKind::Archer,
+        UnitKind::Healer,
+        UnitKind::Builder,
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Grenadier,
@@ -441,7 +461,12 @@ impl UnitKind {
         UnitKind::Medic,
         UnitKind::Engineer,
     ];
-    pub const VEHICLES: [UnitKind; 14] = [
+    pub const VEHICLES: [UnitKind; 19] = [
+        UnitKind::Horseman,
+        UnitKind::Chariot,
+        UnitKind::Catapult,
+        UnitKind::Wagon,
+        UnitKind::OreCart,
         UnitKind::Scout,
         UnitKind::TroopCarrier,
         UnitKind::RaiderBike,
@@ -458,7 +483,7 @@ impl UnitKind {
         UnitKind::Harvester,
     ];
     /// New kinds go at the end: replays store a unit's look as its place in this list.
-    pub const ALL: [UnitKind; 21] = [
+    pub const ALL: [UnitKind; 30] = [
         UnitKind::Rifleman,
         UnitKind::Rocketeer,
         UnitKind::Medic,
@@ -480,6 +505,15 @@ impl UnitKind {
         UnitKind::Bomber,
         UnitKind::Fighter,
         UnitKind::TroopCarrier,
+        UnitKind::Spearman,
+        UnitKind::Archer,
+        UnitKind::Healer,
+        UnitKind::Builder,
+        UnitKind::Horseman,
+        UnitKind::Chariot,
+        UnitKind::Catapult,
+        UnitKind::Wagon,
+        UnitKind::OreCart,
     ];
 
     pub fn flies(self) -> bool {
@@ -509,6 +543,15 @@ impl UnitKind {
             UnitKind::Bomber => &BOMBER,
             UnitKind::Fighter => &FIGHTER,
             UnitKind::TroopCarrier => &TROOP_CARRIER,
+            UnitKind::Spearman => &SPEARMAN,
+            UnitKind::Archer => &ARCHER,
+            UnitKind::Healer => &HEALER,
+            UnitKind::Builder => &BUILDER,
+            UnitKind::Horseman => &HORSEMAN,
+            UnitKind::Chariot => &CHARIOT,
+            UnitKind::Catapult => &CATAPULT,
+            UnitKind::Wagon => &WAGON,
+            UnitKind::OreCart => &ORE_CART,
         }
     }
 
@@ -545,9 +588,13 @@ pub enum BuildingKind {
     SupplyDepot,
     ObservationPost,
     FieldHospital,
+    Watchtower,
+    Palisade,
 }
 
 pub struct BuildingSpec {
+    pub era: Eras,
+    pub line: Option<DefenceLine>,
     pub name: &'static str,
     pub role: &'static str,
     pub model_id: &'static str,
@@ -565,7 +612,7 @@ pub struct BuildingSpec {
 }
 
 impl BuildingKind {
-    pub const CONSTRUCTIBLE: [BuildingKind; 11] = [
+    pub const CONSTRUCTIBLE: [BuildingKind; 13] = [
         BuildingKind::PowerPlant,
         BuildingKind::Refinery,
         BuildingKind::Barracks,
@@ -577,6 +624,8 @@ impl BuildingKind {
         BuildingKind::FlakCannon,
         BuildingKind::RocketBunker,
         BuildingKind::Wall,
+        BuildingKind::Watchtower,
+        BuildingKind::Palisade,
     ];
 
     /// Stand unclaimed on the map until an engineer takes one; nobody builds them.
@@ -592,7 +641,7 @@ impl BuildingKind {
 
     /// Walls are bought segment by segment while being placed, and do not keep a defeated side alive.
     pub fn is_wall(self) -> bool {
-        self == BuildingKind::Wall
+        self.spec().line == Some(DefenceLine::Wall)
     }
 
     /// Walls and captured neutral sites do not keep a side in the war.
@@ -617,6 +666,8 @@ impl BuildingKind {
             BuildingKind::SupplyDepot => &SUPPLY_DEPOT,
             BuildingKind::ObservationPost => &OBSERVATION_POST,
             BuildingKind::FieldHospital => &FIELD_HOSPITAL,
+            BuildingKind::Watchtower => &WATCHTOWER,
+            BuildingKind::Palisade => &PALISADE,
         }
     }
 }
@@ -851,6 +902,8 @@ const BUNKER_ROCKETS: WeaponSpec = WeaponSpec {
 };
 
 const RIFLEMAN: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Infantry,
     name: "Rifleman",
     role: "Cheap infantry. Strong against soldiers, weak against armor.",
     model_id: "rifleman",
@@ -871,6 +924,8 @@ const RIFLEMAN: UnitSpec = UnitSpec {
 };
 
 const SCOUT: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Fast,
     name: "Scout Buggy",
     role: "Fast wheeled raider with a roof machine gun. Hunts infantry.",
     model_id: "scout",
@@ -891,6 +946,8 @@ const SCOUT: UnitSpec = UnitSpec {
 };
 
 const TROOP_CARRIER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Transport,
     name: "Troop Carrier",
     role: "Armoured wheels for five infantry, who fire from its hatches. A light machine gun of its own.",
     model_id: "troop_carrier",
@@ -911,6 +968,8 @@ const TROOP_CARRIER: UnitSpec = UnitSpec {
 };
 
 const TANK: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Main,
     name: "Battle Tank",
     role: "Main battle tank. Heavy cannon, thick armor.",
     model_id: "tank",
@@ -931,6 +990,8 @@ const TANK: UnitSpec = UnitSpec {
 };
 
 const ARTILLERY: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Siege,
     name: "Howitzer",
     role: "Long-range artillery. Splash damage, devastating against bases.",
     model_id: "artillery",
@@ -951,6 +1012,8 @@ const ARTILLERY: UnitSpec = UnitSpec {
 };
 
 const HARVESTER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Harvester,
     name: "Harvester",
     role: "Mines crystals and delivers them to a refinery. Unarmed.",
     model_id: "harvester",
@@ -999,6 +1062,8 @@ const TWIN_CANNON: WeaponSpec = WeaponSpec {
 };
 
 const ROCKETEER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::AntiArmour,
     name: "Rocketeer",
     role: "Anti-armour infantry with a guided missile launcher. Weak against soldiers.",
     model_id: "rocketeer",
@@ -1019,6 +1084,8 @@ const ROCKETEER: UnitSpec = UnitSpec {
 };
 
 const MEDIC: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Healer,
     name: "Field Medic",
     role: "Unarmed. Treats wounded infantry nearby and follows the squad.",
     model_id: "medic",
@@ -1039,6 +1106,8 @@ const MEDIC: UnitSpec = UnitSpec {
 };
 
 const ENGINEER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Builder,
     name: "Engineer",
     role: "Unarmed. Right-click an enemy structure to capture it, or a damaged own one to repair it fully.",
     model_id: "engineer",
@@ -1073,6 +1142,8 @@ const ROCKET_PODS: WeaponSpec = WeaponSpec {
 };
 
 const GUNSHIP: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Gunship,
     name: "Gunship",
     role: "Attack helicopter with rocket pods. Flies over anything; tanks and howitzers cannot hit it.",
     model_id: "gunship",
@@ -1093,6 +1164,8 @@ const GUNSHIP: UnitSpec = UnitSpec {
 };
 
 const BULWARK: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Heavy,
     name: "Bulwark",
     role: "Heavy assault tank with twin cannons. Slow but very hard to stop.",
     model_id: "bulwark",
@@ -1113,6 +1186,8 @@ const BULWARK: UnitSpec = UnitSpec {
 };
 
 const FLAK_TRACK: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::AntiAir,
     name: "Flak Track",
     role: "Mobile anti-aircraft gun. Shreds gunships, weak against armour.",
     model_id: "flak_track",
@@ -1133,6 +1208,8 @@ const FLAK_TRACK: UnitSpec = UnitSpec {
 };
 
 const SNIPER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Marksman,
     name: "Sniper",
     role: "Marksman who drops infantry from far away. Useless against armour.",
     model_id: "sniper",
@@ -1153,6 +1230,8 @@ const SNIPER: UnitSpec = UnitSpec {
 };
 
 const FLAME_TROOPER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Flame,
     name: "Flame Trooper",
     role: "Burns out infantry and buildings at close range. Weak against armour.",
     model_id: "flame_trooper",
@@ -1173,6 +1252,8 @@ const FLAME_TROOPER: UnitSpec = UnitSpec {
 };
 
 const GRENADIER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Ranged,
     name: "Grenadier",
     role: "Lobs grenades into groups of soldiers and at buildings. Slow to reload, weak against armour.",
     model_id: "grenadier",
@@ -1193,6 +1274,8 @@ const GRENADIER: UnitSpec = UnitSpec {
 };
 
 const BOMBER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Bomber,
     name: "Bomber",
     role: "Flies one bombing run against ground targets, then returns to its Helipad to rearm. Flak shoots it down.",
     model_id: "bomber",
@@ -1213,6 +1296,8 @@ const BOMBER: UnitSpec = UnitSpec {
 };
 
 const FIGHTER: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Fighter,
     name: "Fighter",
     role: "Fast interceptor with air-to-air missiles. Hunts gunships and bombers, cannot touch the ground.",
     model_id: "fighter",
@@ -1233,6 +1318,8 @@ const FIGHTER: UnitSpec = UnitSpec {
 };
 
 const RAIDER_BIKE: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Raider,
     name: "Raider Bike",
     role: "Fast, cheap motorbike with anti-armour rockets. Hunts harvesters and artillery, dies to gunfire.",
     model_id: "raider_bike",
@@ -1253,6 +1340,8 @@ const RAIDER_BIKE: UnitSpec = UnitSpec {
 };
 
 const STEALTH_TANK: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Stealth,
     name: "Stealth Tank",
     role: "Hides when it keeps still and ambushes armour with missiles. Thin armour in an open fight.",
     model_id: "stealth_tank",
@@ -1273,6 +1362,8 @@ const STEALTH_TANK: UnitSpec = UnitSpec {
 };
 
 const REPAIR_TRUCK: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::Repair,
     name: "Repair Truck",
     role: "Unarmed. Drives to damaged vehicles nearby and repairs them in the field.",
     model_id: "repair_truck",
@@ -1293,6 +1384,8 @@ const REPAIR_TRUCK: UnitSpec = UnitSpec {
 };
 
 const MISSILE_TRUCK: UnitSpec = UnitSpec {
+    era: Era::Modern,
+    line: UnitLine::RocketArtillery,
     name: "Missile Truck",
     role: "Rocket artillery on wheels. Outranges defenses, fragile up close.",
     model_id: "missile_truck",
@@ -1313,6 +1406,8 @@ const MISSILE_TRUCK: UnitSpec = UnitSpec {
 };
 
 const COMMAND_CENTER: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Command Center",
     role: "Heart of the base. Lose every structure and the war is lost.",
     model_id: "command_center",
@@ -1328,6 +1423,8 @@ const COMMAND_CENTER: BuildingSpec = BuildingSpec {
 };
 
 const POWER_PLANT: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Power Plant",
     role: "Generates 100 power. Low power halves production speed.",
     model_id: "power_plant",
@@ -1343,6 +1440,8 @@ const POWER_PLANT: BuildingSpec = BuildingSpec {
 };
 
 const REFINERY: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Refinery",
     role: "Turns crystals into credits. Comes with a free harvester.",
     model_id: "refinery",
@@ -1358,6 +1457,8 @@ const REFINERY: BuildingSpec = BuildingSpec {
 };
 
 const BARRACKS: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Barracks",
     role: "Trains infantry.",
     model_id: "barracks",
@@ -1373,6 +1474,8 @@ const BARRACKS: BuildingSpec = BuildingSpec {
 };
 
 const FACTORY: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "War Factory",
     role: "Builds vehicles, including harvesters.",
     model_id: "factory",
@@ -1388,6 +1491,8 @@ const FACTORY: BuildingSpec = BuildingSpec {
 };
 
 const GUN_TURRET: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Modern),
+    line: Some(DefenceLine::Tower),
     name: "Gun Turret",
     role: "Static defense cannon. Good against vehicles.",
     model_id: "gun_turret",
@@ -1403,6 +1508,8 @@ const GUN_TURRET: BuildingSpec = BuildingSpec {
 };
 
 const WALL: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Modern),
+    line: Some(DefenceLine::Wall),
     name: "Wall",
     role: "Concrete barrier. Drag to lay a line; each segment is paid as it is placed.",
     model_id: "wall",
@@ -1418,6 +1525,8 @@ const WALL: BuildingSpec = BuildingSpec {
 };
 
 const HELIPAD: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Industrial),
+    line: None,
     name: "Helipad",
     role: "Builds gunships and repairs aircraft hovering over the pad.",
     model_id: "helipad",
@@ -1433,6 +1542,8 @@ const HELIPAD: BuildingSpec = BuildingSpec {
 };
 
 const FLAK_CANNON: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Modern),
+    line: Some(DefenceLine::AntiAir),
     name: "Flak Cannon",
     role: "Anti-aircraft gun pit. Cannot shoot at ground targets.",
     model_id: "flak_cannon",
@@ -1448,6 +1559,8 @@ const FLAK_CANNON: BuildingSpec = BuildingSpec {
 };
 
 const TECH_CENTER: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Tech Center",
     role: "Research labs. Unlocks heavy units: Bulwark or Missile Truck, Howitzer and Gunship.",
     model_id: "tech_center",
@@ -1463,6 +1576,8 @@ const TECH_CENTER: BuildingSpec = BuildingSpec {
 };
 
 const REPAIR_BAY: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Repair Bay",
     role: "Repairs vehicles that wait next to it.",
     model_id: "repair_bay",
@@ -1478,6 +1593,8 @@ const REPAIR_BAY: BuildingSpec = BuildingSpec {
 };
 
 const ROCKET_BUNKER: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Modern),
+    line: Some(DefenceLine::Bunker),
     name: "Rocket Bunker",
     role: "Concrete dome with a rocket launcher. Hits vehicles and aircraft alike.",
     model_id: "rocket_bunker",
@@ -1494,6 +1611,8 @@ const ROCKET_BUNKER: BuildingSpec = BuildingSpec {
 
 /// `cost` of a neutral site is what destroying it is worth to a veteran; nobody pays it.
 const SUPPLY_DEPOT: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Supply Depot",
     role: "Neutral. Once an engineer captures it, it sends its owner credits every few seconds.",
     model_id: "supply_depot",
@@ -1509,6 +1628,8 @@ const SUPPLY_DEPOT: BuildingSpec = BuildingSpec {
 };
 
 const OBSERVATION_POST: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Observation Post",
     role: "Neutral. Once an engineer captures it, its tower watches far across the battlefield.",
     model_id: "observation_post",
@@ -1524,6 +1645,8 @@ const OBSERVATION_POST: BuildingSpec = BuildingSpec {
 };
 
 const FIELD_HOSPITAL: BuildingSpec = BuildingSpec {
+    era: Eras::Since(Era::Antiquity),
+    line: None,
     name: "Field Hospital",
     role: "Neutral. Once an engineer captures it, it heals its owner's infantry nearby.",
     model_id: "field_hospital",
@@ -1535,6 +1658,324 @@ const FIELD_HOSPITAL: BuildingSpec = BuildingSpec {
     prerequisites: &[],
     weapon: None,
     sight: 10.0,
+    faction: None,
+};
+
+/// Thrust at arm's length; a wall of spears is what stops a charge.
+const SPEAR: WeaponSpec = WeaponSpec {
+    range: 1.8,
+    damage: 11.0,
+    reload_secs: 1.0,
+    projectile_speed: 40.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Strike,
+    versus_infantry: 0.75,
+    versus_vehicle: 1.1,
+    versus_structure: 0.2,
+    versus_aircraft: 0.0,
+    report: Sound::BladeStrike,
+};
+
+const SABRE: WeaponSpec = WeaponSpec {
+    range: 1.9,
+    damage: 15.0,
+    reload_secs: 0.9,
+    projectile_speed: 40.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Strike,
+    versus_infantry: 1.2,
+    versus_vehicle: 0.65,
+    versus_structure: 0.15,
+    versus_aircraft: 0.0,
+    report: Sound::BladeStrike,
+};
+
+const BOW: WeaponSpec = WeaponSpec {
+    range: 9.0,
+    damage: 15.0,
+    reload_secs: 1.2,
+    projectile_speed: 22.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Arrow,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.35,
+    versus_structure: 0.1,
+    versus_aircraft: 0.0,
+    report: Sound::BowShot,
+};
+
+const CHARIOT_BOW: WeaponSpec = WeaponSpec {
+    range: 9.5,
+    damage: 22.0,
+    reload_secs: 1.3,
+    projectile_speed: 24.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Arrow,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.8,
+    versus_structure: 0.35,
+    versus_aircraft: 0.0,
+    report: Sound::BowShot,
+};
+
+/// Lobbed stone: slow, inaccurate and crushing against walls.
+const CATAPULT_ARM: WeaponSpec = WeaponSpec {
+    range: 18.0,
+    damage: 70.0,
+    reload_secs: 5.0,
+    projectile_speed: 14.0,
+    splash_radius: 2.0,
+    style: ProjectileStyle::Boulder,
+    versus_infantry: 0.45,
+    versus_vehicle: 0.6,
+    versus_structure: 1.5,
+    versus_aircraft: 0.0,
+    report: Sound::CatapultThrow,
+};
+
+const TOWER_BOWS: WeaponSpec = WeaponSpec {
+    range: 11.0,
+    damage: 17.0,
+    reload_secs: 0.9,
+    projectile_speed: 24.0,
+    splash_radius: 0.0,
+    style: ProjectileStyle::Arrow,
+    versus_infantry: 1.0,
+    versus_vehicle: 0.7,
+    versus_structure: 0.3,
+    versus_aircraft: 0.0,
+    report: Sound::BowShot,
+};
+
+const SPEARMAN: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Infantry,
+    name: "Spearman",
+    role: "Cheap infantry with spear and shield. Holds the line and stops horsemen.",
+    model_id: "spearman",
+    cost: 100,
+    build_secs: 5.0,
+    max_health: 65.0,
+    speed: 2.3,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(SPEAR),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const ARCHER: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Ranged,
+    name: "Archer",
+    role: "Shoots arrows from afar. Strong against soldiers, weak in close combat.",
+    model_id: "archer",
+    cost: 130,
+    build_secs: 6.0,
+    max_health: 45.0,
+    speed: 2.3,
+    turn_rate: 9.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: Some(BOW),
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 14.0,
+};
+
+const HEALER: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Healer,
+    name: "Healer",
+    role: "Unarmed. Binds the wounds of infantry nearby and follows the squad.",
+    model_id: "healer",
+    cost: 150,
+    build_secs: 6.0,
+    max_health: 50.0,
+    speed: 2.4,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 6.0,
+    sight: 12.0,
+};
+
+const BUILDER: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Builder,
+    name: "Builder",
+    role: "Unarmed. Right-click an enemy structure to take it over, or a damaged own one to mend it.",
+    model_id: "builder",
+    cost: 400,
+    build_secs: 9.0,
+    max_health: 50.0,
+    speed: 2.5,
+    turn_rate: 10.0,
+    radius: 0.4,
+    armor: ArmorClass::Infantry,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Barracks,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const HORSEMAN: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Fast,
+    name: "Horseman",
+    role: "Fast rider with a sabre. Runs down archers, breaks on spears.",
+    model_id: "horseman",
+    cost: 250,
+    build_secs: 7.0,
+    max_health: 150.0,
+    speed: 6.2,
+    turn_rate: 6.0,
+    radius: 0.8,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(SABRE),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 18.0,
+};
+
+const CHARIOT: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Main,
+    name: "Chariot",
+    role: "Two horses and an archer on a war cart. The backbone of an ancient army.",
+    model_id: "chariot",
+    cost: 550,
+    build_secs: 12.0,
+    max_health: 400.0,
+    speed: 4.6,
+    turn_rate: 3.0,
+    radius: 1.1,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(CHARIOT_BOW),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 15.0,
+};
+
+const CATAPULT: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Siege,
+    name: "Catapult",
+    role: "Hurls stones far beyond bowshot. Breaks walls and towers, helpless up close.",
+    model_id: "catapult",
+    cost: 700,
+    build_secs: 16.0,
+    max_health: 180.0,
+    speed: 2.0,
+    turn_rate: 1.8,
+    radius: 1.2,
+    armor: ArmorClass::Vehicle,
+    weapon: Some(CATAPULT_ARM),
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: Some(BuildingKind::TechCenter),
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 12.0,
+};
+
+const WAGON: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Transport,
+    name: "Supply Wagon",
+    role: "A covered wagon for five infantry, who shoot from under its canvas. Unarmed itself.",
+    model_id: "wagon",
+    cost: 400,
+    build_secs: 9.0,
+    max_health: 320.0,
+    speed: 4.0,
+    turn_rate: 3.5,
+    radius: 1.1,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 14.0,
+};
+
+const ORE_CART: UnitSpec = UnitSpec {
+    era: Era::Antiquity,
+    line: UnitLine::Harvester,
+    name: "Ore Cart",
+    role: "Ox cart that gathers crystals and hauls them to a smelter. Unarmed.",
+    model_id: "ore_cart",
+    cost: 800,
+    build_secs: 14.0,
+    max_health: 500.0,
+    speed: 2.7,
+    turn_rate: 2.2,
+    radius: 1.4,
+    armor: ArmorClass::Vehicle,
+    weapon: None,
+    has_turret: false,
+    producer: BuildingKind::Factory,
+    requires: None,
+    faction: None,
+    heal_per_sec: 0.0,
+    sight: 10.0,
+};
+
+const WATCHTOWER: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Antiquity),
+    line: Some(DefenceLine::Tower),
+    name: "Watchtower",
+    role: "Timber tower manned by archers. Covers the approaches to the base.",
+    model_id: "watchtower",
+    footprint: IVec2::new(1, 1),
+    cost: 500,
+    build_secs: 9.0,
+    max_health: 450.0,
+    power: -10,
+    prerequisites: &[BuildingKind::Barracks],
+    weapon: Some(TOWER_BOWS),
+    sight: 16.0,
+    faction: None,
+};
+
+const PALISADE: BuildingSpec = BuildingSpec {
+    era: Eras::Only(Era::Antiquity),
+    line: Some(DefenceLine::Wall),
+    name: "Palisade",
+    role: "Sharpened stakes. Drag to lay a line; each stretch is paid as it is placed.",
+    model_id: "palisade",
+    footprint: IVec2::new(1, 1),
+    cost: 30,
+    build_secs: 0.0,
+    max_health: 450.0,
+    power: 0,
+    prerequisites: &[BuildingKind::Barracks],
+    weapon: None,
+    sight: 4.0,
     faction: None,
 };
 

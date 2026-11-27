@@ -151,7 +151,7 @@ pub fn respawn_unit(commands: &mut Commands, saved: &SavedUnit) {
         current: planned.next(),
         queued: planned.collect(),
     });
-    if saved.kind == UnitKind::Harvester {
+    if saved.kind.is_harvester() {
         commands.entity(entity).insert(Harvester {
             state: HarvestState::SeekingField,
             cargo: saved.cargo,

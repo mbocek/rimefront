@@ -137,6 +137,13 @@ pub(super) fn controls_overview(keys: &KeyBindings) -> Vec<(&'static str, String
             ),
         ),
         (
+            tr("New age"),
+            tr_fmt(
+                "{} promotes the selection near its producer",
+                &[&key(Action::Promote)],
+            ),
+        ),
+        (
             tr("Groups"),
             tr_owned("Ctrl+1-9 save, 1-9 select, twice = jump"),
         ),

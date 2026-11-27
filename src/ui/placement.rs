@@ -152,7 +152,7 @@ pub fn place_structure(
         let credits = economies.of(team).credits;
         let segments = {
             let mut context = placement_context(&map, team, known_ground, &buildings, &units);
-            affordable_wall_line(&mut context, anchor, origin, credits)
+            affordable_wall_line(&mut context, kind, anchor, origin, credits)
         };
         if segments.is_empty() {
             cues.write(SoundCue::interface(Sound::UiError));
@@ -206,7 +206,9 @@ pub fn preview_wall_drag(
         Some((anchor, end)) => {
             let team = local.0;
             let mut context = placement_context(&map, team, intel.vision(team), &buildings, &units);
-            let laid = affordable_wall_line(&mut context, anchor, end, economies.of(team).credits);
+            let wall = placement.active.unwrap_or(BuildingKind::Wall);
+            let credits = economies.of(team).credits;
+            let laid = affordable_wall_line(&mut context, wall, anchor, end, credits);
             wall_line(anchor, end)
                 .into_iter()
                 .map(|cell| (cell, laid.contains(&cell)))

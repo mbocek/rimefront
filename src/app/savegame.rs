@@ -349,10 +349,13 @@ pub fn restore_pending_load(
         economies.of_mut(team).income_rate = enemy.difficulty.income_rate();
     }
     for saved in save.production {
-        let lane = production.lane_mut(saved.team, saved.lane);
-        lane.queue = saved.queue.into();
-        lane.progress_secs = saved.progress_secs;
-        lane.ready = saved.ready;
+        let credits = &mut economies.of_mut(saved.team).credits;
+        production.lane_mut(saved.team, saved.lane).restore(
+            saved.queue,
+            saved.progress_secs,
+            saved.ready,
+            credits,
+        );
     }
     for mine in save.mines {
         bury(&mut commands, mine);

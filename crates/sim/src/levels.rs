@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{Alliance, BuildingKind, Faction, Team, UnitKind};
+use crate::sim::eras::Era;
 use crate::world::map::{MapSize, base_sites};
 use crate::world::season::Season;
 use crate::world::terrain::Landscape;
@@ -302,6 +303,8 @@ pub struct LevelDefinition {
     pub events: Vec<LevelEvent>,
     /// Supply Depots, Field Hospitals and an Observation Post stand unclaimed on the map.
     pub neutral_sites: bool,
+    /// The age whose army every side fields; the units and structures listed above stand for their lines.
+    pub era: Era,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
@@ -335,6 +338,7 @@ impl Default for LevelDefinition {
             terrain_seed: None,
             events: Vec::new(),
             neutral_sites: false,
+            era: Era::Modern,
         }
     }
 }
@@ -380,13 +384,24 @@ impl LevelDefinition {
     }
 
     pub fn allows_unit(&self, kind: UnitKind) -> bool {
-        self.available_units.is_empty() || self.available_units.contains(&kind)
+        kind.era() == self.era
+            && (self.available_units.is_empty()
+                || self
+                    .available_units
+                    .iter()
+                    .any(|listed| listed.line() == kind.line()))
     }
 
     pub fn allows_building(&self, kind: BuildingKind) -> bool {
+        if !kind.exists_in(self.era) {
+            return false;
+        }
         kind == BuildingKind::CommandCenter
             || self.available_buildings.is_empty()
-            || self.available_buildings.contains(&kind)
+            || self
+                .available_buildings
+                .iter()
+                .any(|&listed| listed.in_era(self.era) == Some(kind))
     }
 
     /// Problems that would make the level unplayable, in plain words; empty when it is fine.
@@ -554,6 +569,7 @@ pub struct SkirmishOptions {
     pub neutral_sites: bool,
     /// `None` gives every commander its own, varied with the map.
     pub personality: Option<Personality>,
+    pub era: Era,
 }
 
 impl Default for SkirmishOptions {
@@ -576,6 +592,7 @@ impl Default for SkirmishOptions {
             player_faction: Faction::Coalition,
             neutral_sites: true,
             personality: None,
+            era: Era::Modern,
         }
     }
 }
@@ -649,6 +666,7 @@ impl SkirmishOptions {
             neutral_sites: self.neutral_sites,
             terrain_seed: None,
             events: Vec::new(),
+            era: self.era,
         }
     }
 }

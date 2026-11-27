@@ -32,10 +32,11 @@ pub enum Action {
     ReconFlight,
     Barrage,
     Patrol,
+    Promote,
 }
 
 impl Action {
-    pub const ALL: [Action; 25] = [
+    pub const ALL: [Action; 26] = [
         Action::ScrollUp,
         Action::ScrollDown,
         Action::ScrollLeft,
@@ -61,6 +62,7 @@ impl Action {
         Action::ReconFlight,
         Action::Barrage,
         Action::Patrol,
+        Action::Promote,
     ];
 
     pub fn name(self) -> &'static str {
@@ -90,6 +92,7 @@ impl Action {
             Action::ReconFlight => tr("Recon flight"),
             Action::Barrage => tr("Artillery barrage"),
             Action::Patrol => tr("Patrol (hold with right click)"),
+            Action::Promote => tr("Promote into the new age"),
         }
     }
 
@@ -120,6 +123,7 @@ impl Action {
             Action::ReconFlight => KeyCode::KeyZ,
             Action::Barrage => KeyCode::KeyC,
             Action::Patrol => KeyCode::KeyP,
+            Action::Promote => KeyCode::KeyB,
         }
     }
 }

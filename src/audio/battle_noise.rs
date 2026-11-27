@@ -7,6 +7,7 @@ use crate::audio::hearing::{ear_compensation, hear};
 use crate::audio::sound::EARS_AT;
 use crate::sim::catalog::UnitKind;
 use crate::sim::components::{Building, HarvestState, Harvester, Mobile, Unit};
+use crate::sim::eras::Era;
 use crate::sim::structures::Repairing;
 use crate::view::camera::RtsCamera;
 use crate::view::local_view::LocalView;
@@ -20,17 +21,19 @@ pub enum Noise {
     Rotors,
     JetEngines,
     Footsteps,
+    Hooves,
     Harvesting,
     Construction,
 }
 
 impl Noise {
-    const ALL: [Noise; 7] = [
+    const ALL: [Noise; 8] = [
         Noise::TrackedEngines,
         Noise::WheeledEngines,
         Noise::Rotors,
         Noise::JetEngines,
         Noise::Footsteps,
+        Noise::Hooves,
         Noise::Harvesting,
         Noise::Construction,
     ];
@@ -42,6 +45,7 @@ impl Noise {
             Noise::Rotors => "loop_rotors",
             Noise::JetEngines => "loop_jet_engines",
             Noise::Footsteps => "loop_footsteps",
+            Noise::Hooves => "loop_hooves",
             Noise::Harvesting => "loop_harvesting",
             Noise::Construction => "loop_construction",
         }
@@ -55,6 +59,7 @@ impl Noise {
             Noise::Rotors => 0.3,
             Noise::JetEngines => 0.3,
             Noise::Footsteps => 0.4,
+            Noise::Hooves => 0.4,
             Noise::Harvesting => 0.2,
             Noise::Construction => 0.45,
         }
@@ -83,6 +88,7 @@ pub fn noise_of_unit(kind: UnitKind, moving: bool, harvesting: bool) -> Option<(
             engine(Noise::WheeledEngines)
         }
         _ if UnitKind::INFANTRY.contains(&kind) => moving.then_some((Noise::Footsteps, 1.0)),
+        _ if kind.era() == Era::Antiquity => moving.then_some((Noise::Hooves, 1.0)),
         _ => engine(Noise::TrackedEngines),
     }
 }
@@ -267,6 +273,11 @@ mod tests {
             Some((Noise::Footsteps, 1.0))
         );
         assert_eq!(noise_of_unit(UnitKind::Rifleman, false, false), None);
+        assert_eq!(
+            noise_of_unit(UnitKind::Chariot, true, false),
+            Some((Noise::Hooves, 1.0))
+        );
+        assert_eq!(noise_of_unit(UnitKind::Horseman, false, false), None);
         assert_eq!(
             noise_of_unit(UnitKind::Harvester, false, true).unwrap().0,
             Noise::Harvesting

@@ -1,6 +1,6 @@
 //! Balance report: equal-cost unit duels and AI-against-AI tournaments, run headless.
 //!
-//! `cargo run --release --bin balance [-- --matches N] [--personalities]`
+//! `cargo run --release --bin balance [-- --matches N] [--personalities] [--era antiquity]`
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -12,6 +12,7 @@ use rimefront::sim::catalog::{Team, UnitKind};
 use rimefront::sim::combat::DamageSource;
 use rimefront::sim::components::{Health, Order, Orders};
 use rimefront::sim::economy::Economies;
+use rimefront::sim::eras::Era;
 use rimefront::sim::outcome::GameOutcome;
 use rimefront::world::map::GameMap;
 
@@ -33,6 +34,30 @@ const COMBAT_UNITS: [UnitKind; 16] = [
     UnitKind::FlameTrooper,
     UnitKind::MissileTruck,
 ];
+/// The modern list keeps its order so reports stay comparable; other ages field every armed fighting unit.
+fn combat_units(era: Era) -> Vec<UnitKind> {
+    if era == Era::Modern {
+        return COMBAT_UNITS.to_vec();
+    }
+    UnitKind::ALL
+        .into_iter()
+        .filter(|kind| kind.era() == era && kind.spec().weapon.is_some())
+        .filter(|kind| !kind.is_harvester() && !kind.is_engineer() && !kind.carries_troops())
+        .filter(|kind| kind.spec().heal_per_sec == 0.0)
+        .collect()
+}
+
+fn era_of_arguments() -> Era {
+    let named = std::env::args().skip_while(|arg| arg != "--era").nth(1);
+    let Some(named) = named else {
+        return Era::Modern;
+    };
+    Era::ALL
+        .into_iter()
+        .find(|era| format!("{era:?}").eq_ignore_ascii_case(&named))
+        .unwrap_or_else(|| panic!("unknown age {named}"))
+}
+
 const DUEL_BUDGET: i32 = 3000;
 const DUEL_TIME_LIMIT_SECS: f32 = 150.0;
 const WEST_FRONT: IVec2 = IVec2::new(22, 46);
@@ -77,11 +102,15 @@ fn deploy_squad(battle: &mut Battle, kind: UnitKind, team: Team, front: IVec2, e
 }
 
 /// Fights `attacker` against `defender`, each with the same budget; returns the attacker's margin in [-1, 1].
-fn duel(attacker: UnitKind, defender: UnitKind, attacker_west: bool) -> f32 {
+fn duel(attacker: UnitKind, defender: UnitKind, attacker_west: bool, era: Era) -> f32 {
+    let level = LevelDefinition {
+        era,
+        ..LevelDefinition::default()
+    };
     let mut battle = Battle::new(BattleSetup {
         enemy_ai: false,
         starting_forces: false,
-        level: Some(fogless(LevelDefinition::default())),
+        level: Some(fogless(level)),
     });
     let (attacker_front, defender_front) = if attacker_west {
         (WEST_FRONT, EAST_FRONT)
@@ -178,6 +207,7 @@ fn ai_match(
     pairing: Pairing,
     challenger_site: BaseSite,
     map_seed: u64,
+    era: Era,
 ) -> (GameOutcome, f32, HashMap<UnitKind, UnitRecord>) {
     let Pairing {
         challenger,
@@ -193,6 +223,7 @@ fn ai_match(
     let mut level = LevelDefinition {
         fog_of_war,
         map_seed,
+        era,
         ..LevelDefinition::default()
     };
     level.player.site = challenger_site;
@@ -268,7 +299,8 @@ fn parallel<T: Send, R: Send>(jobs: Vec<T>, run: impl Fn(T) -> R + Sync) -> Vec<
     results.into_iter().map(|(_, result)| result).collect()
 }
 
-fn print_duel_matrix() {
+fn print_duel_matrix(era: Era) {
+    let units = combat_units(era);
     println!("## Equal-cost duels (${DUEL_BUDGET} a side, fog off)\n");
     println!(
         "Row unit attacking column unit; remaining army value of the row minus the column, both sides of the field averaged."
@@ -276,27 +308,27 @@ fn print_duel_matrix() {
     println!(
         "+100 = the row wins untouched, -100 = the row is wiped out without loss to the column.\n"
     );
-    let pairs: Vec<(UnitKind, UnitKind, bool)> = COMBAT_UNITS
+    let pairs: Vec<(UnitKind, UnitKind, bool)> = units
         .iter()
         .flat_map(|&a| {
-            COMBAT_UNITS
+            units
                 .iter()
                 .flat_map(move |&b| [(a, b, true), (a, b, false)])
         })
         .collect();
-    let margins = parallel(pairs.clone(), |(a, b, west)| duel(a, b, west));
+    let margins = parallel(pairs.clone(), |(a, b, west)| duel(a, b, west, era));
     let mut table: HashMap<(UnitKind, UnitKind), Vec<f32>> = HashMap::new();
     for ((a, b, _), margin) in pairs.into_iter().zip(margins) {
         table.entry((a, b)).or_default().push(margin);
     }
     print!("| vs |");
-    for b in COMBAT_UNITS {
+    for b in &units {
         print!(" {} |", b.spec().name);
     }
-    println!("\n|---|{}", "---|".repeat(COMBAT_UNITS.len()));
-    for a in COMBAT_UNITS {
+    println!("\n|---|{}", "---|".repeat(units.len()));
+    for &a in &units {
         print!("| **{}** |", a.spec().name);
-        for b in COMBAT_UNITS {
+        for &b in &units {
             let runs = &table[&(a, b)];
             let mean = runs.iter().sum::<f32>() / runs.len() as f32;
             print!(" {:+.0} |", mean * 100.0);
@@ -306,7 +338,7 @@ fn print_duel_matrix() {
     println!();
 }
 
-fn print_tournament(matches: usize, pairings: &[Pairing]) {
+fn print_tournament(matches: usize, pairings: &[Pairing], era: Era) {
     println!(
         "## AI against AI ({matches} matches per pairing, {:.0} min limit)\n",
         MATCH_TIME_LIMIT_SECS / 60.0
@@ -320,7 +352,7 @@ fn print_tournament(matches: usize, pairings: &[Pairing]) {
         })
         .collect();
     let outcomes = parallel(jobs.clone(), |(_, pairing, site, seed)| {
-        ai_match(pairing, site, seed)
+        ai_match(pairing, site, seed, era)
     });
     let mut results: Vec<PairingResult> =
         pairings.iter().map(|_| PairingResult::default()).collect();
@@ -414,12 +446,13 @@ fn main() {
         .and_then(|value| value.parse().ok())
         .unwrap_or(DEFAULT_MATCHES_PER_PAIRING);
     let started = std::time::Instant::now();
-    println!("# Rimefront balance report\n");
+    let era = era_of_arguments();
+    println!("# Rimefront balance report ({era:?})\n");
     if std::env::args().any(|arg| arg == "--personalities") {
-        print_tournament(matches, &PERSONALITY_PAIRINGS);
+        print_tournament(matches, &PERSONALITY_PAIRINGS, era);
     } else {
-        print_duel_matrix();
-        print_tournament(matches, &PAIRINGS);
+        print_duel_matrix(era);
+        print_tournament(matches, &PAIRINGS, era);
     }
     eprintln!("finished in {:.0} s", started.elapsed().as_secs_f32());
 }

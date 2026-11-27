@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 
 use crate::sim::catalog::{BuildingKind, Team, UnitKind};
+use crate::sim::eras::Era;
 use crate::view::side_tint::Painted;
 
 const NEUTRAL_MODELS: [&str; 22] = [
@@ -31,6 +32,41 @@ const NEUTRAL_MODELS: [&str; 22] = [
 ];
 
 const WALL_LINK_MODEL: &str = "wall_link";
+const PALISADE_LINK_MODEL: &str = "palisade_link";
+
+/// Structures that every era builds wear the look of the age; the modern one is their own model.
+const ERA_LOOKS: [(BuildingKind, Era, &str); 7] = [
+    (
+        BuildingKind::CommandCenter,
+        Era::Antiquity,
+        "command_center_antiquity",
+    ),
+    (
+        BuildingKind::PowerPlant,
+        Era::Antiquity,
+        "power_plant_antiquity",
+    ),
+    (BuildingKind::Refinery, Era::Antiquity, "refinery_antiquity"),
+    (BuildingKind::Barracks, Era::Antiquity, "barracks_antiquity"),
+    (BuildingKind::Factory, Era::Antiquity, "factory_antiquity"),
+    (
+        BuildingKind::TechCenter,
+        Era::Antiquity,
+        "tech_center_antiquity",
+    ),
+    (
+        BuildingKind::RepairBay,
+        Era::Antiquity,
+        "repair_bay_antiquity",
+    ),
+];
+
+pub fn building_model(kind: BuildingKind, era: Era) -> &'static str {
+    ERA_LOOKS
+        .iter()
+        .find(|&&(looked, age, _)| looked == kind && age == era)
+        .map_or(kind.spec().model_id, |&(.., model)| model)
+}
 /// The grey variant of a neutral site that nobody holds yet (tools/blender/build_models.py).
 
 #[derive(Resource)]
@@ -44,13 +80,18 @@ impl ModelLibrary {
         self.painted(kind.spec().model_id, Painted::Side(team))
     }
 
-    pub fn building(&self, kind: BuildingKind, team: Team) -> (WorldAssetRoot, Painted) {
-        self.painted(kind.spec().model_id, Painted::Side(team))
+    pub fn building(&self, kind: BuildingKind, team: Team, era: Era) -> (WorldAssetRoot, Painted) {
+        self.painted(building_model(kind, era), Painted::Side(team))
     }
 
     /// Half a wall run, joining a wall post to its neighbour.
-    pub fn wall_link(&self, team: Team) -> (WorldAssetRoot, Painted) {
-        self.painted(WALL_LINK_MODEL, Painted::Side(team))
+    pub fn wall_link(&self, wall: BuildingKind, team: Team) -> (WorldAssetRoot, Painted) {
+        let link = if wall == BuildingKind::Palisade {
+            PALISADE_LINK_MODEL
+        } else {
+            WALL_LINK_MODEL
+        };
+        self.painted(link, Painted::Side(team))
     }
 
     pub fn unclaimed_site(&self, kind: BuildingKind) -> (WorldAssetRoot, Painted) {
@@ -81,7 +122,8 @@ fn all_model_keys() -> Vec<String> {
                 .chain(BuildingKind::NEUTRAL_SITES)
                 .map(|kind| kind.spec().model_id),
         )
-        .chain(std::iter::once(WALL_LINK_MODEL));
+        .chain(ERA_LOOKS.iter().map(|&(.., model)| model))
+        .chain([WALL_LINK_MODEL, PALISADE_LINK_MODEL]);
     team_model_ids
         .chain(NEUTRAL_MODELS.iter().copied())
         .map(str::to_string)

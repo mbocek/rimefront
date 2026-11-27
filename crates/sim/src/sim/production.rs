@@ -8,10 +8,13 @@ use crate::i18n::{tr, tr_fmt};
 use crate::sim::catalog::{BuildingKind, Faction, Team, UnitKind};
 use crate::sim::components::*;
 use crate::sim::determinism::SimulationRng;
+use crate::sim::determinism::{SimEntities, SimId};
 use crate::sim::economy::Economies;
+use crate::sim::eras::Era;
 use crate::sim::fog::{CellSight, FogOfWar};
 use crate::sim::movement::{FLIGHT_ALTITUDE, order_move};
 use crate::sim::notifications::{News, SideNews};
+use crate::sim::promotion::{promote_structure, promote_unit};
 use crate::sim::research::Upgrade;
 use crate::sim::sides::Shelter;
 use crate::sim::sides::{PerSide, Sides};
@@ -30,6 +33,24 @@ pub enum BuildItem {
     Structure(BuildingKind),
     Unit(UnitKind),
     Research(Upgrade),
+    /// A unit of an earlier age made into its successor in the line, at its producer.
+    Promotion {
+        unit: SimId,
+        into: UnitKind,
+    },
+    /// A defence of an earlier age rebuilt as its successor where it stands.
+    Fortification {
+        structure: SimId,
+        into: BuildingKind,
+    },
+}
+
+/// What a promotion costs and takes, as a share of building the successor new.
+pub const PROMOTION_PRICE_SHARE: f32 = 0.4;
+pub const PROMOTION_TIME_SHARE: f32 = 0.5;
+
+fn promotion_price(cost: i32) -> i32 {
+    (cost as f32 * PROMOTION_PRICE_SHARE).round() as i32
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
@@ -64,6 +85,8 @@ impl BuildItem {
             BuildItem::Structure(kind) => tr(kind.spec().name),
             BuildItem::Unit(kind) => tr(kind.spec().name),
             BuildItem::Research(upgrade) => tr(upgrade.spec().name),
+            BuildItem::Promotion { into, .. } => tr(into.spec().name),
+            BuildItem::Fortification { into, .. } => tr(into.spec().name),
         }
     }
 
@@ -72,6 +95,8 @@ impl BuildItem {
             BuildItem::Structure(kind) => kind.spec().cost,
             BuildItem::Unit(kind) => kind.spec().cost,
             BuildItem::Research(upgrade) => upgrade.spec().cost,
+            BuildItem::Promotion { into, .. } => promotion_price(into.spec().cost),
+            BuildItem::Fortification { into, .. } => promotion_price(into.spec().cost),
         }
     }
 
@@ -80,25 +105,65 @@ impl BuildItem {
             BuildItem::Structure(kind) => kind.spec().build_secs,
             BuildItem::Unit(kind) => kind.spec().build_secs,
             BuildItem::Research(upgrade) => upgrade.spec().research_secs,
+            BuildItem::Promotion { into, .. } => into.spec().build_secs * PROMOTION_TIME_SHARE,
+            BuildItem::Fortification { into, .. } => into.spec().build_secs * PROMOTION_TIME_SHARE,
         }
     }
 
     pub fn lane(self) -> Lane {
         match self {
-            BuildItem::Structure(_) => Lane::Structures,
-            BuildItem::Unit(kind) if kind.spec().producer == BuildingKind::Barracks => {
+            BuildItem::Structure(_) | BuildItem::Fortification { .. } => Lane::Structures,
+            BuildItem::Unit(kind) | BuildItem::Promotion { into: kind, .. }
+                if kind.spec().producer == BuildingKind::Barracks =>
+            {
                 Lane::Infantry
             }
-            BuildItem::Unit(_) => Lane::Vehicles,
+            BuildItem::Unit(_) | BuildItem::Promotion { .. } => Lane::Vehicles,
             BuildItem::Research(_) => Lane::Research,
         }
     }
 
     pub fn faction(self) -> Option<Faction> {
         match self {
-            BuildItem::Structure(kind) => kind.spec().faction,
-            BuildItem::Unit(kind) => kind.spec().faction,
+            BuildItem::Structure(kind) | BuildItem::Fortification { into: kind, .. } => {
+                kind.spec().faction
+            }
+            BuildItem::Unit(kind) | BuildItem::Promotion { into: kind, .. } => kind.spec().faction,
             BuildItem::Research(_) => None,
+        }
+    }
+
+    pub fn is_promotion(self) -> bool {
+        matches!(
+            self,
+            BuildItem::Promotion { .. } | BuildItem::Fortification { .. }
+        )
+    }
+
+    /// The unit or structure a promotion works on.
+    pub fn promoted(self) -> Option<SimId> {
+        match self {
+            BuildItem::Promotion { unit, .. } => Some(unit),
+            BuildItem::Fortification { structure, .. } => Some(structure),
+            _ => None,
+        }
+    }
+
+    pub fn belongs_to(self, era: Era) -> bool {
+        match self.product() {
+            Some(BuildItem::Structure(kind)) => kind.exists_in(era),
+            Some(BuildItem::Unit(kind)) => kind.era() == era,
+            _ => true,
+        }
+    }
+
+    /// The unit or structure this item makes, whether new or promoted.
+    pub fn product(self) -> Option<BuildItem> {
+        match self {
+            BuildItem::Promotion { into, .. } => Some(BuildItem::Unit(into)),
+            BuildItem::Fortification { into, .. } => Some(BuildItem::Structure(into)),
+            BuildItem::Research(_) => None,
+            made => Some(made),
         }
     }
 
@@ -108,6 +173,10 @@ impl BuildItem {
 
     pub fn missing_requirement(self, owned: &[BuildingKind]) -> Option<BuildingKind> {
         match self {
+            BuildItem::Promotion { into, .. } => BuildItem::Unit(into).missing_requirement(owned),
+            BuildItem::Fortification { into, .. } => {
+                BuildItem::Structure(into).missing_requirement(owned)
+            }
             BuildItem::Structure(kind) => kind
                 .spec()
                 .prerequisites
@@ -158,6 +227,30 @@ pub struct ProductionLane {
 }
 
 impl ProductionLane {
+    /// A lane as a save left it. Promotions name units by simulation ids, which a restored battle hands out
+    /// afresh, so they are refunded instead of kept; the credits they return are added to `credits`.
+    pub fn restore(
+        &mut self,
+        queue: impl IntoIterator<Item = BuildItem>,
+        progress_secs: f32,
+        ready: Option<BuildingKind>,
+        credits: &mut i32,
+    ) {
+        self.queue.clear();
+        self.progress_secs = progress_secs;
+        self.ready = ready;
+        for item in queue {
+            if item.is_promotion() {
+                *credits += item.cost();
+                if self.queue.is_empty() {
+                    self.progress_secs = 0.0;
+                }
+            } else {
+                self.queue.push_back(item);
+            }
+        }
+    }
+
     pub fn is_idle(&self) -> bool {
         self.queue.is_empty() && self.ready.is_none()
     }
@@ -176,6 +269,9 @@ pub struct Production {
     forbidden: PerSide<Vec<BuildItem>>,
     researched: PerSide<Vec<Upgrade>>,
     player_faction: Faction,
+    era: Era,
+    /// While the age has just turned, no structure takes damage, so every side has time to promote.
+    structures_spared: bool,
 }
 
 impl Production {
@@ -188,7 +284,8 @@ impl Production {
     }
 
     pub fn allows(&self, team: Team, item: BuildItem) -> bool {
-        item.available_to(self.faction_of(team)) && !self.forbidden.of(team).contains(&item)
+        let made = item.product().unwrap_or(item);
+        item.available_to(self.faction_of(team)) && !self.forbidden.of(team).contains(&made)
     }
 
     pub fn faction_of(&self, team: Team) -> Faction {
@@ -197,6 +294,75 @@ impl Production {
 
     pub fn set_player_faction(&mut self, player_faction: Faction) {
         self.player_faction = player_faction;
+    }
+
+    pub fn era(&self) -> Era {
+        self.era
+    }
+
+    pub fn set_era(&mut self, era: Era) {
+        self.era = era;
+    }
+
+    pub fn structures_spared(&self) -> bool {
+        self.structures_spared
+    }
+
+    pub fn spare_structures(&mut self, spared: bool) {
+        self.structures_spared = spared;
+    }
+
+    /// Every queued item and finished structure of another age goes back to its side as credits.
+    pub fn refund_other_ages(
+        &mut self,
+        economies: &mut Economies,
+        sides: impl Iterator<Item = Team>,
+    ) {
+        let era = self.era;
+        let of_another_age = |item: &BuildItem| match *item {
+            BuildItem::Structure(kind) => !kind.exists_in(era),
+            BuildItem::Unit(kind) => kind.era() != era,
+            BuildItem::Research(_) => false,
+            BuildItem::Promotion { into, .. } => into.era() != era,
+            BuildItem::Fortification { into, .. } => !into.exists_in(era),
+        };
+        for team in sides {
+            for lane_kind in Lane::ALL {
+                while let Some(position) = self
+                    .lane(team, lane_kind)
+                    .queue
+                    .iter()
+                    .position(of_another_age)
+                {
+                    self.cancel_at(economies, team, lane_kind, position);
+                }
+            }
+            let stale = self
+                .lane(team, Lane::Structures)
+                .ready
+                .is_some_and(|kind| !kind.exists_in(era));
+            if stale {
+                self.cancel_ready_structure(economies, team);
+            }
+        }
+    }
+
+    pub fn is_promoting(&self, team: Team, id: SimId) -> bool {
+        Lane::ALL.iter().any(|&lane| {
+            self.lane(team, lane)
+                .queue
+                .iter()
+                .any(|item| item.promoted() == Some(id))
+        })
+    }
+
+    /// The member of `kind`'s line that the current era builds.
+    pub fn unit_of_the_age(&self, kind: UnitKind) -> Option<UnitKind> {
+        kind.in_era(self.era)
+    }
+
+    pub fn structure_of_the_age(&self, kind: BuildingKind) -> Option<BuildingKind> {
+        kind.in_era(self.era)
     }
 
     /// `team` has nothing queued or researched; what the level forbids it stays forbidden.
@@ -330,7 +496,8 @@ pub fn advance_production(
     mut rng: ResMut<SimulationRng>,
     time: Res<Time>,
     map: Res<GameMap>,
-    economies: Res<Economies>,
+    ids: Res<SimEntities>,
+    mut economies: ResMut<Economies>,
     mut production: ResMut<Production>,
     buildings: Query<(&Building, &Team, Option<&RallyPoint>)>,
     sides: Res<Sides>,
@@ -339,6 +506,22 @@ pub fn advance_production(
     for team in sides.iter().filter(|&team| !shelter.covers(team)) {
         let rate = economies.of(team).production_rate();
         for lane_kind in Lane::ALL {
+            let front = production.lane(team, lane_kind).queue.front().copied();
+            let still_ours = |id| {
+                ids.get(id).is_some_and(|entity| {
+                    units.get(entity).is_ok_and(|owner| *owner == team)
+                        || buildings
+                            .get(entity)
+                            .is_ok_and(|(_, owner, _)| *owner == team)
+                })
+            };
+            if front
+                .and_then(BuildItem::promoted)
+                .is_some_and(|id| !still_ours(id))
+            {
+                production.cancel_at(&mut economies, team, lane_kind, 0);
+                continue;
+            }
             let lane = production.lane_mut(team, lane_kind);
             let Some(&item) = lane.queue.front() else {
                 continue;
@@ -347,7 +530,7 @@ pub fn advance_production(
                 continue;
             }
             let producer = match item {
-                BuildItem::Structure(_) => None,
+                BuildItem::Structure(_) | BuildItem::Fortification { .. } => None,
                 BuildItem::Research(_) => {
                     let has_tech_center = buildings.iter().any(|(building, owner, _)| {
                         *owner == team && building.kind == BuildingKind::TechCenter
@@ -357,7 +540,7 @@ pub fn advance_production(
                     }
                     None
                 }
-                BuildItem::Unit(kind) => {
+                BuildItem::Unit(kind) | BuildItem::Promotion { into: kind, .. } => {
                     let producer = buildings
                         .iter()
                         .filter(|(building, owner, _)| {
@@ -406,6 +589,14 @@ pub fn advance_production(
                 (BuildItem::Research(upgrade), _) => {
                     production.complete_research(team, upgrade);
                 }
+                (BuildItem::Promotion { unit, into }, _) => {
+                    commands.queue(move |world: &mut World| promote_unit(world, team, unit, into));
+                }
+                (BuildItem::Fortification { structure, into }, _) => {
+                    commands.queue(move |world: &mut World| {
+                        promote_structure(world, team, structure, into)
+                    });
+                }
             }
         }
     }
@@ -429,7 +620,7 @@ fn deploy_unit(
         cell_center(exit)
     };
     let entity = spawn_unit(commands, kind, team, launch, facing_toward_the_middle(exit));
-    if let Some(rally) = rally.filter(|_| kind != UnitKind::Harvester) {
+    if let Some(rally) = rally.filter(|_| !kind.is_harvester()) {
         commands.entity(entity).insert(Orders {
             current: Some(Order::Move(rally.0)),
             queued: Default::default(),
@@ -472,16 +663,20 @@ pub fn construct_building(
     kind: BuildingKind,
     team: Team,
     origin: IVec2,
+    era: Era,
 ) {
     spawn_building(commands, map, kind, team, origin);
-    if kind == BuildingKind::Refinery {
+    let free_harvester = UnitKind::Harvester.in_era(era);
+    if kind == BuildingKind::Refinery
+        && let Some(harvester) = free_harvester
+    {
         let building = Building { kind, origin };
         let dock = map
             .nearest_passable(exit_cell(&building))
             .unwrap_or(exit_cell(&building));
         spawn_unit(
             commands,
-            UnitKind::Harvester,
+            harvester,
             team,
             cell_center(dock),
             facing_toward_the_middle(dock),
@@ -565,17 +760,18 @@ pub fn wall_line(from: IVec2, to: IVec2) -> Vec<IVec2> {
 /// segment extends the base, so a wall can be laid outwards beyond the usual building radius.
 pub fn affordable_wall_line(
     context: &mut PlacementContext,
+    wall: BuildingKind,
     from: IVec2,
     to: IVec2,
     credits: i32,
 ) -> Vec<IVec2> {
-    let segment_cost = BuildingKind::Wall.spec().cost;
+    let segment_cost = wall.spec().cost;
     let mut placed = Vec::new();
     for cell in wall_line(from, to) {
         if (placed.len() as i32 + 1) * segment_cost > credits {
             break;
         }
-        if context.can_place(BuildingKind::Wall, cell) {
+        if context.can_place(wall, cell) {
             context.own_buildings.push((cell, IVec2::ONE));
             context.occupied_cells.push(cell);
             placed.push(cell);
@@ -643,6 +839,7 @@ mod tests {
 
         let wall = affordable_wall_line(
             &mut context,
+            BuildingKind::Wall,
             IVec2::new(14, 11),
             IVec2::new(20, 11),
             100_000,
@@ -666,7 +863,7 @@ mod tests {
         };
         let start = IVec2::new(14, 11);
         let far_end = start + IVec2::new(BUILD_RADIUS_CELLS * 3, 0);
-        let all = affordable_wall_line(&mut context, start, far_end, 100_000);
+        let all = affordable_wall_line(&mut context, BuildingKind::Wall, start, far_end, 100_000);
         assert_eq!(
             all.len() as i32,
             BUILD_RADIUS_CELLS * 3 + 1,
@@ -681,7 +878,14 @@ mod tests {
         };
         let three_segments = BuildingKind::Wall.spec().cost * 3 + 10;
         assert_eq!(
-            affordable_wall_line(&mut context, start, far_end, three_segments).len(),
+            affordable_wall_line(
+                &mut context,
+                BuildingKind::Wall,
+                start,
+                far_end,
+                three_segments
+            )
+            .len(),
             3
         );
     }

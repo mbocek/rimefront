@@ -21,6 +21,8 @@ The code is a Cargo workspace of three crates:
 | Module | Responsibility |
 | --- | --- |
 | `catalog` | unit and building statistics, weapons, armor |
+| `eras` | ages, the lines of units and defences across them |
+| `promotion` | the age turning: refunds, the calm, promoting units and defences |
 | `cues` | the sounds and blasts the simulation asks for; `audio` and `view` play and draw them |
 | `spawn` | spawning units and buildings as simulation data; `view::dressing` gives them their models |
 | `movement` | path following, unit separation |

@@ -72,6 +72,15 @@ against ground units its duels end even; the computer builds it only once it has
 hurt them (a tank picks the rocketeer before the rifleman next to it), which made matches shorter and left fewer
 unfinished.
 
+## Antiquity
+
+`cargo run --release --bin balance -- --era antiquity` runs the same report for the ancient army (see
+[eras.md](eras.md)): the duels take every armed fighting unit of the age. The ancient lines form a circle: spears
+stop horsemen (+59) and chariots (+64), horsemen ride down archers (+71) and catapults, archers shoot spearmen
+(+38), chariots beat archers (+29) and catapults (+47), and catapults crush massed infantry (+25 against
+spearmen, +84 against archers). With 24 matches per pairing Hard beats Normal 14:6 and 11:8 (from either base
+site), Brutal beats Hard 15:7, Easy wins 0 of 24 against Normal; a match takes 8-11 minutes.
+
 ## Commander personalities
 
 Each personality plays Normal against the Balanced commander on Normal, with fog of war, 40 matches per

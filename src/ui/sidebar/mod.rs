@@ -3,12 +3,14 @@ use crate::app::replay::{ReplayPlayback, list_replays, load_replay, replay_direc
 use crate::missions::campaigns::{CampaignLibrary, CampaignRun, find_campaign};
 use crate::missions::level_events::MissionMessage;
 use crate::sim::abilities::MINE_COST;
+use crate::sim::eras::Era;
 use crate::sim::match_stats::{MatchStats, TeamTally};
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::player_commands::{CommandIssuer, PlayerCommand};
 use crate::sim::research::Upgrade;
 use crate::ui::key_bindings::{Action, KeyBindings};
 use crate::ui::structure_tools::spawn_tool_buttons;
+use crate::view::assets::building_model;
 use crate::view::local_view::LocalView;
 use crate::view::sky::{RAINING, WeatherCycle};
 use crate::world::season::Season;
@@ -95,10 +97,12 @@ impl UiFonts {
     }
 }
 
-pub(crate) fn icon_path(item: BuildItem) -> String {
+pub(crate) fn icon_path(item: BuildItem, era: Era) -> String {
     let model_id = match item {
-        BuildItem::Structure(kind) => kind.spec().model_id,
-        BuildItem::Unit(kind) => kind.spec().model_id,
+        BuildItem::Structure(kind) | BuildItem::Fortification { into: kind, .. } => {
+            building_model(kind, era)
+        }
+        BuildItem::Unit(kind) | BuildItem::Promotion { into: kind, .. } => kind.spec().model_id,
         BuildItem::Research(upgrade) => upgrade.spec().icon_id,
     };
     format!("icons/{model_id}.png")

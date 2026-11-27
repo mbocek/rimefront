@@ -25,12 +25,16 @@ use crate::sim::veterancy::{Rank, Veterancy};
 use crate::world::map::{CELL_SIZE, GameMap, world_to_cell};
 
 const SIGHT_BEYOND_RANGE: f32 = 6.0;
+/// A blade reaches an arm's length, so a melee unit charges whatever comes within bowshot instead of
+/// standing under fire from enemies just beyond its reach.
+const CHARGE_BEYOND_REACH: f32 = 10.0;
 const CHASE_REPATH_SECS: f32 = 1.0;
 const AIM_TOLERANCE: f32 = 0.12;
 const BODY_AIM_TURN_RATE: f32 = 6.0;
 const ARTILLERY_SCATTER: f32 = 1.2;
 const ARTILLERY_ARC_PER_METER: f32 = 0.25;
 const MISSILE_ARC_PER_METER: f32 = 0.07;
+const ARROW_ARC_PER_METER: f32 = 0.12;
 const BARREL_LENGTH: f32 = 1.4;
 const MUZZLE_HEIGHT: f32 = 1.2;
 const TARGET_CENTER_HEIGHT: f32 = 0.7;
@@ -297,6 +301,14 @@ fn seen_by(
     allies.union(seeing)
 }
 
+fn beyond_range(weapon: &WeaponSpec) -> f32 {
+    if weapon.style == ProjectileStyle::Strike {
+        CHARGE_BEYOND_REACH
+    } else {
+        SIGHT_BEYOND_RANGE
+    }
+}
+
 pub fn acquire_targets(
     targets: Res<Targets>,
     mut shooters: Query<(
@@ -320,7 +332,7 @@ pub fn acquire_targets(
             chosen => chosen,
         };
         let sight = match stance {
-            Stance::Aggressive => weapon.spec.range + SIGHT_BEYOND_RANGE,
+            Stance::Aggressive => weapon.spec.range + beyond_range(&weapon.spec),
             Stance::HoldPosition | Stance::HoldFire => weapon.spec.range,
         };
         if let Some((entity, mode)) = attack.target {
@@ -529,7 +541,10 @@ pub(crate) fn fire_projectile(
     let mut end = target.position + Vec3::Y * TARGET_CENTER_HEIGHT;
     let mut arc_height = 0.0;
     let mut homing_target = Some(target.entity);
-    if weapon.style == ProjectileStyle::ArtilleryShell {
+    if matches!(
+        weapon.style,
+        ProjectileStyle::ArtilleryShell | ProjectileStyle::Boulder
+    ) {
         end += Vec3::new(
             rng.random_range(-ARTILLERY_SCATTER..ARTILLERY_SCATTER),
             -TARGET_CENTER_HEIGHT,
@@ -541,14 +556,17 @@ pub(crate) fn fire_projectile(
     if weapon.style == ProjectileStyle::Missile {
         arc_height = muzzle.distance(end) * MISSILE_ARC_PER_METER;
     }
+    if weapon.style == ProjectileStyle::Arrow {
+        arc_height = muzzle.distance(end) * ARROW_ARC_PER_METER;
+    }
 
     let flash_size = if matches!(
         weapon.style,
-        ProjectileStyle::Bullet | ProjectileStyle::Flame
+        ProjectileStyle::Shell | ProjectileStyle::ArtilleryShell | ProjectileStyle::Missile
     ) {
-        0.0
-    } else {
         1.0
+    } else {
+        0.0
     };
     if flash_size > 0.0 {
         blasts.write(BlastCue::at(muzzle, BlastSize::MuzzleFlash));
@@ -685,29 +703,39 @@ fn deal_impact_damage(
 
 fn impact_blast(style: ProjectileStyle) -> BlastSize {
     match style {
-        ProjectileStyle::Bullet | ProjectileStyle::Flame => BlastSize::BulletImpact,
-        ProjectileStyle::Shell | ProjectileStyle::ArtilleryShell | ProjectileStyle::Missile => {
-            BlastSize::ShellImpact
-        }
+        ProjectileStyle::Bullet
+        | ProjectileStyle::Flame
+        | ProjectileStyle::Arrow
+        | ProjectileStyle::Strike => BlastSize::BulletImpact,
+        ProjectileStyle::Shell
+        | ProjectileStyle::ArtilleryShell
+        | ProjectileStyle::Missile
+        | ProjectileStyle::Boulder => BlastSize::ShellImpact,
     }
 }
 
 fn scorch_radius(weapon: &WeaponSpec) -> f32 {
     match weapon.style {
-        ProjectileStyle::Bullet => 0.0,
+        ProjectileStyle::Bullet | ProjectileStyle::Arrow | ProjectileStyle::Strike => 0.0,
         ProjectileStyle::Shell | ProjectileStyle::Missile | ProjectileStyle::Flame => {
             SHELL_SCORCH_RADIUS
         }
-        ProjectileStyle::ArtilleryShell => weapon.splash_radius * ARTILLERY_SCORCH_SHARE,
+        ProjectileStyle::ArtilleryShell | ProjectileStyle::Boulder => {
+            weapon.splash_radius * ARTILLERY_SCORCH_SHARE
+        }
     }
 }
 
 fn impact_sound(style: ProjectileStyle) -> Sound {
     match style {
-        ProjectileStyle::Bullet | ProjectileStyle::Flame => Sound::BulletImpact,
-        ProjectileStyle::Shell | ProjectileStyle::ArtilleryShell | ProjectileStyle::Missile => {
-            Sound::ShellExplosion
-        }
+        ProjectileStyle::Bullet
+        | ProjectileStyle::Flame
+        | ProjectileStyle::Arrow
+        | ProjectileStyle::Strike => Sound::BulletImpact,
+        ProjectileStyle::Shell
+        | ProjectileStyle::ArtilleryShell
+        | ProjectileStyle::Missile
+        | ProjectileStyle::Boulder => Sound::ShellExplosion,
     }
 }
 

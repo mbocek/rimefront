@@ -49,6 +49,9 @@ class SoldierKit:
     add_helmet: Callable
     add_backpack: Callable
     add_extras: Callable = lambda build: None
+    cloth: str = "Uniform"
+    gear: str = "Webbing"
+    boots: str = "Rubber"
     shouldered_offset: Vector = field(default_factory=Vector)
     ready_poles: tuple = (Vector((-0.2, -0.6, -1.0)), Vector((0.4, 0.5, -1.0)))
     aim_poles: tuple = (Vector((-0.1, -1.0, -0.4)), Vector((0.2, 0.3, -1.0)))
@@ -131,48 +134,48 @@ class SoldierBuild:
         for side, sign in (("L", 1), ("R", -1)):
             hip, knee, ankle = HIP_JOINT[side], KNEE[side], ANKLE[side]
             with self.bone_mesh(f"thigh.{side}"):
-                cylinder_between("Uniform", hip, knee, 0.078, 10, 0.06, name="Thigh")
-                box("Webbing", (0.06, 0.07, 0.14), hip.lerp(knee, 0.4) + Vector((0, sign * 0.07, 0)), bevel=0.015,
+                cylinder_between(self.kit.cloth, hip, knee, 0.078, 10, 0.06, name="Thigh")
+                box(self.kit.gear, (0.06, 0.07, 0.14), hip.lerp(knee, 0.4) + Vector((0, sign * 0.07, 0)), bevel=0.015,
                     name="ThighPocket")
             with self.bone_mesh(f"shin.{side}"):
-                cylinder_between("Uniform", knee, ankle, 0.058, 10, 0.045, name="Shin")
-                sphere("Uniform", 0.06, knee, segments=10, rings=6, name="Knee")
-                box("Webbing", (0.05, 0.1, 0.11), knee + Vector((0.055, 0, 0.0)), bevel=0.015, name="KneePad")
+                cylinder_between(self.kit.cloth, knee, ankle, 0.058, 10, 0.045, name="Shin")
+                sphere(self.kit.cloth, 0.06, knee, segments=10, rings=6, name="Knee")
+                box(self.kit.gear, (0.05, 0.1, 0.11), knee + Vector((0.055, 0, 0.0)), bevel=0.015, name="KneePad")
             with self.bone_mesh(f"foot.{side}"):
-                box("Rubber", (0.25, 0.11, 0.11), Vector((ankle.x + 0.05, ankle.y, 0.055)), bevel=0.025,
+                box(self.kit.boots, (0.25, 0.11, 0.11), Vector((ankle.x + 0.05, ankle.y, 0.055)), bevel=0.025,
                     name="Boot")
-                box("Webbing", (0.12, 0.1, 0.06), Vector((ankle.x, ankle.y, 0.13)), bevel=0.02, name="BootCuff")
+                box(self.kit.gear, (0.12, 0.1, 0.06), Vector((ankle.x, ankle.y, 0.13)), bevel=0.02, name="BootCuff")
 
     def _add_torso(self):
         with self.bone_mesh("hips"):
-            box("Uniform", (0.2, 0.3, 0.18), (0.0, 0.0, 0.95), bevel=0.05, name="Pelvis")
-            box("Webbing", (0.22, 0.32, 0.05), (0.0, 0.0, 1.03), bevel=0.015, name="Belt")
-            box("Webbing", (0.07, 0.1, 0.07), (0.0, 0.17, 1.03), bevel=0.015, name="BeltPouch")
-            box("Webbing", (0.07, 0.1, 0.07), (-0.04, -0.17, 1.03), bevel=0.015, name="BeltPouch")
+            box(self.kit.cloth, (0.2, 0.3, 0.18), (0.0, 0.0, 0.95), bevel=0.05, name="Pelvis")
+            box(self.kit.gear, (0.22, 0.32, 0.05), (0.0, 0.0, 1.03), bevel=0.015, name="Belt")
+            box(self.kit.gear, (0.07, 0.1, 0.07), (0.0, 0.17, 1.03), bevel=0.015, name="BeltPouch")
+            box(self.kit.gear, (0.07, 0.1, 0.07), (-0.04, -0.17, 1.03), bevel=0.015, name="BeltPouch")
         with self.bone_mesh("spine"):
-            box("Uniform", (0.2, 0.33, 0.16), (0.0, 0.0, 1.11), bevel=0.05, name="Waist")
+            box(self.kit.cloth, (0.2, 0.33, 0.16), (0.0, 0.0, 1.11), bevel=0.05, name="Waist")
         with self.bone_mesh("chest"):
-            box("Uniform", (0.22, 0.36, 0.3), (0.0, 0.0, 1.3), (0, math.radians(6), 0), bevel=0.06, name="Torso")
-            box("Webbing", (0.27, 0.34, 0.3), (0.01, 0.0, 1.25), (0, math.radians(6), 0), bevel=0.03,
+            box(self.kit.cloth, (0.22, 0.36, 0.3), (0.0, 0.0, 1.3), (0, math.radians(6), 0), bevel=0.06, name="Torso")
+            box(self.kit.gear, (0.27, 0.34, 0.3), (0.01, 0.0, 1.25), (0, math.radians(6), 0), bevel=0.03,
                 name="PlateCarrier")
             for y in (-0.1, 0.0, 0.1):
-                box("Webbing", (0.06, 0.08, 0.1), (0.155, y, 1.15), (0, math.radians(6), 0), bevel=0.015,
+                box(self.kit.gear, (0.06, 0.08, 0.1), (0.155, y, 1.15), (0, math.radians(6), 0), bevel=0.015,
                     name="MagPouch")
             for sign in (-1, 1):
-                sphere("Uniform", 0.083, (0.0, sign * 0.2, 1.39), segments=10, rings=6, name="Shoulder")
+                sphere(self.kit.cloth, 0.083, (0.0, sign * 0.2, 1.39), segments=10, rings=6, name="Shoulder")
                 box("TeamColor", (0.09, 0.012, 0.07), (0.0, sign * 0.276, 1.34), bevel=0.0, name="ShoulderPatch")
-                box("Webbing", (0.29, 0.06, 0.02), (0.0, sign * 0.11, 1.42), (0, math.radians(6), 0), bevel=0.005,
+                box(self.kit.gear, (0.29, 0.06, 0.02), (0.0, sign * 0.11, 1.42), (0, math.radians(6), 0), bevel=0.005,
                     name="ShoulderStrap")
 
     def _add_arm(self, side):
         shoulder, elbow, hand = SHOULDER[side], self.kit.elbow[side], self.kit.hand[side]
         with self.bone_mesh(f"upper_arm.{side}"):
-            cylinder_between("Uniform", shoulder, elbow, 0.055, 10, 0.045, name="UpperArm")
-            sphere("Uniform", 0.047, elbow, segments=8, rings=6, name="Elbow")
+            cylinder_between(self.kit.cloth, shoulder, elbow, 0.055, 10, 0.045, name="UpperArm")
+            sphere(self.kit.cloth, 0.047, elbow, segments=8, rings=6, name="Elbow")
         with self.bone_mesh(f"forearm.{side}"):
-            cylinder_between("Uniform", elbow, hand, 0.045, 10, 0.036, name="Forearm")
+            cylinder_between(self.kit.cloth, elbow, hand, 0.045, 10, 0.036, name="Forearm")
         with self.bone_mesh(f"hand.{side}"):
-            sphere("Webbing", 0.042, hand, scale=(1.1, 0.9, 1.0), segments=10, rings=6, name="Glove")
+            sphere(self.kit.gear, 0.042, hand, scale=(1.1, 0.9, 1.0), segments=10, rings=6, name="Glove")
 
     def _rig_and_animate(self, root, merged):
         rig = _create_rig(root, self.skeleton)

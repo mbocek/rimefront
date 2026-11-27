@@ -444,6 +444,57 @@ def unit_promoted():
     return finished_effect(soft_clip(fanfare, 1.3), duration, reverb_seconds=0.9, reverb_wet=0.2, end_fade=0.1)
 
 
+def bow_shot(variant):
+    """The string's twang, the limbs' thump and the arrow hissing away."""
+    rng = random.Random(2100 + variant)
+    duration = 0.45
+    length = samples(duration)
+    pitch = 180.0 + 25.0 * variant
+    twang = summed(
+        pitch_drop(pitch * 1.6, pitch, 0.01, 0.06, length),
+        scaled(pitch_drop(pitch * 3.1, pitch * 2.0, 0.008, 0.03, length), 0.4),
+    )
+    thump = one_pole_lowpass(decaying_noise(rng, length, 0.015, kind="brown"), 400.0)
+    hiss_center = segments([(0.0, 2500.0), (0.05, 5000.0), (0.45, 2000.0)], length)
+    hiss = biquad(white_noise(length, rng), "bandpass", hiss_center, 1.4)
+    hiss_envelope = segments([(0.0, 0.0), (0.02, 0.0), (0.06, 1.0), (0.45, 0.0)], length)
+    shot = summed(scaled(twang, 1.0), scaled(thump, 2.5), scaled(multiplied(hiss, hiss_envelope), 0.5))
+    return finished_effect(soft_clip(shot, 1.3), duration, reverb_seconds=0.4, reverb_wet=0.12, end_fade=0.05)
+
+
+def catapult_throw():
+    """The arm slamming into its padded crossbar, timber creaking and the stone whooshing off."""
+    rng = random.Random(2200)
+    duration = 1.2
+    length = samples(duration)
+    creak_center = segments([(0.0, 300.0), (0.18, 520.0), (0.2, 300.0)], length)
+    creak = biquad(white_noise(length, rng), "bandpass", creak_center, 6.0)
+    creak_envelope = segments([(0.0, 0.0), (0.04, 0.8), (0.18, 1.0), (0.2, 0.0), (1.2, 0.0)], length)
+    slam = silence(length)
+    mix_into(slam, summed(pitch_drop(110.0, 45.0, 0.04, 0.12, length),
+                          scaled(one_pole_lowpass(decaying_noise(rng, length, 0.05, kind="brown"), 300.0), 4.0)),
+             samples(0.2), 1.0)
+    whoosh_center = segments([(0.0, 400.0), (0.25, 400.0), (0.45, 1400.0), (1.2, 500.0)], length)
+    whoosh = biquad(white_noise(length, rng), "bandpass", whoosh_center, 1.0)
+    whoosh_envelope = segments([(0.0, 0.0), (0.22, 0.0), (0.35, 1.0), (1.2, 0.0)], length)
+    throw = summed(scaled(multiplied(creak, creak_envelope), 1.4), scaled(slam, 1.6),
+                   scaled(multiplied(whoosh, whoosh_envelope), 1.2))
+    return finished_effect(soft_clip(throw, 1.4), duration, reverb_seconds=0.9, reverb_wet=0.2, end_fade=0.1)
+
+
+def blade_strike(variant):
+    """Iron meeting shield and armour: a ringing clang over a dull blow."""
+    rng = random.Random(2300 + variant)
+    duration = 0.5
+    length = samples(duration)
+    base = 820.0 + 140.0 * variant
+    ring = partials([base, base * 2.41, base * 3.9], [1.0, 0.5, 0.3], [0.18, 0.09, 0.05], length)
+    blow = one_pole_lowpass(decaying_noise(rng, length, 0.02), 1200.0)
+    scrape = biquad(decaying_noise(rng, length, 0.04), "highpass", 3500.0)
+    strike = summed(scaled(ring, 0.7), scaled(blow, 2.0), scaled(scrape, 0.3))
+    return finished_effect(soft_clip(strike, 1.3), duration, reverb_seconds=0.4, reverb_wet=0.12, end_fade=0.06)
+
+
 SOUND_EFFECTS = {
     "sfx/rifle_shot_1": lambda: rifle_shot(0),
     "sfx/rifle_shot_2": lambda: rifle_shot(1),
@@ -480,6 +531,11 @@ SOUND_EFFECTS = {
     "sfx/base_alert": base_alert,
     "sfx/credits": credits_chime,
     "sfx/unit_acknowledge": unit_acknowledge,
+    "sfx/bow_shot_1": lambda: bow_shot(0),
+    "sfx/bow_shot_2": lambda: bow_shot(1),
+    "sfx/catapult_throw": catapult_throw,
+    "sfx/blade_strike_1": lambda: blade_strike(0),
+    "sfx/blade_strike_2": lambda: blade_strike(1),
 }
 
 # Every weapon and blast also has a version heard from far away; the game picks it for sounds off screen.
@@ -487,7 +543,7 @@ HEARD_FROM_AFAR = [
     "rifle_shot_1", "rifle_shot_2", "mg_shot_1", "sniper_shot", "flak_shot", "grenade_launch_1",
     "cannon_shot_1", "cannon_shot_2",
     "heavy_cannon_shot", "howitzer_shot", "missile_launch", "flame_burst", "explosion_1", "explosion_2",
-    "explosion_3", "explosion_large", "building_collapse",
+    "explosion_3", "explosion_large", "building_collapse", "catapult_throw",
 ]
 SOUND_EFFECTS.update({
     f"sfx/{name}_far": distant_version(SOUND_EFFECTS[f"sfx/{name}"]) for name in HEARD_FROM_AFAR

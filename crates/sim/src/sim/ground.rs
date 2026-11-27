@@ -25,12 +25,21 @@ impl RunningGear {
             | UnitKind::Engineer
             | UnitKind::Sniper
             | UnitKind::FlameTrooper
-            | UnitKind::Grenadier => RunningGear::Feet,
+            | UnitKind::Grenadier
+            | UnitKind::Spearman
+            | UnitKind::Archer
+            | UnitKind::Healer
+            | UnitKind::Builder
+            | UnitKind::Horseman => RunningGear::Feet,
             UnitKind::Scout
             | UnitKind::MissileTruck
             | UnitKind::RepairTruck
             | UnitKind::RaiderBike
-            | UnitKind::TroopCarrier => RunningGear::Wheels,
+            | UnitKind::TroopCarrier
+            | UnitKind::Chariot
+            | UnitKind::Catapult
+            | UnitKind::Wagon
+            | UnitKind::OreCart => RunningGear::Wheels,
             UnitKind::Tank
             | UnitKind::Bulwark
             | UnitKind::Artillery

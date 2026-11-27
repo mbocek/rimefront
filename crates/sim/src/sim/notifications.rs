@@ -8,6 +8,7 @@ use crate::sim::combat::DamageDealt;
 use crate::sim::components::{Building, Harvester};
 use crate::sim::cues::{Sound, SoundCue};
 use crate::sim::economy::Economies;
+use crate::sim::eras::Era;
 use crate::sim::player_commands::LocalTeam;
 use crate::sim::production::{BuildItem, EnqueueRefusal};
 use crate::sim::sides::{PerSide, Sides};
@@ -89,6 +90,8 @@ pub enum SideNews {
     AllianceLeft(Team),
     /// The player came back to a world after being away.
     WelcomeBack(AwayReport),
+    /// A new age has begun: its army is built from now on, and the old one can be promoted.
+    AgeTurned(Era),
 }
 
 /// How long a player was away from a world and what their side lost meanwhile; the losses are `None` when the
@@ -160,6 +163,16 @@ impl SideNews {
             SideNews::AllianceFormed(team) => tr_fmt("Allied with {}", &[&team.name()]),
             SideNews::AllianceLeft(team) => tr_fmt("No longer allied with {}", &[&team.name()]),
             SideNews::WelcomeBack(report) => report.message(),
+            SideNews::AgeTurned(era) => tr_fmt(
+                "A new age begins: {}. Promote your army and defences",
+                &[&era.label()],
+            ),
+            SideNews::Finished(BuildItem::Promotion { into, .. }) => {
+                tr_fmt("Promoted to {}", &[&tr(into.spec().name)])
+            }
+            SideNews::Finished(BuildItem::Fortification { into, .. }) => {
+                tr_fmt("Promoted to {}", &[&tr(into.spec().name)])
+            }
             SideNews::RepairStarted | SideNews::StructureSold | SideNews::CargoSold => return None,
         })
     }
@@ -169,6 +182,10 @@ impl SideNews {
             SideNews::Finished(BuildItem::Structure(_)) => Sound::ConstructionComplete,
             SideNews::Finished(BuildItem::Research(_)) => Sound::ResearchComplete,
             SideNews::Finished(BuildItem::Unit(_)) => Sound::UnitReady,
+            SideNews::Finished(BuildItem::Promotion { .. } | BuildItem::Fortification { .. }) => {
+                Sound::UnitPromoted
+            }
+            SideNews::AgeTurned(_) => Sound::BaseAlert,
             SideNews::Promoted(..) => Sound::UnitPromoted,
             SideNews::Captured(_) => Sound::StructureCaptured,
             SideNews::CapturedByEnemy(_) => Sound::StructureLost,

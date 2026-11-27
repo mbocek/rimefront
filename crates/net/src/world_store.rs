@@ -595,14 +595,18 @@ fn restore_crystal(world: &mut World, chunks: &HashMap<IVec2, ChunkRecord>) -> V
 
 fn restore_sides(world: &mut World, teams: &[Team], records: &[SideRecord]) {
     for (&team, record) in teams.iter().zip(records) {
-        world.resource_mut::<Economies>().of_mut(team).credits = record.credits;
+        let mut credits = record.credits;
         let mut production = world.resource_mut::<Production>();
         for (lane, saved) in Lane::ALL.into_iter().zip(&record.lanes) {
-            let lane = production.lane_mut(team, lane);
-            lane.queue = saved.queue.iter().copied().collect();
-            lane.progress_secs = saved.progress_secs;
-            lane.ready = saved.ready;
+            production.lane_mut(team, lane).restore(
+                saved.queue.iter().copied(),
+                saved.progress_secs,
+                saved.ready,
+                &mut credits,
+            );
         }
+        world.resource_mut::<Economies>().of_mut(team).credits = credits;
+        let mut production = world.resource_mut::<Production>();
         for &upgrade in &record.researched {
             production.complete_research(team, upgrade);
         }

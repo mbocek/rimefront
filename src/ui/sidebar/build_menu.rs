@@ -131,7 +131,7 @@ pub(super) fn spawn_build_tile(
     .with_children(|tile| {
         tile.spawn((
             TileIcon(item),
-            ImageNode::new(asset_server.load(icon_path(item))),
+            ImageNode::new(asset_server.load(icon_path(item, Era::default()))),
             Node {
                 width: Val::Px(TILE_ICON_SIZE),
                 height: Val::Px(TILE_ICON_SIZE),
@@ -390,6 +390,8 @@ pub(super) fn tile_state(
 }
 
 pub fn refresh_build_tiles(
+    asset_server: Res<AssetServer>,
+    mut icons_drawn_for: Local<Option<Era>>,
     local: Res<LocalTeam>,
     time: Res<Time>,
     active: Res<ActiveTab>,
@@ -418,7 +420,7 @@ pub fn refresh_build_tiles(
     let pulse = (time.elapsed_secs() * 5.0).sin() * 0.5 + 0.5;
 
     for (tile, hovered, mut node, mut background, mut border) in &mut tiles {
-        let display = if tile.0.lane() == active.0 {
+        let display = if tile.0.lane() == active.0 && tile.0.belongs_to(production.era()) {
             Display::Flex
         } else {
             Display::None
@@ -470,7 +472,12 @@ pub fn refresh_build_tiles(
         text.set_if_neq(Text(label));
         color.set_if_neq(TextColor(tint));
     }
+    let era = production.era();
+    let redraw_icons = icons_drawn_for.replace(era) != Some(era);
     for (icon, mut image) in &mut icons {
+        if redraw_icons {
+            image.image = asset_server.load(icon_path(icon.0, era));
+        }
         let locked = matches!(
             state_of(icon.0),
             TileState::Locked | TileState::NotInMission
@@ -509,7 +516,7 @@ pub(super) fn describe_item(
     production: &Production,
     team: Team,
 ) -> (String, String) {
-    let (role, build_secs, extra) = match item {
+    let (role, build_secs, extra) = match item.product().unwrap_or(item) {
         BuildItem::Structure(kind) => {
             let spec = kind.spec();
             let power = if spec.power >= 0 {
@@ -535,6 +542,9 @@ pub(super) fn describe_item(
                 String::new()
             };
             (spec.role, spec.research_secs, status)
+        }
+        BuildItem::Promotion { .. } | BuildItem::Fortification { .. } => {
+            unreachable!("a promotion describes what it makes")
         }
     };
     let requirement = if !production.allows(team, item) {

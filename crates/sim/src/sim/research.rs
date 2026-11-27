@@ -72,6 +72,9 @@ pub fn outgoing_damage_factor(production: &Production, shooter: Team) -> f32 {
 }
 
 pub fn incoming_damage_factor(production: &Production, victim: Team, armor: ArmorClass) -> f32 {
+    if armor == ArmorClass::Structure && production.structures_spared() {
+        return 0.0;
+    }
     let armoured = matches!(armor, ArmorClass::Vehicle | ArmorClass::Aircraft)
         && production.has_researched(victim, Upgrade::CompositeArmour);
     if armoured { ARMOURED_DAMAGE_TAKEN } else { 1.0 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::levels::{ActiveLevel, BaseSite};
 use crate::match_flow::MatchClock;
-use crate::sim::catalog::{BuildingKind, Team, UnitKind};
+use crate::sim::catalog::{Team, UnitKind};
 use crate::sim::components::{Building, Order, Orders, Unit};
 use crate::sim::economy::Economies;
 use crate::sim::spawn::spawn_unit;
@@ -107,7 +107,11 @@ pub fn run_level_events(
                 }
                 EventAction::Reinforcements { team, units, from } => {
                     let toward = level.player.site.origin() + level.player.site.rally_offset();
-                    bring_reinforcements(&mut commands, &map, team, &units, from, toward);
+                    let of_the_age: Vec<UnitKind> = units
+                        .iter()
+                        .filter_map(|kind| kind.in_era(level.era))
+                        .collect();
+                    bring_reinforcements(&mut commands, &map, team, &of_the_age, from, toward);
                 }
                 EventAction::Credits { team, amount } => {
                     economies.of_mut(team).credits += amount;
@@ -128,7 +132,7 @@ fn triggered(
         Trigger::StructuresLeft { team, at_most } => {
             let standing = buildings
                 .iter()
-                .filter(|(building, owner)| **owner == team && building.kind != BuildingKind::Wall)
+                .filter(|(building, owner)| **owner == team && !building.kind.is_wall())
                 .count();
             standing as u32 <= at_most
         }

@@ -117,9 +117,14 @@ A level file is plain JSON; omitted fields take defaults:
   "landscape": "River",
   "weather": "Clear",
   "season": "Summer",
-  "map_size": "Standard"
+  "map_size": "Standard",
+  "era": "Modern"
 }
 ```
+
+Ages: `Modern` (the default) or `Antiquity`, also *Age* in the battle editor. Units and structures named in the
+level stand for their line, so an ancient level that gives the player a `Rifleman` and a `GunTurret` starts it
+with a Spearman and a Watchtower; see [eras.md](eras.md).
 
 Landscapes: `River` (a winding river with three fords), `Lake` (a long lake between the bases with one
 causeway across its middle) and `Plains` (open ground without water), all three point-symmetric, and `Wilds`:

@@ -392,13 +392,23 @@ pub fn issue_orders(
     }
     let own_carriers: Vec<SimId> = selected_units
         .iter()
-        .filter(|(_, unit, owner)| **owner == team && unit.0 == UnitKind::TroopCarrier)
+        .filter(|(_, unit, owner)| **owner == team && unit.0.carries_troops())
         .map(|(&id, ..)| id)
         .collect();
     if settings.keys.just_pressed(&keys, Action::Unload) && !own_carriers.is_empty() {
         issuer.issue(PlayerCommand::Unload {
             carriers: own_carriers,
         });
+    }
+    if settings.keys.just_pressed(&keys, Action::Promote) {
+        let own_defences = selected_buildings
+            .iter()
+            .filter(|(_, _, owner)| **owner == team)
+            .map(|(&id, ..)| id);
+        let ids: Vec<SimId> = units.iter().copied().chain(own_defences).collect();
+        if !ids.is_empty() {
+            issuer.issue(PlayerCommand::Promote { ids });
+        }
     }
     if settings.keys.just_pressed(&keys, Action::LayMine) && !engineers.is_empty() {
         issuer.issue(PlayerCommand::LayMines { units: engineers });
@@ -531,7 +541,7 @@ type SelectedUnits<'w, 's> =
 fn own_engineers(selected_units: &SelectedUnits, team: Team) -> Vec<SimId> {
     selected_units
         .iter()
-        .filter(|(_, unit, owner)| **owner == team && unit.0 == UnitKind::Engineer)
+        .filter(|(_, unit, owner)| **owner == team && unit.0.is_engineer())
         .map(|(&id, ..)| id)
         .collect()
 }

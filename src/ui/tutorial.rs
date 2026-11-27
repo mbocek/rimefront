@@ -189,7 +189,7 @@ pub fn follow_tutorial(
     tutorial.flash_secs = (tutorial.flash_secs - time.delta_secs()).max(0.0);
     let mut facts = TutorialFacts::default();
     for (unit, &team, mobile, orders, selected) in &units {
-        if team != Team::Azure || unit.0 == UnitKind::Harvester {
+        if team != Team::Azure || unit.0.is_harvester() {
             continue;
         }
         facts.troops_selected |= selected;

@@ -193,6 +193,47 @@ def footsteps():
     return seamless(left, right, seconds)
 
 
+def hoofbeat(rng):
+    """A hoof striking hard ground: a hollow knock with a short ring, then a scuff of dirt."""
+    length = samples(0.12)
+    pitch = rng.uniform(320.0, 480.0)
+    knock = partials([pitch, pitch * 1.9], [1.0, 0.35], [0.025, 0.012], length)
+    scuff = biquad(multiplied(white_noise(length, rng), exponential_decay(length, 0.02)), "bandpass",
+                   rng.uniform(700.0, 1400.0), 0.9)
+    return summed(scaled(knock, 1.4), scaled(scuff, 0.6))
+
+
+def wheel_creak(rng, length):
+    """Wooden wheels on axles groaning as they turn."""
+    creak = biquad(multiplied(saw(rng.uniform(70.0, 95.0), length), wobble(rng, length, 3.0, 0.8)),
+                   "bandpass", 600.0, 3.0)
+    return scaled(creak, 0.12)
+
+
+def hooves():
+    """Horses and oxen at a trot, each hoof in a four-beat gait, and the carts they pull creaking behind."""
+    rng = random.Random(7700)
+    seconds = 4.0
+    length = rendered_length(seconds)
+    left, right = silence(length), silence(length)
+    for _ in range(4):
+        pan_left, pan_right = pan_gains(rng.uniform(-0.6, 0.6))
+        loudness = rng.uniform(0.6, 1.0)
+        stride = rng.uniform(0.55, 0.7)
+        t = rng.uniform(0.0, stride)
+        while t < seconds + LOOP_SEAM_SECONDS:
+            for beat in (0.0, 0.11, 0.27, 0.38):
+                hoof = hoofbeat(rng)
+                at = samples(t + beat * stride / 0.6)
+                mix_into(left, hoof, at, loudness * pan_left)
+                mix_into(right, hoof, at, loudness * pan_right)
+            t += stride
+    creak = wheel_creak(rng, length)
+    mix_into(left, creak, 0, 0.8)
+    mix_into(right, creak, 0, 0.6)
+    return seamless(left, right, seconds)
+
+
 def harvesting():
     """A drum grinding crystal: the motor, the churn of the drum and bright shards chiming as they break."""
     rng = random.Random(7500)
@@ -256,6 +297,7 @@ BATTLE_NOISE = {
     "sfx/loop_rotors": rotors,
     "sfx/loop_jet_engines": jet_engines,
     "sfx/loop_footsteps": footsteps,
+    "sfx/loop_hooves": hooves,
     "sfx/loop_harvesting": harvesting,
     "sfx/loop_construction": construction,
 }

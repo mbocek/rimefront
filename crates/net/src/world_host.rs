@@ -142,7 +142,7 @@ impl Default for AbsenceRules {
 /// everything they carry, the kinds of units, structures, sounds and news included. A world lets in only a
 /// game of the same protocol, whatever either's version, since the game only mirrors the world's battle.
 /// `fixtures/world_protocol.txt` changes with it; see docs/compatibility.md.
-pub const WORLD_PROTOCOL: u32 = 8;
+pub const WORLD_PROTOCOL: u32 = 9;
 
 /// Why a game speaking `protocol` cannot enter this world; `None` when it can.
 fn protocol_refusal(protocol: u32) -> Option<&'static str> {

@@ -112,7 +112,8 @@ pub fn rebuild_queue_bar(
         commands.entity(slot).despawn();
     }
     for &(slot, item) in &entries {
-        spawn_slot(&mut commands, &fonts, &asset_server, bar, slot, item);
+        let icon = asset_server.load(icon_path(item, production.era()));
+        spawn_slot(&mut commands, &fonts, icon, bar, slot);
     }
     *visibility = if entries.is_empty() {
         Visibility::Hidden
@@ -125,10 +126,9 @@ pub fn rebuild_queue_bar(
 fn spawn_slot(
     commands: &mut Commands,
     fonts: &UiFonts,
-    asset_server: &AssetServer,
+    icon: Handle<Image>,
     bar: Entity,
     slot: QueueSlot,
-    item: BuildItem,
 ) {
     let (frame_color, icon_tint) = match slot {
         QueueSlot::AwaitingPlacement(_) => (GOOD, Color::WHITE),
@@ -151,7 +151,7 @@ fn spawn_slot(
         ))
         .with_children(|tile| {
             tile.spawn((
-                ImageNode::new(asset_server.load(icon_path(item))).with_color(icon_tint),
+                ImageNode::new(icon).with_color(icon_tint),
                 Node {
                     width: Val::Px(SLOT_ICON_SIZE),
                     height: Val::Px(SLOT_ICON_SIZE),

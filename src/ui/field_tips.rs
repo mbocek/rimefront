@@ -166,7 +166,7 @@ pub fn offer_field_tips(
     for (unit, &team, transform, selected) in &units {
         let is_sniper = unit.0 == UnitKind::Sniper;
         if team == own {
-            encounters.engineer_selected |= selected && unit.0 == UnitKind::Engineer;
+            encounters.engineer_selected |= selected && unit.0.is_engineer();
             encounters.sniper_met |= is_sniper;
         } else if is_sniper && view.is_hostile(team) {
             encounters.sniper_met |= view.sight().is_visible(transform.translation);

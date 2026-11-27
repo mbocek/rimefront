@@ -759,10 +759,16 @@ fn level_facts(level: &LevelDefinition) -> Vec<(String, String, Color)> {
         level
             .available_units
             .iter()
+            .filter_map(|kind| kind.in_era(level.era))
             .map(|kind| tr(kind.spec().name))
             .collect::<Vec<_>>()
             .join(", ")
     };
+    facts.push((
+        tr("Age").to_string(),
+        level.era.label().to_string(),
+        TEXT_DIM,
+    ));
     facts.push((tr("Units").to_string(), units, TEXT_DIM));
     facts
 }

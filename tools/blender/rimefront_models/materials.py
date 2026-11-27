@@ -102,6 +102,20 @@ PALETTE = {
     "PetalYellow": Surface((0.90, 0.72, 0.10), roughness=0.6),
     "PetalWhite": Surface((0.88, 0.87, 0.82), roughness=0.6),
     "PetalViolet": Surface((0.42, 0.20, 0.65), roughness=0.6),
+    "Bronze": Surface((0.62, 0.42, 0.18), metallic=0.85, roughness=0.4),
+    "Iron": Surface((0.30, 0.30, 0.31), metallic=0.8, roughness=0.5),
+    "Leather": Surface((0.33, 0.20, 0.10), roughness=0.75),
+    "Linen": Surface((0.72, 0.66, 0.52), roughness=0.9),
+    "Canvas": Surface((0.62, 0.57, 0.44), roughness=0.9),
+    "Thatch": Surface((0.55, 0.45, 0.22), roughness=0.95),
+    "Timber": Surface((0.45, 0.31, 0.17), roughness=0.85),
+    "TimberDark": Surface((0.26, 0.17, 0.09), roughness=0.9),
+    "Stone": Surface((0.55, 0.52, 0.46), roughness=0.9),
+    "StoneDark": Surface((0.36, 0.34, 0.30), roughness=0.92),
+    "Clay": Surface((0.62, 0.36, 0.22), roughness=0.85),
+    "HorseCoat": Surface((0.38, 0.23, 0.12), roughness=0.8),
+    "HorseMane": Surface((0.10, 0.07, 0.05), roughness=0.9),
+    "OxCoat": Surface((0.52, 0.42, 0.30), roughness=0.85),
 }
 
 

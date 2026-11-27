@@ -10,7 +10,8 @@ pub mod world;
 use sim::{
     abilities, ai, cadence, catalog, combat, cues, determinism, economy, engineers, ground, intel,
     match_stats, medical, movement, neutral_sites, notifications, outcome, player_commands,
-    production, servicing, sorties, structures, support_powers, transport, unit_orders, veterancy,
+    production, promotion, servicing, sorties, structures, support_powers, transport, unit_orders,
+    veterancy,
 };
 use world::{map, map_edits, scenery};
 
@@ -141,6 +142,7 @@ impl Plugin for SimulationPlugin {
             .init_resource::<notifications::Notifications>()
             .init_resource::<notifications::LastAlert>()
             .init_resource::<match_flow::MatchClock>()
+            .init_resource::<promotion::AgeTurned>()
             .init_resource::<intel::Intel>()
             .init_resource::<ground::Ground>()
             .init_resource::<sim::alliances::AllianceOffers>()
@@ -193,11 +195,12 @@ impl Plugin for SimulationPlugin {
                         (
                             match_flow::advance_match_clock,
                             level_events::run_level_events,
+                            promotion::turn_the_age,
                         )
                             .chain(),
                         economy::tally_power,
                         production::advance_production,
-                        ai::command_enemies,
+                        (ai::command_enemies, promotion::promote_computer_sides).chain(),
                         ai::call_support_powers,
                         ai::repair_damaged_structures,
                         ai::fortify_turrets,

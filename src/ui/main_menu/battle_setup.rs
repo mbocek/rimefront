@@ -1,5 +1,6 @@
 use super::*;
 use crate::missions::levels::Personality;
+use crate::sim::eras::Era;
 
 #[derive(Component)]
 pub struct EditorOption(EditorField);
@@ -91,6 +92,7 @@ pub enum EditorField {
     Credits,
     Objective,
     Tech,
+    Era,
     MapVariant,
     PlayerSite,
     FogOfWar,
@@ -105,12 +107,13 @@ pub enum EditorField {
     Faction,
 }
 
-pub(super) const EDITOR_FIELDS: [EditorField; 17] = [
+pub(super) const EDITOR_FIELDS: [EditorField; 18] = [
     EditorField::Enemies,
     EditorField::Difficulty,
     EditorField::Personality,
     EditorField::Credits,
     EditorField::Objective,
+    EditorField::Era,
     EditorField::Tech,
     EditorField::MapVariant,
     EditorField::PlayerSite,
@@ -147,6 +150,7 @@ impl EditorField {
             EditorField::Credits => tr("Starting credits"),
             EditorField::Objective => tr("Objective"),
             EditorField::Tech => tr("Available units"),
+            EditorField::Era => tr("Age"),
             EditorField::MapVariant => tr("Map variant"),
             EditorField::PlayerSite => tr("Your base"),
             EditorField::FogOfWar => tr("Fog of war"),
@@ -174,6 +178,7 @@ impl EditorField {
                 ObjectiveKind::Economy => tr("Stockpile credits").into(),
             },
             EditorField::Tech => options.tech.label().into(),
+            EditorField::Era => options.era.label().into(),
             EditorField::MapVariant => tr_fmt("{} of {}", &[&options.map_variant, &MAP_VARIANTS]),
             EditorField::PlayerSite => options.player_site.name().into(),
             EditorField::FogOfWar => on_or_off(options.fog_of_war),
@@ -223,6 +228,10 @@ impl EditorField {
                     options.tech,
                     forward,
                 );
+            }
+            EditorField::Era => {
+                let eras: Vec<Era> = Era::playable().collect();
+                options.era = cycle(&eras, options.era, forward);
             }
             EditorField::MapVariant => {
                 let variants: Vec<u64> = (1..=MAP_VARIANTS).collect();

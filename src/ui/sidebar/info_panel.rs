@@ -160,7 +160,9 @@ pub fn refresh_info_panel(
     mut title: Query<&mut Text, (With<InfoTitle>, Without<InfoBody>)>,
     mut body: Query<&mut Text, (With<InfoBody>, Without<InfoTitle>)>,
     mut health_fill: Query<(&mut Node, &mut BackgroundColor), With<InfoHealthFill>>,
+    production: Res<Production>,
 ) {
+    let era = production.era();
     let (
         Ok((mut icon_image, mut icon_node)),
         Ok(mut title),
@@ -192,7 +194,7 @@ pub fn refresh_info_panel(
                 .unwrap_or_default();
             let path = unit
                 .map(|u| format!("icons/{}.png", u.0.spec().model_id))
-                .or(building.map(|b| format!("icons/{}.png", b.kind.spec().model_id)));
+                .or(building.map(|b| format!("icons/{}.png", building_model(b.kind, era))));
             let role = unit
                 .map(|u| tr(u.0.spec().role))
                 .or(building.map(|b| tr(b.kind.spec().role)))

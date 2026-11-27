@@ -6,6 +6,8 @@
   makes everyone fight everyone, each seeing only through its own units and buildings, and `"TwoAgainstTwo"`
   pairs the Coalition with Amber against Crimson and Violet (the two western corners against the two eastern
   ones with the default sites); allies share what they see. Older levels' `"free_for_all": true` still works.
+- **Ages:** a battle is fought in antiquity or the modern age, each with its own army and defences; when the
+  age turns, units and defences are promoted into the new one. See [eras.md](eras.md).
 - **Economy:** the harvester mines crystals and unloads them at the refinery. Every refinery comes with a free harvester.
   Harvesters spread over a field, each to a crystal no other harvester has claimed, and drive through each other
   on their way so two of them never block a narrow lane. Once the fields near them are mined out they drive to

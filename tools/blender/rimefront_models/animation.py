@@ -2,6 +2,8 @@ import math
 
 import bpy
 
+from .weathering import REVOLVES
+
 FPS = 30
 
 
@@ -30,6 +32,7 @@ def add_spin_animation(objects, track_name, seconds, axis_index=1, turns=1.0):
     """Constant-speed rotation about a local axis; whole turns keep the loop seamless."""
     frame_count = frames_for(seconds)
     for obj in objects:
+        obj[REVOLVES] = True
         base = tuple(obj.rotation_euler)
 
         def pose_at(frame, obj=obj, base=base):

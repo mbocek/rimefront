@@ -102,6 +102,29 @@ def add_lathe(bm, profile_rz, matrix, segments=24, cap_start=True, cap_end=True,
     return [v for ring in rings for v in ring]
 
 
+def add_loft(bm, stations, matrix=Matrix(), segments=12, y=0.0):
+    """A body of elliptical sections along a path in the local XZ plane, closed to a point at both ends.
+
+    Each station is (x, z, half_width, half_depth): half_width lies along Y, half_depth across the path.
+    """
+    centres = [Vector((x, y, z)) for x, z, _, _ in stations]
+    rings = []
+    for index, (_, _, half_width, half_depth) in enumerate(stations):
+        along = centres[min(index + 1, len(centres) - 1)] - centres[max(index - 1, 0)]
+        across = Vector((-along.z, 0.0, along.x)).normalized()
+        ring = []
+        for step in range(segments):
+            angle = math.tau * step / segments
+            offset = Vector((0.0, half_width * math.cos(angle), 0.0)) + across * half_depth * math.sin(angle)
+            ring.append(bm.verts.new(matrix @ (centres[index] + offset)))
+        rings.append(ring)
+    for lower, upper in zip(rings, rings[1:]):
+        _bridge_rings(bm, lower, upper, closed=True)
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
+    return [vert for ring in rings for vert in ring]
+
+
 def add_hex_prism_rivet(bm, position, normal, radius=0.02, height=0.012):
     matrix, _ = aligned_between(Vector(position), Vector(position) + Vector(normal) * height)
     return add_cylinder(bm, radius, height, matrix, segments=6, top_radius=0.0)

@@ -101,6 +101,39 @@ Apple M5 Pro: 24,800 → 18,800 entities and about 26 % less CPU time (≈69 s �
 a mission has 7 % fewer entities and no measurable change in CPU time. Trees, rocks and crystals keep their named
 materials, which the game merges itself (`flat_scenery.rs`, `crystal_models.rs`).
 
+Units and structures also carry their weathering as a vertex colour, `COLOR_0`
+(`tools/blender/rimefront_models/weathering.py`): shade where parts meet or sink into each other, dust rising
+from the ground and gathering in crevices, patches of stain, and a slight tone of its own for every panel and
+fitting. The shade comes from rays cast over the model at rest; wheels, drums and rotors are shaded against
+themselves only and dusted evenly, since they turn. Bevy multiplies a vertex colour into the surface by itself,
+so the game does nothing for it but divide it out again in `side_tint.wesl` to find the key. A flat face holds
+weathering only at its corners, so large faces with an edge over 1.1 m are cut up: the 110 models went from
+366,000 to 391,000 triangles (+6.7 %, almost all of it in structures; a tank gained 1.3 %) and from 26 to
+32 MB. Measured over 40 s of a custom level with 120 idle units and five structures on an Apple M5 Pro, CPU
+time did not change measurably: 39.7 and 46.4 s before, 40.0 and 45.0 s after.
+
+What a vertex colour cannot hold, detail finer than the mesh, `side_tint.wesl` computes for every pixel
+instead of reading a texture: patches of worn paint, streaks down steep faces and a fine grain, each a value
+noise over where the point lies on its own part, so the pattern stays put while a unit drives and a turret
+turns. They lighten or darken the paint and make it a little glossier or duller with it; lamps and glass stay
+clean, and the grain fades out before it gets smaller than a pixel. It costs no texture, memory or draw call,
+only arithmetic on the GPU for the pixels units and structures cover (up to 24 hashes each), which has not
+been measured: capture runs on macOS are held at the display's frame rate.
+
+Infantry of every age share one body (`soldier.py`): limbs are lathed along the bone from a radius profile
+(`THIGH_SHAPE` and the like) instead of straight cylinders, a little heavier than life so a soldier reads as
+a body from the battle camera, and gear worn on a limb follows the profile.
+
+Horses, oxen and the people on them are shared too (`mounts.py`): an animal is lofted from elliptical
+sections along its body, neck, head and legs (`geometry.add_loft`), harnessed for riding, draught or in
+armour, and riders and drivers are the infantry's body seated or standing, dressed by a `MountedKit`.
+
+The vehicles of the ages before and after the modern one were blockouts of 500 to 1,600 triangles; they are
+now built like the modern ones, at 4,400 to 13,400 triangles each (22 units: 32,000 triangles before, 198,000
+after; `assets/models` grew to 45 MB). Measured over 40 s of a custom industrial-age level with 120 of the
+heaviest of them idle in view (armoured cars, landships, lorries, steam harvesters) on an Apple M5 Pro: 31.9
+and 32.9 s of CPU time before, 33.7 and 33.2 s after, about 3 % more.
+
 Writing a unit's `Transform` only when it changes (interpolation, settling on the terrain, separation, turret
 nodes), so Bevy could skip propagating the transforms of units standing still, made no measurable difference:
 over 40 s of a custom level with 120 idle units, 38.9 and 38.2 s of CPU time before, 38.2 and 38.5 s after

@@ -6,6 +6,7 @@ import math
 import bpy
 
 from .materials import PALETTE, TEAM_COLOR_MATERIAL, TEAM_COLORS, Surface
+from .weathering import WEATHERING_ATTRIBUTE
 
 CELL_PIXELS = 4
 PALETTE_MATERIAL = "Palette"
@@ -80,7 +81,15 @@ class ModelPalette:
             links.new(uv_map.outputs["UV"], node.inputs["Vector"])
             return node
 
-        links.new(texture(self.colors).outputs["Color"], bsdf.inputs["Base Color"])
+        weathering = nodes.new("ShaderNodeVertexColor")
+        weathering.layer_name = WEATHERING_ATTRIBUTE
+        weathered = nodes.new("ShaderNodeMix")
+        weathered.data_type = "RGBA"
+        weathered.blend_type = "MULTIPLY"
+        weathered.inputs["Factor"].default_value = 1.0
+        links.new(texture(self.colors).outputs["Color"], weathered.inputs["A"])
+        links.new(weathering.outputs["Color"], weathered.inputs["B"])
+        links.new(weathered.outputs["Result"], bsdf.inputs["Base Color"])
         split = nodes.new("ShaderNodeSeparateColor")
         links.new(texture(self.surface).outputs["Color"], split.inputs["Color"])
         links.new(split.outputs["Green"], bsdf.inputs["Roughness"])

@@ -5,10 +5,11 @@ from mathutils import Vector, noise
 
 from . import geometry as geo
 from .animation import add_recoil_animation, add_rolling_animation, add_spin_animation
-from .details import (add_ammo_box, add_antenna, add_jerrycan, add_outline_band, add_tarp_roll, scaled_outline,
+from .details import (add_ammo_box, add_antenna, add_crate, add_jerrycan, add_outline_band, add_tarp_roll, scaled_outline,
                        add_beacon, add_bolt_circle, add_hazard_stripes, add_ladder, add_lamp,
                       add_pipe_run, add_railing, add_rivets_along, add_smoke_launchers, add_vent_grille,
                       add_wheel_arch)
+from .mounts import MountedKit, add_seated_figure
 from .nature import add_boulder
 from .ore import Crystal, add_crystal
 from .parts import (AUTO_SMOOTH, TURRET, batch, box, current_assembly, cylinder, cylinder_between, group, lathe,
@@ -824,6 +825,7 @@ def build_gunship():
     _add_gunship_tail()
     _add_gunship_skids()
     _add_gunship_weapons()
+    _add_gunship_fittings()
     mast_top = Vector((0.1, 0.0, 1.86))
     cylinder("Steel", 0.07, 0.32, (0.1, 0.0, 1.66), segments=10, name="RotorMast")
     with group(ROTOR, mast_top):
@@ -889,6 +891,39 @@ def _add_gunship_weapons():
             tube = pod + Vector((0.46, math.cos(angle) * 0.07, math.sin(angle) * 0.07))
             cylinder("Gunmetal", 0.022, 0.03, tube, FACING_FRONT, segments=6, name="RocketTube")
     cylinder_between("Gunmetal", (1.45, 0.0, 0.62), (1.85, 0.0, 0.6), 0.035, 8, name="ChinGun")
+
+
+def _add_gunship_fittings():
+    for side in (-1, 1):
+        box("ArmorLight", (0.7, 0.012, 0.5), (-0.1, side * 0.506, 0.98), bevel=0.0, name="CabinDoor")
+        box(GLASS, (0.34, 0.014, 0.2), (-0.05, side * 0.507, 1.18), bevel=0.0, name="DoorWindow")
+        box("Gunmetal", (0.08, 0.02, 0.025), (0.18, side * 0.515, 1.0), bevel=0.0, name="DoorHandle")
+        add_vent_grille((-0.25, side * 0.365, 1.5), 0.6, 0.24, 6, rotation=(side * -math.pi / 2, 0.0, 0.0))
+        box("ArmorDark", (0.3, 0.2, 0.2), (0.25, side * 0.3, 1.5), bevel=0.05, name="EngineIntake")
+        box("Gunmetal", (0.03, 0.16, 0.16), (0.41, side * 0.3, 1.5), bevel=0.0, name="IntakeMesh")
+        cylinder_between("Steel", (0.05, side * 0.5, 0.92), (0.05, side * 0.9, 0.9), 0.025, 6, name="PylonSpar")
+        cylinder_between("ArmorDark", (-0.25, side * 0.6, 0.8), (0.45, side * 0.6, 0.8), 0.045, 8, name="GuidedMissile")
+        cylinder_between("WarningLight", (0.45, side * 0.6, 0.8), (0.55, side * 0.6, 0.8), 0.045, 8, end_radius=0.01,
+                         name="MissileSeeker")
+        box("SignalGreen" if side > 0 else "WarningLight", (0.04, 0.03, 0.03), (0.05, side * 1.01, 0.94), bevel=0.0,
+            name="NavigationLight")
+        box("Armor", (0.3, 0.02, 0.26), (-2.7, side * 0.45, 1.42), bevel=0.008, name="TailPlaneFin")
+    box("Gunmetal", (0.22, 0.2, 0.16), (1.5, 0.0, 0.62), bevel=0.04, name="ChinTurret")
+    sphere(GLASS, 0.09, (1.6, 0.0, 0.84), segments=10, rings=6, name="SensorBall")
+    box("ArmorDark", (0.03, 0.03, 0.5), (1.15, 0.0, 1.14), (0.0, math.radians(18), 0.0), bevel=0.0, name="CanopyFrame")
+    box("ArmorDark", (0.6, 0.03, 0.03), (1.13, 0.0, 1.37), (0.0, math.radians(18), 0.0), bevel=0.0, name="CanopySpine")
+    for k in range(4):
+        angle = k * math.pi / 2 + math.pi / 4
+        reach = Vector((math.cos(angle), math.sin(angle), 0.0))
+        cylinder_between("Steel", Vector((0.1, 0.0, 1.74)) + reach * 0.12, Vector((0.1, 0.0, 1.84)) + reach * 0.3, 0.012,
+                         4, name="PitchLink")
+    cylinder("Gunmetal", 0.13, 0.03, (0.1, 0.0, 1.74), segments=12, name="Swashplate")
+    cylinder_between("Gunmetal", (-3.18, 0.0, 1.52), (-3.18, 0.12, 1.52), 0.035, 6, name="TailGearbox")
+    cylinder_between("Gunmetal", (-3.2, 0.0, 1.3), (-3.3, 0.0, 1.1), 0.02, 5, name="TailSkid")
+    for x in (-1.4, -2.0, -2.6):
+        add_bolt_circle((x, 0.0, 1.18 + (-0.8 - x) * 0.1), 0.2 + (x + 0.8) * 0.05, 8, normal=(1, 0, 0),
+                        bolt_radius=0.012)
+    box("WarningLight", (0.05, 0.05, 0.04), (-0.75, 0.0, 1.68), bevel=0.01, name="AntiCollisionLight")
 
 
 FLAK_ELEVATION = math.radians(55)
@@ -970,6 +1005,9 @@ def build_missile_truck():
         add_lamp((1.62, side * 0.45, 0.75), FACING_FRONT, radius=0.05, depth=0.05)
     box("Armor", (1.6, 1.3, 0.12), (-0.25, 0.0, 0.67), bevel=0.02, name="Bed")
     add_jerrycan((-1.1, 0.55, 0.73))
+    _add_truck_cab_fittings(cab_rear=0.75, roof_z=1.45)
+    _add_truck_running_gear([1.0, -0.3, -1.0], track, wheel_radius, wheel_width)
+    _add_missile_truck_bed()
     pivot = Vector((-0.35, 0.0, 0.73))
     with group(TURRET, pivot):
         cylinder("ArmorDark", 0.42, 0.1, pivot + Vector((0, 0, 0.05)), segments=20, name="RackRing")
@@ -987,6 +1025,7 @@ def build_missile_truck():
                                               y, 0.66 * math.sin(MISSILE_RACK_ELEVATION) + z))
                     cylinder("Gunmetal", 0.06, 0.04, tip, (0, math.pi / 2 - MISSILE_RACK_ELEVATION, 0),
                              segments=8, name="TubeMouth")
+            _add_rocket_rack_fittings(rack_root, tilt)
     animate_vehicle(ground_speed=4.0, recoil=Vector((-MISSILE_TRUCK_RECOIL, 0.0, 0.0)))
 
 
@@ -1017,6 +1056,9 @@ def build_repair_truck():
     for k, material_name in enumerate(("WarningLight", "Steel")):
         cylinder(material_name, 0.08, 0.5, (-0.95, (k - 0.5) * 0.2, 0.98), segments=10, name="WeldingBottle")
     _add_service_crane(Vector((-0.25, 0.0, 0.73)))
+    _add_truck_cab_fittings(cab_rear=0.6, roof_z=1.42)
+    _add_truck_running_gear([0.95, -0.85], track, wheel_radius, wheel_width)
+    _add_workshop_fittings()
     add_hazard_stripes((-1.12, 0.0, 0.58), 0.05, 1.0, (0.0, math.pi / 2, 0.0))
     animate_vehicle(ground_speed=4.5)
 
@@ -1052,6 +1094,7 @@ def build_stealth_tank():
             bevel=0.0, name="SideTeamStripe")
     box("Webbing", (0.7, 1.2, 0.08), (-1.0, 0.0, deck_z + 0.04), bevel=0.03, name="CamouflageNetRoll")
     add_lamp((1.42, 0.5, 0.62), FACING_FRONT, radius=0.03, depth=0.04, lens="WarningLight")
+    _add_stealth_hull_fittings(deck_z, track_height)
     pivot = Vector((-0.05, 0.0, deck_z))
     with group(TURRET, pivot):
         turret = [(-0.75, -0.55), (0.55, -0.45), (0.8, 0.0), (0.55, 0.45), (-0.75, 0.55)]
@@ -1059,6 +1102,7 @@ def build_stealth_tank():
              name="WedgeTurret")
         box("TeamColor", (0.3, 0.3, 0.012), pivot + Vector((-0.35, 0.0, 0.265)), bevel=0.0, name="TurretTeamPlate")
         cylinder("Gunmetal", 0.05, 0.12, pivot + Vector((-0.2, 0.3, 0.32)), segments=8, name="Sensor")
+        _add_stealth_turret_fittings(pivot)
         pod_root = pivot + Vector((0.1, 0.0, 0.36))
         with group(BARREL, pod_root, parent=TURRET):
             for side in (-1, 1):
@@ -1091,21 +1135,166 @@ def build_raider_bike():
         pod = Vector((0.42, side * 0.26, 0.78))
         box("Armor", (0.42, 0.12, 0.12), pod, bevel=0.015, name="RocketPod")
         cylinder("Gunmetal", 0.035, 0.03, pod + Vector((0.22, 0.0, 0.0)), FACING_FRONT, segments=8, name="PodMouth")
+    _add_bike_fittings()
     _add_bike_rider()
     animate_vehicle(ground_speed=6.0)
 
 
-def _add_bike_rider():
-    """A crouched rider in the saddle; part of the bike's mesh, as the bike carries no skeleton."""
-    box("Uniform", (0.32, 0.3, 0.24), (-0.25, 0.0, 1.0), bevel=0.04, name="RiderHips")
-    box("Uniform", (0.34, 0.34, 0.42), (-0.08, 0.0, 1.28), (0, math.radians(-35), 0), bevel=0.05, name="RiderTorso")
-    box("Webbing", (0.16, 0.3, 0.34), (-0.27, 0.0, 1.32), (0, math.radians(-35), 0), bevel=0.03, name="RiderPack")
-    sphere("Armor", 0.13, (0.12, 0.0, 1.55), name="RiderHelmet")
-    box("TeamColor", (0.05, 0.2, 0.06), (0.24, 0.0, 1.56), bevel=0.0, name="RiderVisorBand")
+def _add_bike_fittings():
     for side in (-1, 1):
-        cylinder_between("Uniform", (0.0, side * 0.17, 1.42), (0.42, side * 0.3, 1.02), 0.05, 6, name="RiderArm")
-        cylinder_between("Uniform", (-0.22, side * 0.15, 0.98), (0.08, side * 0.2, 0.7), 0.065, 6, name="RiderThigh")
-        cylinder_between("Uniform", (0.08, side * 0.2, 0.7), (-0.05, side * 0.2, 0.4), 0.055, 6, name="RiderShin")
+        cylinder_between("Gunmetal", (0.72, side * 0.1, 0.34), (0.48, side * 0.1, 0.95), 0.022, 6, name="ForkLeg")
+        cylinder_between("Gunmetal", (-0.62, side * 0.1, 0.34), (-0.4, side * 0.1, 0.8), 0.02, 6, name="RearShock")
+        cylinder("Rubber", 0.028, 0.1, (0.48, side * 0.29, 1.0), WHEEL_AXIS_ROTATION_Y, segments=8, name="Grip")
+        box("Gunmetal", (0.12, 0.08, 0.02), (-0.05, side * 0.2, 0.44), bevel=0.004, name="Footrest")
+        box("Webbing", (0.34, 0.1, 0.24), (-0.55, side * 0.2, 0.7), bevel=0.04, name="SaddleBag")
+    for x in (0.72, -0.62):
+        add_wheel_arch(Vector((x, 0.0, 0.34)), 0.34, 0.14, material_name="Armor", clearance=0.03, thickness=0.02)
+    box("Gunmetal", (0.34, 0.24, 0.26), (0.02, 0.0, 0.55), bevel=0.04, name="EngineBlock")
+    for k in range(4):
+        box("Steel", (0.3, 0.3, 0.012), (0.02, 0.0, 0.6 + k * 0.035), bevel=0.0, name="CoolingFin")
+    cylinder("Gunmetal", 0.06, 0.03, (-0.62, 0.11, 0.34), WHEEL_AXIS_ROTATION_Y, segments=10, name="Sprocket")
+    box("Gunmetal", (0.62, 0.012, 0.03), (-0.31, 0.11, 0.42), (0.0, math.radians(-16), 0.0), bevel=0.0, name="Chain")
+    box("WarningLight", (0.03, 0.1, 0.04), (-0.91, 0.0, 0.61), bevel=0.0, name="TailLight")
+    add_antenna((-0.6, -0.1, 0.84), 0.9)
+    add_tarp_roll((-0.62, -0.14, 0.9), (-0.62, 0.14, 0.9), radius=0.055)
+
+
+def _add_riders_helmet(head):
+    sphere("Armor", 0.13, head + Vector((0.0, 0.0, 0.02)), segments=12, rings=7, name="RiderHelmet")
+    box(GLASS, (0.06, 0.2, 0.08), head + Vector((0.1, 0.0, 0.01)), bevel=0.02, name="RiderGoggles")
+    box("TeamColor", (0.2, 0.05, 0.03), head + Vector((0.0, 0.0, 0.14)), bevel=0.0, name="RiderHelmetStripe")
+
+
+BIKE_RIDER_KIT = MountedKit(coat="Uniform", legs="Uniform", boots="Rubber", cuirass="Webbing", sash="Webbing",
+                            add_headgear=_add_riders_helmet)
+BIKE_SADDLE = Vector((-0.3, 0.0, 0.92))
+BIKE_RIDER_LEAN = math.radians(36)
+
+
+def _add_bike_rider():
+    """Part of the bike's mesh, as the bike carries no skeleton."""
+    add_seated_figure(BIKE_SADDLE, BIKE_RIDER_KIT, knee_spread=0.2, rein_hand=Vector((0.48, 0.29, 1.0)),
+                      weapon_hand=Vector((0.48, -0.29, 1.0)), lean=BIKE_RIDER_LEAN)
+    box("Webbing", (0.16, 0.3, 0.32), BIKE_SADDLE + Vector((-0.02, 0.0, 0.5)), (0.0, BIKE_RIDER_LEAN, 0.0), bevel=0.04,
+        name="RiderPack")
+    box("TeamColor", (0.02, 0.2, 0.12), BIKE_SADDLE + Vector((-0.11, 0.0, 0.47)), (0.0, BIKE_RIDER_LEAN, 0.0),
+        bevel=0.0, name="RiderPackMark")
+
+
+def _add_truck_cab_fittings(cab_rear, roof_z):
+    """Doors, glass, mirrors, bumper and grille for the cab shared by the wheeled trucks, 0.87 m long."""
+    front = cab_rear + 0.87
+    add_vent_grille((front + 0.012, 0.0, 0.9), 0.36, 0.7, 6, rotation=(0.0, math.pi / 2, 0.0))
+    box("ArmorDark", (0.12, 1.4, 0.16), (front + 0.07, 0.0, 0.56), bevel=0.03, name="Bumper")
+    cylinder("Gunmetal", 0.07, 0.34, (front + 0.1, 0.0, 0.68), WHEEL_AXIS_ROTATION_Y, segments=10, name="WinchDrum")
+    box("ArmorLight", (0.34, 0.4, 0.012), (cab_rear + 0.34, 0.0, roof_z + 0.006), bevel=0.0, name="RoofHatch")
+    add_antenna((cab_rear + 0.1, -0.5, roof_z), 0.9)
+    for side in (-1, 1):
+        box("ArmorLight", (0.5, 0.014, 0.5), (cab_rear + 0.36, side * 0.652, 0.93), bevel=0.0, name="CabDoor")
+        box(GLASS, (0.34, 0.016, 0.17), (cab_rear + 0.36, side * 0.653, 1.27), bevel=0.0, name="DoorWindow")
+        box("Gunmetal", (0.08, 0.02, 0.025), (cab_rear + 0.18, side * 0.662, 1.0), bevel=0.0, name="DoorHandle")
+        add_rivets_along((cab_rear + 0.12, side * 0.66, 0.7), (cab_rear + 0.6, side * 0.66, 0.7), 5,
+                         normal=(0, side, 0), radius=0.012)
+        box("Gunmetal", (0.3, 0.14, 0.025), (cab_rear + 0.36, side * 0.72, 0.5), bevel=0.005, name="CabStep")
+        cylinder_between("Gunmetal", (front - 0.2, side * 0.65, 1.22), (front - 0.16, side * 0.8, 1.26), 0.012, 4,
+                         name="MirrorArm")
+        box("Gunmetal", (0.02, 0.07, 0.13), (front - 0.16, side * 0.81, 1.27), bevel=0.004, name="Mirror")
+        box("Gunmetal", (0.06, 0.05, 0.08), (front + 0.15, side * 0.4, 0.56), bevel=0.01, name="TowHook")
+        box("SignalGreen" if side > 0 else "WarningLight", (0.02, 0.05, 0.03), (front - 0.3, side * 0.6, roof_z + 0.02),
+            bevel=0.0, name="MarkerLight")
+    cylinder_between("Steel", (cab_rear - 0.08, 0.55, 0.62), (cab_rear - 0.08, 0.55, roof_z + 0.25), 0.04, 8,
+                     name="ExhaustStack")
+    cylinder("Gunmetal", 0.05, 0.3, (cab_rear - 0.08, 0.55, roof_z - 0.1), segments=8, name="ExhaustShield")
+
+
+def _add_truck_running_gear(axle_positions, track, wheel_radius, wheel_width):
+    for x in axle_positions:
+        cylinder_between("Gunmetal", (x, -track, wheel_radius), (x, track, wheel_radius), 0.045, 8, name="Axle")
+        box("Gunmetal", (0.22, 0.22, 0.2), (x, 0.0, wheel_radius), bevel=0.05, name="Differential")
+        for side in (-1, 1):
+            add_wheel_arch(Vector((x, side * track, wheel_radius)), wheel_radius, wheel_width)
+            box("Steel", (0.5, 0.05, 0.04), (x, side * 0.45, wheel_radius + 0.1), bevel=0.008, name="LeafSpring")
+    middle = (axle_positions[0] + axle_positions[1]) / 2
+    for side in (-1, 1):
+        cylinder_between("ArmorLight", (middle - 0.24, side * 0.6, 0.47), (middle + 0.24, side * 0.6, 0.47), 0.13, 12,
+                         name="FuelTank")
+        for x in (middle - 0.14, middle + 0.14):
+            cylinder_between("ArmorDark", (x - 0.02, side * 0.6, 0.47), (x + 0.02, side * 0.6, 0.47), 0.136, 12,
+                             name="FuelTankStrap")
+    cylinder_between("Gunmetal", (axle_positions[0], 0.0, wheel_radius + 0.02),
+                     (axle_positions[-1], 0.0, wheel_radius + 0.02), 0.035, 6, name="DriveShaft")
+
+
+def _add_missile_truck_bed():
+    for side in (-1, 1):
+        box("ArmorDark", (1.6, 0.04, 0.16), (-0.25, side * 0.64, 0.8), bevel=0.01, name="BedRail")
+        add_rivets_along((-0.95, side * 0.662, 0.8), (0.45, side * 0.662, 0.8), 7, normal=(0, side, 0), radius=0.012)
+        cylinder_between("Steel", (-1.0, side * 0.6, 0.64), (-1.0, side * 0.6, 0.12), 0.035, 8, name="StabiliserJack")
+        cylinder("Gunmetal", 0.1, 0.03, (-1.0, side * 0.6, 0.1), segments=10, name="JackFoot")
+        box("TeamColor", (0.6, 0.012, 0.08), (-0.25, side * 0.665, 0.86), bevel=0.0, name="BedTeamStripe")
+    add_ammo_box((0.4, -0.45, 0.73), size=(0.34, 0.2, 0.16))
+    add_crate((0.38, 0.4, 0.73), (0.34, 0.3, 0.22), rotation_z=0.1, material_name="ArmorLight")
+    add_hazard_stripes((-1.07, 0.0, 0.62), 0.05, 1.2, (0.0, math.pi / 2, 0.0))
+    box("ArmorDark", (0.05, 1.2, 0.34), (0.62, 0.0, 0.9), bevel=0.01, name="BlastShield")
+
+
+def _add_rocket_rack_fittings(rack_root, tilt):
+    along = Vector((math.cos(MISSILE_RACK_ELEVATION), 0.0, math.sin(MISSILE_RACK_ELEVATION)))
+    for share in (-0.4, 0.0, 0.4):
+        box("ArmorDark", (0.05, 0.99, 0.44), rack_root + along * share, tilt, bevel=0.008, name="RackRib")
+    box("ArmorDark", (0.04, 0.9, 0.34), rack_root - along * 0.66, tilt, bevel=0.0, name="RackBackPlate")
+    for side in (-1, 1):
+        cylinder_between("Steel", rack_root + Vector((-0.1, side * 0.3, -0.28)), rack_root + along * 0.3
+                         + Vector((0.0, side * 0.3, -0.16)), 0.03, 8, name="ElevationRam")
+        box("Gunmetal", (0.1, 0.06, 0.14), rack_root + Vector((-0.1, side * 0.52, -0.2)), bevel=0.015,
+            name="TrunnionBracket")
+    box("Gunmetal", (0.12, 0.1, 0.1), rack_root + along * 0.2 + Vector((0.0, -0.55, 0.12)), tilt, bevel=0.02,
+        name="RackSight")
+
+
+def _add_workshop_fittings():
+    for side in (-1, 1):
+        for x in (-0.75, -0.05):
+            box("Gunmetal", (0.03, 0.012, 0.2), (x + 0.33, side * 0.636, 0.86), bevel=0.0, name="ToolboxHinge")
+    box("ArmorDark", (0.36, 0.5, 0.3), (0.3, 0.0, 0.88), bevel=0.03, name="Generator")
+    add_vent_grille((0.3, 0.0, 1.03), 0.3, 0.4, 5)
+    add_pipe_run([(-0.95, -0.1, 1.24), (-0.95, -0.1, 1.34), (-0.4, -0.3, 1.34), (-0.25, -0.3, 0.95)], 0.012,
+                 material_name="Rubber", segments=6)
+    cylinder("Rubber", 0.19, 0.12, (-1.14, 0.3, 0.9), (0.0, math.pi / 2, 0.0), segments=14, name="SpareWheel")
+    cylinder("ArmorDark", 0.09, 0.13, (-1.14, 0.3, 0.9), (0.0, math.pi / 2, 0.0), segments=10, name="SpareWheelHub")
+    add_jerrycan((0.32, 0.5, 0.73))
+    add_jerrycan((0.32, -0.5, 0.73))
+    box("Steel", (0.5, 0.03, 0.03), (-0.4, 0.3, 0.76), bevel=0.0, name="TowBar")
+    box("MedicalWhite", (0.2, 0.012, 0.2), (0.96, 0.66, 0.93), bevel=0.0, name="WorkshopMark")
+    box("MedicalWhite", (0.2, 0.012, 0.2), (0.96, -0.66, 0.93), bevel=0.0, name="WorkshopMark")
+
+
+def _add_stealth_hull_fittings(deck_z, track_height):
+    for side in (-1, 1):
+        add_vent_grille((-1.05, side * 0.52, deck_z + 0.005), 0.4, 0.3, 6, frame_material="ArmorDark")
+        box("Armor", (0.9, 0.5, 0.012), (0.2, side * 0.62, deck_z + 0.006), bevel=0.0, name="DeckPanel")
+        add_rivets_along((-0.2, side * 0.84, deck_z + 0.012), (0.6, side * 0.84, deck_z + 0.012), 5, radius=0.012,
+                         material_name="Gunmetal")
+        box("Gunmetal", (0.3, 0.08, 0.05), (-1.47, side * 0.5, 0.5), bevel=0.01, name="ExhaustBaffle")
+        box("Gunmetal", (0.06, 0.05, 0.08), (1.56, side * 0.4, 0.42), bevel=0.01, name="TowHook")
+        box("Armor", (0.5, 0.36, 0.012), (0.95, side * 0.42, (deck_z + 0.5) / 2 + 0.105), (0.0, math.radians(31), 0.0),
+            bevel=0.0, name="GlacisPanel")
+    box("Armor", (0.36, 0.4, 0.025), (0.72, 0.0, deck_z + 0.012), bevel=0.008, name="DriverHatch")
+    box(GLASS, (0.03, 0.26, 0.04), (0.93, 0.0, deck_z + 0.03), bevel=0.0, name="DriverPeriscope")
+    add_tarp_roll((-1.36, -0.5, deck_z + 0.16), (-1.36, 0.5, deck_z + 0.16), radius=0.06)
+    box("TeamColor", (0.5, 0.5, 0.012), (-0.95, 0.0, deck_z + 0.09), bevel=0.0, name="NetRollMark")
+
+
+def _add_stealth_turret_fittings(pivot):
+    cylinder("ArmorDark", 0.2, 0.04, pivot + Vector((-0.35, -0.25, 0.27)), segments=12, name="CommanderHatch")
+    box(GLASS, (0.14, 0.1, 0.07), pivot + Vector((0.42, 0.0, 0.3)), bevel=0.015, name="GunnerSight")
+    cylinder_between("Gunmetal", pivot + Vector((-0.2, 0.3, 0.38)), pivot + Vector((-0.2, 0.3, 0.62)), 0.02, 6,
+                     name="SensorMast")
+    box("Gunmetal", (0.1, 0.14, 0.08), pivot + Vector((-0.2, 0.3, 0.66)), bevel=0.02, name="SensorHead")
+    add_antenna(pivot + Vector((-0.65, -0.4, 0.24)), 1.0)
+    for side in (-1, 1):
+        box("Armor", (0.3, 0.012, 0.1), pivot + Vector((0.1, side * 0.535, 0.36)), bevel=0.0, name="PodAccessPanel")
+        add_smoke_launchers(pivot + Vector((0.45, side * 0.3, 0.2)), side * math.radians(30), count=2)
 
 
 BOMBER_AXIS_Z = 1.0
@@ -1384,6 +1573,8 @@ def build_troop_carrier():
         cylinder("ArmorDark", 0.2, 0.06, (x, 0.0, 1.18), segments=16, name="RoofHatch")
     add_vent_grille((1.35, 0.0, 0.98), 0.3, 0.5, 5, rotation=(0, math.radians(-36), 0))
     add_antenna((-1.3, 0.45, 1.15), 1.0)
+    _add_carrier_hull_fittings(wheel_radius, wheel_width, wheel_y)
+    _add_carrier_stowage()
     pivot = Vector((0.15, 0.0, 1.17))
     with group(TURRET, pivot):
         cylinder("Armor", 0.36, 0.22, pivot + Vector((0, 0, 0.11)), segments=16, top_radius=0.3,
@@ -1391,4 +1582,49 @@ def build_troop_carrier():
         box("TeamColor", (0.3, 0.012, 0.08), (pivot.x, 0.33, pivot.z + 0.12), bevel=0.0, name="TurretTeamMark")
         lathe("Gunmetal", [(0.0, 0.0), (0.04, 0.0), (0.04, 0.1), (0.028, 0.12), (0.028, 0.72), (0.0, 0.72)],
               (pivot.x + 0.25, 0.0, pivot.z + 0.13), FACING_FRONT, segments=10, name="GunBarrel")
+        box("ArmorDark", (0.2, 0.2, 0.14), pivot + Vector((0.3, 0.0, 0.13)), bevel=0.03, name="GunMantlet")
+        cylinder("ArmorDark", 0.13, 0.03, pivot + Vector((-0.1, 0.0, 0.235)), segments=12, name="TurretHatch")
+        box(GLASS, (0.06, 0.1, 0.05), pivot + Vector((0.16, -0.18, 0.24)), bevel=0.01, name="TurretSight")
+        for side in (-1, 1):
+            add_smoke_launchers(pivot + Vector((0.12, side * 0.34, 0.12)), side * math.radians(40), count=2)
     animate_vehicle(ground_speed=4.2)
+
+
+def _add_carrier_hull_fittings(wheel_radius, wheel_width, wheel_y):
+    for x in (1.05, 0.0, -1.05):
+        cylinder_between("Gunmetal", (x, -wheel_y, wheel_radius), (x, wheel_y, wheel_radius), 0.05, 8, name="Axle")
+        for side in (-1, 1):
+            add_wheel_arch(Vector((x, side * wheel_y, wheel_radius)), wheel_radius, wheel_width)
+    for side in (-1, 1):
+        box("ArmorLight", (0.5, 0.012, 0.42), (-0.6, side * 0.688, 0.84), bevel=0.0, name="SideDoor")
+        box("Gunmetal", (0.06, 0.02, 0.025), (-0.42, side * 0.7, 0.86), bevel=0.0, name="SideDoorHandle")
+        add_rivets_along((-1.45, side * 0.742, 1.0), (1.1, side * 0.742, 1.0), 14, normal=(0, side, 0), radius=0.012)
+        for x in (0.3, -0.1, -0.95, -1.3):
+            cylinder("Gunmetal", 0.035, 0.02, (x, side * 0.69, 1.03), WHEEL_AXIS_ROTATION_Y, segments=8,
+                     name="FiringPort")
+        box("Gunmetal", (0.06, 0.05, 0.08), (1.74, side * 0.4, 0.6), bevel=0.01, name="TowHook")
+        box("WarningLight", (0.02, 0.1, 0.05), (-1.69, side * 0.5, 1.02), bevel=0.0, name="TailLight")
+        cylinder_between("Gunmetal", (1.25, side * 0.6, 1.15), (1.3, side * 0.74, 1.2), 0.012, 4, name="MirrorArm")
+        box("Gunmetal", (0.02, 0.07, 0.11), (1.3, side * 0.75, 1.22), bevel=0.004, name="Mirror")
+    box("ArmorLight", (0.9, 1.2, 0.03), (1.47, 0.0, 0.93), (0.0, math.radians(-36), 0.0), bevel=0.008, name="TrimVane")
+    box("ArmorLight", (0.4, 0.44, 0.03), (0.85, 0.36, 1.165), bevel=0.008, name="DriverHatch")
+    for y in (0.22, 0.36, 0.5):
+        box(GLASS, (0.04, 0.1, 0.05), (1.08, y, 1.19), bevel=0.008, name="DriverPeriscope")
+    for x in (-0.55, -1.05):
+        box("Gunmetal", (0.05, 0.14, 0.03), (x - 0.2, 0.0, 1.2), bevel=0.0, name="HatchHinge")
+        box("Gunmetal", (0.03, 0.08, 0.04), (x + 0.12, 0.0, 1.22), bevel=0.0, name="HatchHandle")
+    cylinder_between("Steel", (-0.2, -0.6, 1.2), (-1.2, -0.6, 1.2), 0.06, 10, name="ExhaustMuffler")
+    cylinder_between("Steel", (-1.2, -0.6, 1.2), (-1.42, -0.66, 1.24), 0.03, 6, name="ExhaustTip")
+    box("ArmorDark", (0.9, 1.0, 0.012), (-1.672, 0.0, 0.75), (0.0, math.pi / 2, 0.0), bevel=0.0, name="RampPanel")
+    for side in (-1, 1):
+        box("Gunmetal", (0.04, 0.12, 0.06), (-1.68, side * 0.4, 0.38), bevel=0.0, name="RampHinge")
+
+
+def _add_carrier_stowage():
+    add_tarp_roll((-1.5, -0.45, 1.22), (-1.5, 0.45, 1.22), radius=0.07)
+    add_jerrycan((-1.2, -0.3, 1.15), heading=math.pi / 2)
+    add_ammo_box((-0.2, 0.45, 1.15), heading=0.1)
+    cylinder_between("Timber", (0.9, -0.5, 1.19), (0.1, -0.5, 1.19), 0.016, 5, name="ShovelHandle")
+    box("Gunmetal", (0.2, 0.14, 0.02), (1.0, -0.5, 1.19), bevel=0.005, name="ShovelBlade")
+    cylinder("Rubber", 0.2, 0.14, (-0.75, -0.3, 1.24), segments=14, name="SpareWheel")
+    cylinder("ArmorDark", 0.1, 0.15, (-0.75, -0.3, 1.24), segments=10, name="SpareWheelHub")

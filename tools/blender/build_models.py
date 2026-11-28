@@ -16,6 +16,7 @@ from rimefront_models.materials import TEAM_COLOR_MATERIAL, set_team_color  # no
 from rimefront_models.palette import PALETTE_MATERIAL, convert_to_palette  # noqa: E402
 from rimefront_models.parts import TURRET, begin_model  # noqa: E402
 from rimefront_models.pipeline import export_glb, inspect_glb, render_icon, render_preview, reset_scene  # noqa: E402
+from rimefront_models.weathering import bake_weathering  # noqa: E402
 
 # A model is exported once, its side's colour a key the game replaces; previews and icons show the first side.
 EXPORTED_TEAM = "key"
@@ -315,6 +316,7 @@ def build_all(arguments):
         has_teams = model_id in TEAM_MODELS
         palette = convert_to_palette(root) if has_teams else None
         if has_teams:
+            bake_weathering(root)
             palette.set_team(PREVIEW_TEAM)
         if not arguments.no_previews:
             render_preview(root, arguments.previews / f"{model_id}.png")

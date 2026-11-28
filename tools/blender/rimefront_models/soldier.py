@@ -9,7 +9,7 @@ from mathutils import Euler, Matrix, Quaternion, Vector
 from . import geometry as geo
 from .animation import finish_rig_action, frames_for, start_rig_action
 from .details import add_pipe_run
-from .parts import BODY, box, current_assembly, cylinder, cylinder_between, group, lathe, sphere
+from .parts import AUTO_SMOOTH, BODY, box, current_assembly, cylinder, cylinder_between, group, lathe, part, sphere
 
 GLASS = "Glass"
 FACING_FRONT = (0.0, math.pi / 2, 0.0)
@@ -17,6 +17,16 @@ RIG_NAME = "Rig"
 WEAPON_BONE = "rifle"
 HELMET_SCALE = 1.1
 UPPER_ARM_LENGTH, FOREARM_LENGTH = 0.27, 0.28
+
+# Radius along each limb as (share of its length, radius): clothed muscle instead of a straight stick, a little
+# heavier than life so a soldier still reads as a body from the battle camera.
+THIGH_SHAPE = ((0.0, 0.088), (0.2, 0.096), (0.65, 0.082), (1.0, 0.07))
+SHIN_SHAPE = ((0.0, 0.066), (0.28, 0.076), (0.7, 0.06), (0.88, 0.068), (1.0, 0.06))
+UPPER_ARM_SHAPE = ((0.0, 0.062), (0.3, 0.07), (1.0, 0.055))
+FOREARM_SHAPE = ((0.0, 0.054), (0.3, 0.06), (1.0, 0.044))
+LIMB_SEGMENTS = 12
+KNEE_RADIUS, ELBOW_RADIUS, SHOULDER_RADIUS, HAND_RADIUS = 0.072, 0.057, 0.092, 0.05
+ARMBAND_ALONG_UPPER_ARM = 0.45
 
 HIP_JOINT = {"L": Vector((0.0, 0.1, 0.94)), "R": Vector((0.0, -0.1, 0.94))}
 KNEE = {"L": Vector((0.1, 0.115, 0.52)), "R": Vector((-0.01, -0.115, 0.52))}
@@ -88,6 +98,29 @@ def make_skeleton(kit):
     return bones
 
 
+def limb_radius(shape, along):
+    for (start, start_radius), (end, end_radius) in zip(shape, shape[1:]):
+        if along <= end:
+            return start_radius + (end_radius - start_radius) * (along - start) / (end - start)
+    return shape[-1][1]
+
+
+def limb(material_name, start, end, shape, name):
+    matrix, length = geo.aligned_between(start, end)
+    profile = [(radius, (along - 0.5) * length) for along, radius in shape]
+    return part(material_name, lambda bm: geo.add_lathe(bm, profile, matrix, LIMB_SEGMENTS), shading=AUTO_SMOOTH,
+                name=name)
+
+
+def add_armband(build, side, half_width, proud, material_name, name):
+    shoulder, elbow = SHOULDER[side], build.kit.elbow[side]
+    band = shoulder.lerp(elbow, ARMBAND_ALONG_UPPER_ARM)
+    direction = (elbow - shoulder).normalized()
+    radius = limb_radius(UPPER_ARM_SHAPE, ARMBAND_ALONG_UPPER_ARM) + proud
+    cylinder_between(material_name, band - direction * half_width, band + direction * half_width, radius,
+                     LIMB_SEGMENTS, name=name)
+
+
 def rest_elbow(shoulder, hand, pole):
     """Elbow position for a resting hand, bending toward pole."""
     to_hand = hand - shoulder
@@ -110,7 +143,7 @@ class SoldierBuild:
         self._add_legs()
         self._add_torso()
         with self.bone_mesh("neck"):
-            cylinder("Skin", 0.05, 0.1, (0.0, 0.0, 1.49), segments=10, name="Neck")
+            cylinder("Skin", 0.057, 0.1, (0.0, 0.0, 1.49), segments=LIMB_SEGMENTS, name="Neck")
         with self.bone_mesh("head"):
             sphere("Skin", 0.1, (0.015, 0.0, 1.6), scale=(1.0, 0.9, 1.05), segments=14, rings=8, name="Head")
             self.kit.add_helmet()
@@ -134,17 +167,20 @@ class SoldierBuild:
         for side, sign in (("L", 1), ("R", -1)):
             hip, knee, ankle = HIP_JOINT[side], KNEE[side], ANKLE[side]
             with self.bone_mesh(f"thigh.{side}"):
-                cylinder_between(self.kit.cloth, hip, knee, 0.078, 10, 0.06, name="Thigh")
-                box(self.kit.gear, (0.06, 0.07, 0.14), hip.lerp(knee, 0.4) + Vector((0, sign * 0.07, 0)), bevel=0.015,
-                    name="ThighPocket")
+                limb(self.kit.cloth, hip, knee, THIGH_SHAPE, "Thigh")
+                pocket_out = limb_radius(THIGH_SHAPE, 0.4) - 0.012
+                box(self.kit.gear, (0.07, 0.07, 0.15), hip.lerp(knee, 0.4) + Vector((0, sign * pocket_out, 0)),
+                    bevel=0.015, name="ThighPocket")
             with self.bone_mesh(f"shin.{side}"):
-                cylinder_between(self.kit.cloth, knee, ankle, 0.058, 10, 0.045, name="Shin")
-                sphere(self.kit.cloth, 0.06, knee, segments=10, rings=6, name="Knee")
-                box(self.kit.gear, (0.05, 0.1, 0.11), knee + Vector((0.055, 0, 0.0)), bevel=0.015, name="KneePad")
+                limb(self.kit.cloth, knee, ankle, SHIN_SHAPE, "Shin")
+                sphere(self.kit.cloth, KNEE_RADIUS, knee, segments=LIMB_SEGMENTS, rings=6, name="Knee")
+                box(self.kit.gear, (0.05, 0.11, 0.12), knee + Vector((KNEE_RADIUS - 0.008, 0, 0.0)), bevel=0.015,
+                    name="KneePad")
             with self.bone_mesh(f"foot.{side}"):
-                box(self.kit.boots, (0.25, 0.11, 0.11), Vector((ankle.x + 0.05, ankle.y, 0.055)), bevel=0.025,
+                box(self.kit.boots, (0.28, 0.13, 0.12), Vector((ankle.x + 0.055, ankle.y, 0.06)), bevel=0.03,
                     name="Boot")
-                box(self.kit.gear, (0.12, 0.1, 0.06), Vector((ankle.x, ankle.y, 0.13)), bevel=0.02, name="BootCuff")
+                box(self.kit.gear, (0.15, 0.14, 0.07), Vector((ankle.x, ankle.y, 0.135)), bevel=0.025,
+                    name="BootCuff")
 
     def _add_torso(self):
         with self.bone_mesh("hips"):
@@ -153,29 +189,32 @@ class SoldierBuild:
             box(self.kit.gear, (0.07, 0.1, 0.07), (0.0, 0.17, 1.03), bevel=0.015, name="BeltPouch")
             box(self.kit.gear, (0.07, 0.1, 0.07), (-0.04, -0.17, 1.03), bevel=0.015, name="BeltPouch")
         with self.bone_mesh("spine"):
-            box(self.kit.cloth, (0.2, 0.33, 0.16), (0.0, 0.0, 1.11), bevel=0.05, name="Waist")
+            box(self.kit.cloth, (0.21, 0.35, 0.16), (0.0, 0.0, 1.11), bevel=0.05, name="Waist")
         with self.bone_mesh("chest"):
-            box(self.kit.cloth, (0.22, 0.36, 0.3), (0.0, 0.0, 1.3), (0, math.radians(6), 0), bevel=0.06, name="Torso")
-            box(self.kit.gear, (0.27, 0.34, 0.3), (0.01, 0.0, 1.25), (0, math.radians(6), 0), bevel=0.03,
+            box(self.kit.cloth, (0.24, 0.4, 0.3), (0.0, 0.0, 1.3), (0, math.radians(6), 0), bevel=0.07, name="Torso")
+            box(self.kit.gear, (0.29, 0.37, 0.3), (0.01, 0.0, 1.25), (0, math.radians(6), 0), bevel=0.03,
                 name="PlateCarrier")
             for y in (-0.1, 0.0, 0.1):
-                box(self.kit.gear, (0.06, 0.08, 0.1), (0.155, y, 1.15), (0, math.radians(6), 0), bevel=0.015,
+                box(self.kit.gear, (0.06, 0.08, 0.1), (0.165, y, 1.15), (0, math.radians(6), 0), bevel=0.015,
                     name="MagPouch")
             for sign in (-1, 1):
-                sphere(self.kit.cloth, 0.083, (0.0, sign * 0.2, 1.39), segments=10, rings=6, name="Shoulder")
-                box("TeamColor", (0.09, 0.012, 0.07), (0.0, sign * 0.276, 1.34), bevel=0.0, name="ShoulderPatch")
+                sphere(self.kit.cloth, SHOULDER_RADIUS, (0.0, sign * 0.2, 1.39), segments=LIMB_SEGMENTS, rings=6,
+                       name="Shoulder")
+                box("TeamColor", (0.09, 0.012, 0.07), (0.0, sign * (0.196 + SHOULDER_RADIUS), 1.355), bevel=0.0,
+                    name="ShoulderPatch")
                 box(self.kit.gear, (0.29, 0.06, 0.02), (0.0, sign * 0.11, 1.42), (0, math.radians(6), 0), bevel=0.005,
                     name="ShoulderStrap")
 
     def _add_arm(self, side):
         shoulder, elbow, hand = SHOULDER[side], self.kit.elbow[side], self.kit.hand[side]
         with self.bone_mesh(f"upper_arm.{side}"):
-            cylinder_between(self.kit.cloth, shoulder, elbow, 0.055, 10, 0.045, name="UpperArm")
-            sphere(self.kit.cloth, 0.047, elbow, segments=8, rings=6, name="Elbow")
+            limb(self.kit.cloth, shoulder, elbow, UPPER_ARM_SHAPE, "UpperArm")
+            sphere(self.kit.cloth, ELBOW_RADIUS, elbow, segments=LIMB_SEGMENTS, rings=6, name="Elbow")
         with self.bone_mesh(f"forearm.{side}"):
-            cylinder_between(self.kit.cloth, elbow, hand, 0.045, 10, 0.036, name="Forearm")
+            limb(self.kit.cloth, elbow, hand, FOREARM_SHAPE, "Forearm")
         with self.bone_mesh(f"hand.{side}"):
-            sphere(self.kit.gear, 0.042, hand, scale=(1.1, 0.9, 1.0), segments=10, rings=6, name="Glove")
+            sphere(self.kit.gear, HAND_RADIUS, hand, scale=(1.1, 0.9, 1.0), segments=LIMB_SEGMENTS, rings=6,
+                   name="Glove")
 
     def _rig_and_animate(self, root, merged):
         rig = _create_rig(root, self.skeleton)
@@ -327,14 +366,10 @@ def add_medic_extras(build):
         box("Gunmetal", (0.04, 0.035, 0.07), (0.0, -0.19, 0.99), (0, math.radians(-20), 0), bevel=0.006,
             name="SidearmGrip")
         box("MedicalWhite", (0.1, 0.12, 0.08), (0.04, 0.19, 0.96), bevel=0.015, name="FirstAidPouch")
-    for side, sign in (("L", 1), ("R", -1)):
+    for side in ("L", "R"):
         with build.bone_mesh(f"upper_arm.{side}"):
-            band = SHOULDER[side].lerp(build.kit.elbow[side], 0.45)
-            direction = (build.kit.elbow[side] - SHOULDER[side]).normalized()
-            cylinder_between("MedicalWhite", band - direction * 0.035, band + direction * 0.035, 0.058, 10,
-                             name="Armband")
-            cylinder_between("TeamColor", band - direction * 0.008, band + direction * 0.008, 0.06, 10,
-                             name="ArmbandStripe")
+            add_armband(build, side, 0.035, 0.004, "MedicalWhite", "Armband")
+            add_armband(build, side, 0.008, 0.006, "TeamColor", "ArmbandStripe")
 
 
 def add_hard_hat():
@@ -371,12 +406,8 @@ def add_engineer_extras(build):
         box("Webbing", (0.1, 0.1, 0.1), (0.05, 0.2, 0.92), bevel=0.015, name="ToolPouch")
     for side in ("L", "R"):
         with build.bone_mesh(f"upper_arm.{side}"):
-            band = SHOULDER[side].lerp(build.kit.elbow[side], 0.45)
-            direction = (build.kit.elbow[side] - SHOULDER[side]).normalized()
-            cylinder_between("HazardYellow", band - direction * 0.03, band + direction * 0.03, 0.058, 10,
-                             name="HazardSleeve")
-            cylinder_between("HazardBlack", band - direction * 0.008, band + direction * 0.008, 0.06, 10,
-                             name="HazardSleeveStripe")
+            add_armband(build, side, 0.03, 0.004, "HazardYellow", "HazardSleeve")
+            add_armband(build, side, 0.008, 0.006, "HazardBlack", "HazardSleeveStripe")
 
 
 def add_sniper_rifle():

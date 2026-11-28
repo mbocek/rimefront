@@ -8,6 +8,7 @@ import bpy
 from mathutils import Vector
 
 from .animation import FPS
+from .weathering import WEATHERING_ATTRIBUTE
 
 PREVIEW_RESOLUTION = (640, 480)
 PREVIEW_AZIMUTH = math.radians(-55.0)
@@ -41,6 +42,8 @@ def export_glb(root, path):
         export_cameras=False,
         export_lights=False,
         export_materials="EXPORT",
+        export_vertex_color="NAME",
+        export_vertex_color_name=WEATHERING_ATTRIBUTE,
         export_animations=True,
         export_animation_mode="NLA_TRACKS",
         export_force_sampling=True,

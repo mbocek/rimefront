@@ -236,4 +236,42 @@ Po kroku 2 se zahraje starověk proti moderní éře a rozhodne se, jestli pokra
 
 ## Výsledek
 
-_Doplnit po implementaci: vydržel směr? Co se změnilo? Poučení._
+_Doplněno 2026-11-28._
+
+**Směr vydržel.** Kroky 1–5 jsou hotové:
+
+| Krok | Commit |
+|---|---|
+| 1 a 2 (model ér, starověk, povyšování) | `cafbd2a` |
+| 3 (světy s érami) | `f706629`, `1d6c919` |
+| 4 (Střelný prach) | `f68dd01` |
+| 4 (Průmyslová) | `f500aaa` |
+| 5 (Budoucnost a Projekt) | `f6d6aa8` |
+| 5 (přezdívka) | `d30be56` |
+| 5 (finále a síň slávy) | `00335d4`, `32e47a2` |
+
+Krok 6 zůstává mimo plán. Ve všech krocích zůstaly bitvy moderní éry beze změny, takže se nezměnil `tests/fingerprints.txt`.
+
+Rozhodnutí „éra je vlastnost druhu“ se osvědčilo. Každá éra přibyla bez zásahu do volání `.spec()` a bez změny otisků.
+
+Co se oproti plánu změnilo:
+- Kroky 1 a 2 vyšly jako jeden commit.
+- Linie, která v nějaké éře nemá člena, si drží, co má. Například vůz zůstane vozem i ve Střelném prachu. Obrana může platit přes víc ér (`Eras::Span`): palisáda stojí v obou raných érách, zeď a protiletadlový kanón v Průmyslové i Moderní.
+- Éry a období se počítají z ticku, ne z `MatchClock.elapsed_secs`. Hodiny v `f32` se po dvanácti světových dnech zastaví. Plán světa ukládá aktuální éru a tick jejího začátku, takže vydání, které doplní další éru, uložený svět nevrátí zpět.
+- Strana, kterou zatím nikdo nedrží, se povyšuje zdarma.
+- Projekt existuje jen v perzistentním světě, ne v šarvátce.
+- Projekt se počítá, jen dokud jeho strana není pod ochranou nepřítomných (`32e47a2`). Plán Projekt z ochrany vyjímal. Šlo ale postavit Projekt, odhlásit se a vyhrát.
+- Revize finále našla a uzavřela tyto mezery:
+  - vyřazená strana odchází ze spojenectví;
+  - strop spojenectví počítá skutečně přistupující stranu;
+  - soubory chunků nesou seed, takže nový svět nepřepíše starý;
+  - přezdívka nepropustí znaky nulové šířky ani znaky měnící směr textu.
+- Frakční jednotky Budoucnosti nevznikly. Frakční linie (protitanková, odstřelovač, plamenomet, těžké a stealth tanky a další) mají člena jen v Moderní éře. Obě frakce mají v ostatních érách stejný soupis.
+- Modely ostatních ér byly nejdřív hrubé zástupné tvary (500–1 600 trojúhelníků). V `f30061d` se předělaly na plné modely s opotřebením. Podrobnosti a měření jsou v `docs/development.md`.
+
+Co zůstává otevřené:
+- Ve hře s lidmi se nic neověřilo. Herní test starověku proti moderní éře, který měl proběhnout po kroku 2, není nikde zapsán. Ladicí hodnoty z „Otevřených otázek“ (40 % / 50 %, 12 h, 10 min klidu) tak dál čekají na hraní.
+- Rovnováha (`docs/balance.md`):
+  - Průmyslová éra má obtížnosti v nesprávném pořadí: Hard vyjde proti Normal nastejno a Brutal prohrává s Hard.
+  - Ve Střelném prachu drží Easy krok s Normal.
+- Rozdělit práci po érách a mít automatický nástroj rovnováhy (`balance --era`) bylo správné. Každá éra dostala měřenou matici protivníků dřív, než ji kdo hrál. Hraní ale nenahradí.
